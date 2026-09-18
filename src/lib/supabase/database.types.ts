@@ -56,6 +56,8 @@ export type Database = {
           id: string
           maya_account_name: string | null
           maya_qr_url: string | null
+          gotyme_account_name: string | null
+          gotyme_qr_url: string | null
           name: string
           org_address: string | null
           org_name: string
@@ -78,6 +80,8 @@ export type Database = {
           id?: string
           maya_account_name?: string | null
           maya_qr_url?: string | null
+          gotyme_account_name?: string | null
+          gotyme_qr_url?: string | null
           name: string
           org_address?: string | null
           org_name: string
@@ -100,6 +104,8 @@ export type Database = {
           id?: string
           maya_account_name?: string | null
           maya_qr_url?: string | null
+          gotyme_account_name?: string | null
+          gotyme_qr_url?: string | null
           name?: string
           org_address?: string | null
           org_name?: string
@@ -630,7 +636,7 @@ export type Database = {
         | "rejected"
         | "expired"
         | "cancelled"
-      payment_method: "gcash" | "maya" | "cash"
+      payment_method: "gotyme" | "gcash" | "maya" | "cash"
       staff_role: "admin" | "staff" | "scanner"
       ticket_status: "issued" | "redeemed" | "void"
     }
@@ -653,7 +659,7 @@ export const Constants = {
         "expired",
         "cancelled",
       ],
-      payment_method: ["gcash", "maya", "cash"],
+      payment_method: ["gotyme", "gcash", "maya", "cash"],
       staff_role: ["admin", "staff", "scanner"],
       ticket_status: ["issued", "redeemed", "void"],
     },

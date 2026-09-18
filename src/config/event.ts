@@ -49,3 +49,20 @@ export function shirtSizeSummary(size: ShirtSize): string {
 
 /** Maximum tickets per online order. */
 export const MAX_QTY_PER_TYPE = 10;
+
+/**
+ * Display details per payment method. Which online channels are actually
+ * offered is decided by the events row: a channel shows up on the pay page and
+ * in "I paid with" only when its *_qr_url is set. Currently only GoTyme is set.
+ */
+export const PAYMENT_CHANNELS: Record<PaymentMethod, { label: string; accent: string; hint?: string }> = {
+  gotyme: { label: "GoTyme Bank", accent: "text-teal-600", hint: "InstaPay QR. Scan with GoTyme or any bank / e-wallet app that supports InstaPay QR." },
+  gcash: { label: "GCash", accent: "text-sky-700" },
+  maya: { label: "Maya", accent: "text-emerald-700" },
+  cash: { label: "Cash", accent: "text-zinc-700" },
+};
+
+/** Short phrase for marketing copy ("Pay via ..."). Keep in sync with the channels enabled above. */
+export const PAY_VIA = "GoTyme Bank (InstaPay QR)";
+
+import type { PaymentMethod } from "@/lib/supabase/types";

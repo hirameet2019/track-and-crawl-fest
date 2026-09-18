@@ -9,6 +9,7 @@ import type { AvailabilityRow, TicketTypeRow } from "@/lib/supabase/types";
 import { BandSwatch } from "@/components/BandSwatch";
 import { Reveal } from "@/components/Reveal";
 import { ShirtSizeChartButton, ShirtSizeHint } from "@/components/ShirtSizeChart";
+import { mobileProblem, normalizeMobile, suggestEmail } from "@/lib/contact";
 
 type Attendee = {
   holder_name: string;
@@ -93,6 +94,10 @@ export function OrderForm({ types, availability }: { types: TicketTypeRow[]; ava
   );
   const count = Object.values(qty).reduce((a, b) => a + b, 0);
   const anySelected = count > 0;
+  // Live contact checks: the server validates again, but a wrong digit or a
+  // "gmail.cim" typo is much cheaper to catch while the buyer is still typing.
+  const mobileIssue = mobileProblem(buyer.buyer_mobile);
+  const emailSuggestion = suggestEmail(buyer.buyer_email);
 
   function setQuantity(t: TicketTypeRow, n: number) {
     const max = Math.min(MAX_QTY_PER_TYPE, sellable(t.id));
@@ -122,6 +127,11 @@ export function OrderForm({ types, availability }: { types: TicketTypeRow[]; ava
   function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    if (mobileIssue) {
+      setError(`Mobile number: ${mobileIssue}.`);
+      document.getElementById("buyer-mobile")?.focus();
+      return;
+    }
     const selected = types.filter((t) => (qty[t.id] ?? 0) > 0);
     const items: CreateOrderInput["items"] = selected.map((t) => ({
       ticket_type_id: t.id,
@@ -135,7 +145,7 @@ export function OrderForm({ types, availability }: { types: TicketTypeRow[]; ava
     }));
     start(async () => {
       const fd = new FormData();
-      fd.set("payload", JSON.stringify({ ...buyer, items }));
+      fd.set("payload", JSON.stringify({ ...buyer, buyer_mobile: normalizeMobile(buyer.buyer_mobile), items }));
       for (const t of selected) {
         if (!t.requires_vehicle) continue;
         for (const [i, a] of (attendees[t.id] ?? []).entries()) {
@@ -266,11 +276,37 @@ export function OrderForm({ types, availability }: { types: TicketTypeRow[]; ava
           </div>
           <div>
             <label className="label">Email * (tickets are sent here)</label>
-            <input className="input" type="email" value={buyer.buyer_email} onChange={(e) => setBuyer({ ...buyer, buyer_email: e.target.value })} required />
+            <input className="input" type="email" inputMode="email" autoComplete="email" value={buyer.buyer_email} onChange={(e) => setBuyer({ ...buyer, buyer_email: e.target.value })} required aria-describedby={emailSuggestion ? "buyer-email-hint" : undefined} />
+            {emailSuggestion && (
+              <p id="buyer-email-hint" className="enter mt-1 text-xs text-amber-300">
+                Did you mean{" "}
+                <button type="button" className="font-semibold underline underline-offset-2" onClick={() => setBuyer({ ...buyer, buyer_email: emailSuggestion })}>
+                  {emailSuggestion}
+                </button>
+                ? Tickets are emailed to this address.
+              </p>
+            )}
           </div>
           <div>
             <label className="label">Mobile number *</label>
-            <input className="input" inputMode="tel" placeholder="09171234567" value={buyer.buyer_mobile} onChange={(e) => setBuyer({ ...buyer, buyer_mobile: e.target.value })} required />
+            <input
+              id="buyer-mobile"
+              className="input"
+              type="tel"
+              inputMode="numeric"
+              autoComplete="tel-national"
+              placeholder="09171234567"
+              maxLength={16}
+              value={buyer.buyer_mobile}
+              onChange={(e) => setBuyer({ ...buyer, buyer_mobile: e.target.value.replace(/[^\d+\s-]/g, "") })}
+              onBlur={() => setBuyer((b) => ({ ...b, buyer_mobile: normalizeMobile(b.buyer_mobile) || b.buyer_mobile }))}
+              required
+              aria-invalid={mobileIssue ? true : undefined}
+              aria-describedby="buyer-mobile-hint"
+            />
+            <p id="buyer-mobile-hint" className={`mt-1 text-xs ${mobileIssue ? "text-amber-300" : "text-zinc-500"}`}>
+              {mobileIssue ?? "11 digits starting with 09. +63 works too."}
+            </p>
           </div>
         </div>
       </Reveal>
@@ -288,7 +324,7 @@ export function OrderForm({ types, availability }: { types: TicketTypeRow[]; ava
             {pending ? "Reserving..." : "Continue to payment"}
           </button>
         </div>
-        <p className="mt-3 text-xs text-zinc-400">You will have 30 minutes to pay via GCash or Maya and upload your proof of payment.</p>
+        <p className="mt-3 text-xs text-zinc-400">You will have 30 minutes to pay via GoTyme (InstaPay QR) and upload your proof of payment.</p>
       </Reveal>
     </form>
   );

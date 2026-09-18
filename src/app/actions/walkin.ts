@@ -11,7 +11,7 @@ function fail(e: unknown): ActionResult {
   return { ok: false, error: e instanceof Error ? e.message : "Something went wrong" };
 }
 
-const methodSchema = z.enum(["cash", "gcash", "maya"]);
+const methodSchema = z.enum(["cash", "gotyme", "gcash", "maya"]);
 
 /**
  * Walk-in tally: +N wristbands handed out (or -N to correct a mistake).

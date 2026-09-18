@@ -32,7 +32,7 @@ export default async function WalkinPage() {
       .limit(25),
   ]);
 
-  const today: TallyToday = { byType: {}, byMethod: { cash: 0, gcash: 0, maya: 0 }, total_centavos: 0, entries: 0 };
+  const today: TallyToday = { byType: {}, byMethod: { cash: 0, gotyme: 0, gcash: 0, maya: 0 }, total_centavos: 0, entries: 0 };
   for (const r of todayRows ?? []) {
     const amt = r.qty * r.unit_price_centavos;
     const t = (today.byType[r.ticket_type_id] ??= { qty: 0, centavos: 0 });

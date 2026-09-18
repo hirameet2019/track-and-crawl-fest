@@ -28,7 +28,7 @@ export default async function VerifyPage() {
   return (
     <div>
       <h1 className="text-2xl font-bold">Payment verification</h1>
-      <p className="text-sm text-zinc-500">Compare each screenshot and reference number with the organizer&apos;s GCash or Maya transaction history, then approve or reject.</p>
+      <p className="text-sm text-zinc-500">Compare each screenshot and reference number with the organizer&apos;s GoTyme transaction history, then approve or reject.</p>
       <div className="mt-6">
         <VerifyQueue orders={orders} />
       </div>

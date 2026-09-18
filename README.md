@@ -1,7 +1,7 @@
 # Drift Event Tickets
 
-Ticket sales website for a car drift event. Buyers pay via the organizer's personal
-GCash or Maya QR, upload proof, staff verify, and the system issues numbered tickets
+Ticket sales website for a car drift event. Buyers pay via the organizer's
+GoTyme Bank InstaPay QR (GCash / Maya can be re-enabled), upload proof, staff verify, and the system issues numbered tickets
 that match pre-printed wristbands. Includes a receipt PDF, email delivery, on-site
 sales, a sales dashboard, and a mobile gate scanner with offline fallback.
 
@@ -53,6 +53,21 @@ pasted from Dashboard > Project Settings > API Keys.
 5. Import the real wristband serials at **Admin > Numbers** (delete the seeded
    placeholder ranges first: `delete from ticket_numbers;`).
 6. `npm run dev`
+
+## Payment channels
+
+Which channels a buyer sees on `/pay/[id]` (and can pick under "I paid with") is
+driven by the `events` row: a channel is offered only when its `*_qr_url` is set.
+Currently **GoTyme Bank (InstaPay QR)** only:
+
+```sql
+update events set gotyme_qr_url = '/payment/gotyme-qr.jpg', gotyme_account_name = 'Christine Sy',
+                  gcash_qr_url = null, maya_qr_url = null where active;
+```
+
+To bring GCash or Maya back, set their `*_qr_url` (public path or Storage URL)
+again; no deploy needed. Labels/colours live in `PAYMENT_CHANNELS`
+(`src/config/event.ts`); the marketing copy uses `PAY_VIA` from the same file.
 
 ## Flows
 

@@ -12,7 +12,9 @@ export type OrderStatus =
   | "expired"
   | "cancelled";
 export type OrderChannel = "online" | "onsite" | "import";
-export type PaymentMethod = "gcash" | "maya" | "cash";
+export type PaymentMethod = "gotyme" | "gcash" | "maya" | "cash";
+/** Channels a buyer can pay through online (everything except cash at the gate). */
+export type OnlinePaymentMethod = Exclude<PaymentMethod, "cash">;
 export type TicketStatus = "issued" | "redeemed" | "void";
 export type NumberStatus = "available" | "assigned" | "void";
 export type StaffRole = "admin" | "staff" | "scanner";
@@ -31,6 +33,8 @@ export interface EventRow {
   org_address: string | null;
   org_vat_registered: boolean;
   receipt_label: string;
+  gotyme_qr_url: string | null;
+  gotyme_account_name: string | null;
   gcash_qr_url: string | null;
   gcash_account_name: string | null;
   maya_qr_url: string | null;

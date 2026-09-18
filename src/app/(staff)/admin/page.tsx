@@ -4,6 +4,7 @@ import { requireStaff } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getActiveEvent, getAvailability } from "@/lib/queries";
 import { php } from "@/lib/money";
+import { PAYMENT_CHANNELS } from "@/config/event";
 import { BandSwatch } from "@/components/BandSwatch";
 
 function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
@@ -38,9 +39,11 @@ export default async function DashboardPage() {
   const onlineRevenue = paid.reduce((s, o) => s + o.total_centavos, 0);
   const walkinRevenue = tally.reduce((s, w) => s + w.qty * w.unit_price_centavos, 0);
   const walkinCount = tally.reduce((s, w) => s + w.qty, 0);
-  const byMethod = { gcash: 0, maya: 0, cash: 0 } as Record<string, number>;
-  for (const o of paid) if (o.payment_method) byMethod[o.payment_method] += o.total_centavos;
-  for (const w of tally) byMethod[w.payment_method] += w.qty * w.unit_price_centavos;
+  const byMethod = { gotyme: 0, gcash: 0, maya: 0, cash: 0 } as Record<string, number>;
+  for (const o of paid) if (o.payment_method) byMethod[o.payment_method] = (byMethod[o.payment_method] ?? 0) + o.total_centavos;
+  for (const w of tally) byMethod[w.payment_method] = (byMethod[w.payment_method] ?? 0) + w.qty * w.unit_price_centavos;
+  // GoTyme and cash are the live channels; GCash / Maya tiles only appear if they ever took money.
+  const methodTiles = (["gotyme", "cash", "gcash", "maya"] as const).filter((m) => m === "gotyme" || m === "cash" || byMethod[m] > 0);
   const sold = availability.reduce((s, a) => s + Number(a.sold), 0);
   const onlineSold = availability.reduce((s, a) => s + Number(a.online_sold), 0);
   const redeemed = availability.reduce((s, a) => s + Number(a.redeemed), 0);
@@ -82,10 +85,15 @@ export default async function DashboardPage() {
         <Stat label="Walk-in vs online" value={`${php(walkinRevenue)} / ${php(onlineRevenue)}`} />
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-3">
-        <Stat label="GCash" value={php(byMethod.gcash)} sub="online + gate, reconcile vs wallet" />
-        <Stat label="Maya" value={php(byMethod.maya)} sub="online + gate, reconcile vs wallet" />
-        <Stat label="Cash" value={php(byMethod.cash)} sub="reconcile vs cash box" />
+      <div className={`grid gap-3 ${methodTiles.length > 2 ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
+        {methodTiles.map((m) => (
+          <Stat
+            key={m}
+            label={PAYMENT_CHANNELS[m].label}
+            value={php(byMethod[m])}
+            sub={m === "cash" ? "reconcile vs cash box" : "online + gate, reconcile vs account history"}
+          />
+        ))}
       </div>
 
       <div className="card overflow-x-auto">

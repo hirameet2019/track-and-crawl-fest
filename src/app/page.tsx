@@ -12,7 +12,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const event = await getActiveEvent();
   return {
     title: event ? `${event.name} · Tickets` : "Tickets",
-    description: event ? `${event.name}${event.venue ? ` at ${event.venue}` : ""}. Pay via GCash or Maya.` : undefined,
+    description: event ? `${event.name}${event.venue ? ` at ${event.venue}` : ""}. Pay via GoTyme Bank (InstaPay QR).` : undefined,
   };
 }
 
@@ -35,8 +35,11 @@ export default async function HomePage() {
     .filter((t) => !t.includes_shirt)
     .map((t) => ({ label: t.is_child ? "Children" : "Adult", price: php(t.price_centavos) }));
 
+  // overflow-x-clip (not hidden): off-screen reveal transforms and hero glows
+  // must not create a sideways scroll on phones, and clip keeps the sticky
+  // total bar working, which an overflow:hidden ancestor would break.
   return (
-    <main className="flex-1 bg-[#0a0a0c]">
+    <main className="flex-1 overflow-x-clip bg-[#0a0a0c]">
       <EventHero event={event} prices={prices} />
 
       <section id="tickets" className="dark-zone mx-auto max-w-3xl px-4 pb-16 pt-6 sm:px-8">
@@ -46,7 +49,7 @@ export default async function HomePage() {
             <h2 className="reveal-title text-2xl font-black uppercase italic sm:text-3xl">Secure your spot</h2>
           </div>
           <p className="hidden text-right text-xs text-zinc-400 sm:block">
-            Pay via GCash or Maya.<br />Tickets emailed after verification.
+            Pay via GoTyme Bank (InstaPay QR).<br />Tickets emailed after verification.
           </p>
         </Reveal>
 
@@ -60,7 +63,7 @@ export default async function HomePage() {
         )}
 
         <p className="mt-10 text-center text-xs text-zinc-500">
-          Payment via GCash or Maya. Tickets are emailed after payment verification. <Link href="/login" className="underline">Staff login</Link>
+          Payment via GoTyme Bank (InstaPay QR). Tickets are emailed after payment verification. <Link href="/login" className="underline">Staff login</Link>
         </p>
       </section>
     </main>

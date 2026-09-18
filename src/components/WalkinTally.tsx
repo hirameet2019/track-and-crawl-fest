@@ -27,6 +27,7 @@ export interface TallyEntry {
 
 const METHODS: { key: PaymentMethod; label: string }[] = [
   { key: "cash", label: "Cash" },
+  { key: "gotyme", label: "GoTyme" },
   { key: "gcash", label: "GCash" },
   { key: "maya", label: "Maya" },
 ];

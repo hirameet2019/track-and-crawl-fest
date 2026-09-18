@@ -6,7 +6,7 @@ const orbitron = Orbitron({ subsets: ["latin"], weight: ["700", "900"], variable
 
 export const metadata: Metadata = {
   title: "Meet & Drift 3 · Tickets",
-  description: "Buy tickets for Meet & Drift 3 at the Philippine Arena Helipad Area. Pay via GCash or Maya.",
+  description: "Buy tickets for Meet & Drift 3 at the Philippine Arena Helipad Area. Pay via GoTyme Bank (InstaPay QR).",
 };
 
 export const viewport: Viewport = {

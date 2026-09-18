@@ -6,6 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getActiveEvent, getTicketTypes, isSalesOpen } from "@/lib/queries";
 import { MAX_QTY_PER_TYPE, PAYMENT_WINDOW_MINUTES, SHIRT_SIZES } from "@/config/event";
 import { IMAGE_MIME, MAX_UPLOAD_BYTES } from "@/lib/image";
+import { MOBILE_RE, normalizeMobile } from "@/lib/contact";
 import { audit } from "@/lib/audit";
 
 export type ActionResult = { ok: true; warning?: string } | { ok: false; error: string };
@@ -22,10 +23,11 @@ const attendeeSchema = z.object({
 const createOrderSchema = z.object({
   buyer_name: z.string().trim().min(2, "Enter your full name").max(80),
   buyer_email: z.string().trim().email("Enter a valid email"),
-  buyer_mobile: z
-    .string()
-    .trim()
-    .regex(/^(09\d{9}|\+639\d{9})$/, "Enter a PH mobile number like 09171234567"),
+  // Accept "+63 917 123 4567", "0917-123-4567" etc.; store the canonical 09XXXXXXXXX.
+  buyer_mobile: z.preprocess(
+    (v) => normalizeMobile(String(v ?? "")),
+    z.string().regex(MOBILE_RE, "Enter an 11-digit PH mobile number starting with 09, like 09171234567"),
+  ),
   items: z
     .array(
       z.object({
@@ -122,11 +124,12 @@ export async function createOnlineOrder(formData: FormData): Promise<ActionResul
 
 const proofSchema = z.object({
   order_id: z.string().uuid(),
-  payment_method: z.enum(["gcash", "maya"]),
-  payment_reference: z
-    .string()
-    .trim()
-    .regex(/^\d{10,20}$/, "Reference number should be the digits shown in your GCash/Maya receipt"),
+  payment_method: z.enum(["gotyme", "gcash", "maya"]),
+  // InstaPay / bank references mix letters and digits; e-wallets use digits only.
+  payment_reference: z.preprocess(
+    (v) => String(v ?? "").replace(/\s+/g, "").toUpperCase(),
+    z.string().regex(/^[A-Z0-9-]{6,40}$/, "Enter the reference number shown on your payment confirmation (letters and digits only)"),
+  ),
 });
 
 /** Buyer submits reference number + screenshot. Moves order to awaiting_verification. */
