@@ -13,17 +13,21 @@ import { SHIRT_SIZES, SHIRT_SIZE_CHART, SHIRT_SIZE_CHART_IMAGE, isShirtSize, shi
  *
  * The <dialog> is portalled to <body>: it is flow content, so rendering it where
  * the trigger sits (inside a <p> or a table cell) would produce invalid HTML and
- * a hydration mismatch. It is only rendered while open, which always follows a
- * client-side click, so nothing about it reaches the server-rendered HTML.
+ * a hydration mismatch. It is first rendered on the first click (so nothing about
+ * it reaches the server HTML) and then stays mounted, closed, so the CSS fade-out
+ * in globals.css (`dialog.sheet`) can play before it disappears.
  */
 export function ShirtSizeChartButton({ highlight, className = "", label = "Size chart" }: { highlight?: string; className?: string; label?: string }) {
   const [open, setOpen] = useState(false);
+  const [everOpened, setEverOpened] = useState(false);
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
 
   useEffect(() => {
     const el = ref.current;
-    if (open && el && !el.open) el.showModal();
+    if (!el) return;
+    if (open && !el.open) el.showModal();
+    else if (!open && el.open) el.close();
   }, [open]);
 
   const selected = highlight && isShirtSize(highlight) ? highlight : null;
@@ -36,7 +40,7 @@ export function ShirtSizeChartButton({ highlight, className = "", label = "Size 
         onKeyDown={(e) => { if (e.key === "Escape") { e.preventDefault(); setOpen(false); } }}
         onClick={(e) => { if (e.target === e.currentTarget) setOpen(false); }}
         aria-labelledby={titleId}
-        className="m-auto w-[min(100vw-1.5rem,52rem)] max-h-[92vh] overflow-hidden rounded-2xl border border-white/10 bg-zinc-950 p-0 text-zinc-100 shadow-2xl backdrop:bg-black/75 backdrop:backdrop-blur-sm"
+        className="sheet m-auto w-[min(100vw-1.5rem,52rem)] max-h-[92vh] overflow-hidden rounded-2xl border border-white/10 bg-zinc-950 p-0 text-zinc-100 shadow-2xl"
       >
           <div className="flex max-h-[92vh] flex-col">
             <div className="flex items-start justify-between gap-4 border-b border-white/10 px-5 py-4">
@@ -96,7 +100,7 @@ export function ShirtSizeChartButton({ highlight, className = "", label = "Size 
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={() => { setEverOpened(true); setOpen(true); }}
         className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-semibold text-cyan-300 underline decoration-cyan-300/50 underline-offset-2 transition hover:bg-cyan-400/10 hover:decoration-cyan-300 ${className}`}
       >
         <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
@@ -104,7 +108,7 @@ export function ShirtSizeChartButton({ highlight, className = "", label = "Size 
         </svg>
         {label}
       </button>
-      {open && createPortal(dialog, document.body)}
+      {everOpened && createPortal(dialog, document.body)}
     </>
   );
 }

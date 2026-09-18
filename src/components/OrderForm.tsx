@@ -201,7 +201,7 @@ export function OrderForm({ types, availability }: { types: TicketTypeRow[]; ava
       </section>
 
       {anySelected && (
-        <section className="space-y-3">
+        <section className="enter space-y-3">
           <h2 className="text-lg font-bold">2. Ticket holder details</h2>
           {types.filter((t) => (qty[t.id] ?? 0) > 0).map((t) => (
             <div key={t.id} className="card space-y-4">
@@ -275,7 +275,7 @@ export function OrderForm({ types, availability }: { types: TicketTypeRow[]; ava
         </div>
       </Reveal>
 
-      {error && <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+      {error && <p className="enter rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p>}
 
       <Reveal from="zoom" delay={200} className="sticky bottom-0 -mx-4 border-t border-white/10 bg-zinc-950/90 p-4 text-white backdrop-blur-md sm:static sm:mx-0 sm:rounded-2xl sm:border sm:border-white/10 sm:bg-white/[0.06]">
         <div className="flex items-center justify-between gap-4">
