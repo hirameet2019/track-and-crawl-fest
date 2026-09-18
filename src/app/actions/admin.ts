@@ -1,0 +1,170 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { z } from "zod";
+import { assertStaff } from "@/lib/auth";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { getOrderBundle } from "@/lib/queries";
+import { issueOrder, deliverOrder } from "@/lib/issue";
+import { sendRejectionEmail } from "@/lib/email";
+import type { ActionResult } from "./orders";
+
+function fail(e: unknown): ActionResult {
+  return { ok: false, error: e instanceof Error ? e.message : "Something went wrong" };
+}
+
+/* ----------------------------------------------------------- verification */
+export async function approveOrder(orderId: string): Promise<ActionResult> {
+  try {
+    const { userId } = await assertStaff("staff");
+    const bundle = await getOrderBundle(orderId);
+    if (!bundle) return { ok: false, error: "Order not found" };
+    if (bundle.order.status !== "awaiting_verification" && bundle.order.status !== "pending_payment")
+      return { ok: false, error: `Order is ${bundle.order.status}` };
+    const r = await issueOrder({
+      orderId,
+      actorId: userId,
+      paymentMethod: bundle.order.payment_method,
+      paymentReference: bundle.order.payment_reference,
+    });
+    revalidatePath("/admin");
+    revalidatePath("/admin/verify");
+    revalidatePath(`/admin/orders/${orderId}`);
+    if (r.deliveryError) return { ok: true, warning: `Tickets issued, but the email could not be sent: ${r.deliveryError}. Re-send it from the order page.` };
+    if (!r.emailed) return { ok: true, warning: "Tickets issued. No email on file, so nothing was sent." };
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function rejectOrder(orderId: string, reason: string): Promise<ActionResult> {
+  try {
+    const { userId } = await assertStaff("staff");
+    const r = reason.trim();
+    if (r.length < 3) return { ok: false, error: "Give a short reason for the buyer" };
+    const admin = createAdminClient();
+    const { error } = await admin
+      .from("orders")
+      .update({ status: "rejected", rejection_reason: r, verified_by: userId, verified_at: new Date().toISOString() })
+      .eq("id", orderId)
+      .in("status", ["awaiting_verification", "pending_payment"]);
+    if (error) return { ok: false, error: error.message };
+    await admin.from("audit_log").insert({ actor: userId, action: "order.rejected", entity: "order", entity_id: orderId, data: { reason: r } });
+    const bundle = await getOrderBundle(orderId);
+    if (bundle) await sendRejectionEmail(bundle, r).catch((e) => console.error(e));
+    revalidatePath("/admin/verify");
+    revalidatePath(`/admin/orders/${orderId}`);
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function resendTickets(orderId: string): Promise<ActionResult> {
+  try {
+    await assertStaff("staff");
+    await deliverOrder(orderId);
+    revalidatePath(`/admin/orders/${orderId}`);
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export type PrivateBucket = "payment-proofs" | "vehicle-photos";
+
+/** Short-lived signed URL for an object in one of the private buckets. Any signed-in staff. */
+export async function getSignedUrl(bucket: PrivateBucket, path: string): Promise<string | null> {
+  await assertStaff("scanner");
+  if (bucket !== "payment-proofs" && bucket !== "vehicle-photos") return null;
+  const admin = createAdminClient();
+  const { data } = await admin.storage.from(bucket).createSignedUrl(path, 60 * 10);
+  return data?.signedUrl ?? null;
+}
+
+/** Signed URL for a payment screenshot (private bucket). */
+export async function getProofUrl(path: string): Promise<string | null> {
+  return getSignedUrl("payment-proofs", path);
+}
+
+/* ------------------------------------------------------------ number pool */
+const rangeSchema = z.object({
+  ticket_type_id: z.string().uuid(),
+  prefix: z.string().trim().max(10),
+  start: z.coerce.number().int().min(0),
+  end: z.coerce.number().int().min(0),
+  pad: z.coerce.number().int().min(0).max(8),
+});
+
+export async function importNumberRange(formData: FormData): Promise<ActionResult & { inserted?: number }> {
+  try {
+    const { userId } = await assertStaff("admin");
+    const parsed = rangeSchema.safeParse(Object.fromEntries(formData));
+    if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
+    const { start, end } = parsed.data;
+    if (end < start) return { ok: false, error: "End must be greater than or equal to start" };
+    if (end - start > 20000) return { ok: false, error: "Import at most 20,000 numbers at a time" };
+    const admin = createAdminClient();
+    const { data, error } = await admin.rpc("import_number_range", {
+      p_ticket_type_id: parsed.data.ticket_type_id,
+      p_prefix: parsed.data.prefix,
+      p_start: start,
+      p_end: end,
+      p_pad: parsed.data.pad,
+    });
+    if (error) return { ok: false, error: error.message };
+    await admin.from("audit_log").insert({ actor: userId, action: "numbers.imported", entity: "ticket_type", entity_id: parsed.data.ticket_type_id, data: parsed.data });
+    revalidatePath("/admin/numbers");
+    return { ok: true, inserted: data ?? 0 };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/** Import an explicit list of numbers (one per line) for non-sequential serials. */
+export async function importNumberList(formData: FormData): Promise<ActionResult & { inserted?: number }> {
+  try {
+    const { userId } = await assertStaff("admin");
+    const ticketTypeId = z.string().uuid().parse(formData.get("ticket_type_id"));
+    const raw = String(formData.get("numbers") ?? "");
+    const numbers = Array.from(new Set(raw.split(/\r?\n|,/).map((s) => s.trim()).filter(Boolean)));
+    if (numbers.length === 0) return { ok: false, error: "Paste at least one number" };
+    if (numbers.length > 20000) return { ok: false, error: "Import at most 20,000 numbers at a time" };
+    const admin = createAdminClient();
+    const { data: maxRow } = await admin
+      .from("ticket_numbers")
+      .select("seq")
+      .eq("ticket_type_id", ticketTypeId)
+      .order("seq", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    let seq = (maxRow?.seq ?? 0) + 1;
+    const rows = numbers.map((number) => ({ ticket_type_id: ticketTypeId, number, seq: seq++ }));
+    const { error, count } = await admin.from("ticket_numbers").upsert(rows, { onConflict: "ticket_type_id,number", ignoreDuplicates: true, count: "exact" });
+    if (error) return { ok: false, error: error.message };
+    await admin.from("audit_log").insert({ actor: userId, action: "numbers.imported_list", entity: "ticket_type", entity_id: ticketTypeId, data: { count: numbers.length } });
+    revalidatePath("/admin/numbers");
+    return { ok: true, inserted: count ?? numbers.length };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function voidNumber(numberId: string, reason: string): Promise<ActionResult> {
+  try {
+    const { userId } = await assertStaff("admin");
+    const admin = createAdminClient();
+    const { error } = await admin
+      .from("ticket_numbers")
+      .update({ status: "void", void_reason: reason.trim() || "voided" })
+      .eq("id", numberId)
+      .eq("status", "available");
+    if (error) return { ok: false, error: error.message };
+    await admin.from("audit_log").insert({ actor: userId, action: "number.voided", entity: "ticket_number", entity_id: numberId, data: { reason } });
+    revalidatePath("/admin/numbers");
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}

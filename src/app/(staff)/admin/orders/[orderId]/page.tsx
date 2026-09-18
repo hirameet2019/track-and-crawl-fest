@@ -1,0 +1,83 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { requireStaff } from "@/lib/auth";
+import { getOrderBundle } from "@/lib/queries";
+import { OrderStatusBadge, TicketStatusBadge } from "@/components/StatusBadge";
+import { OrderActions } from "@/components/OrderActions";
+import { php } from "@/lib/money";
+import { SignedImage } from "@/components/SignedImage";
+
+const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleString("en-PH", { timeZone: "Asia/Manila" }) : "-");
+
+export default async function OrderDetailPage({ params }: { params: Promise<{ orderId: string }> }) {
+  await requireStaff("staff");
+  const { orderId } = await params;
+  const b = await getOrderBundle(orderId);
+  if (!b) notFound();
+  const { order, items, tickets } = b;
+
+  return (
+    <div className="space-y-6">
+      <Link href="/admin/orders" className="text-sm text-zinc-500 hover:underline">&larr; Orders</Link>
+      <div className="flex flex-wrap items-center gap-3">
+        <h1 className="text-2xl font-bold">Order #{order.order_no}</h1>
+        <OrderStatusBadge status={order.status} />
+        <span className="text-sm text-zinc-500">{order.channel}</span>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-3">
+        <div className="card lg:col-span-2">
+          <h2 className="font-semibold">Buyer</h2>
+          <dl className="mt-2 grid grid-cols-2 gap-2 text-sm sm:grid-cols-3">
+            <div><dt className="text-zinc-500">Name</dt><dd>{order.buyer_name}</dd></div>
+            <div><dt className="text-zinc-500">Email</dt><dd>{order.buyer_email ?? "-"}</dd></div>
+            <div><dt className="text-zinc-500">Mobile</dt><dd>{order.buyer_mobile ?? "-"}</dd></div>
+            <div><dt className="text-zinc-500">Payment</dt><dd className="uppercase">{order.payment_method ?? "-"}</dd></div>
+            <div><dt className="text-zinc-500">Reference</dt><dd className="font-mono">{order.payment_reference ?? "-"}</dd></div>
+            <div><dt className="text-zinc-500">Receipt no.</dt><dd>{order.receipt_no ?? "-"}</dd></div>
+            <div><dt className="text-zinc-500">Created</dt><dd>{fmt(order.created_at)}</dd></div>
+            <div><dt className="text-zinc-500">Proof submitted</dt><dd>{fmt(order.proof_submitted_at)}</dd></div>
+            <div><dt className="text-zinc-500">Paid / verified</dt><dd>{fmt(order.paid_at)}</dd></div>
+            <div><dt className="text-zinc-500">Email sent</dt><dd>{fmt(order.email_sent_at)}</dd></div>
+            {order.rejection_reason && <div className="col-span-2"><dt className="text-zinc-500">Rejection reason</dt><dd className="text-red-700">{order.rejection_reason}</dd></div>}
+          </dl>
+          <h2 className="mt-5 font-semibold">Items</h2>
+          <ul className="mt-2 divide-y text-sm">
+            {items.map((it) => (
+              <li key={it.id} className="flex justify-between py-2"><span>{it.ticket_type.name} x {it.qty}</span><span>{php(it.qty * it.unit_price_centavos)}</span></li>
+            ))}
+            <li className="flex justify-between py-2 font-bold"><span>Total</span><span>{php(order.total_centavos)}</span></li>
+          </ul>
+        </div>
+        <div className="card">
+          <h2 className="font-semibold">Actions</h2>
+          <OrderActions orderId={order.id} status={order.status} proofPath={order.payment_proof_path} hasEmail={!!order.buyer_email} />
+        </div>
+      </div>
+
+      {tickets.length > 0 && (
+        <div className="card overflow-x-auto">
+          <h2 className="font-semibold">Tickets</h2>
+          <table className="mt-2 w-full text-sm">
+            <thead className="text-left text-xs uppercase text-zinc-500"><tr><th className="py-1">Number</th><th>Type</th><th>Holder</th><th>Shirt</th><th>Vehicle</th><th>Car photo</th><th>Status</th><th>Redeemed</th><th></th></tr></thead>
+            <tbody>
+              {tickets.map((t) => (
+                <tr key={t.id} className="border-t">
+                  <td className="py-2 font-bold">{t.number}</td>
+                  <td>{t.ticket_type.name}</td>
+                  <td>{t.holder_name}</td>
+                  <td>{t.shirt_size ?? "-"}</td>
+                  <td>{t.vehicle_plate ? `${t.vehicle_plate} ${t.vehicle_model ?? ""}` : "-"}</td>
+                  <td>{t.vehicle_photo_path ? <SignedImage bucket="vehicle-photos" path={t.vehicle_photo_path} alt={`Car ${t.vehicle_plate ?? ""}`} className="h-12 w-16 rounded-md object-cover" /> : "-"}</td>
+                  <td><TicketStatusBadge status={t.status} /></td>
+                  <td className="text-xs text-zinc-500">{fmt(t.redeemed_at)}</td>
+                  <td><Link href={`/t/${t.qr_token}`} className="text-xs underline" target="_blank">View QR</Link></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
