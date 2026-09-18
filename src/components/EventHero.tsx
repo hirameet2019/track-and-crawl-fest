@@ -69,6 +69,10 @@ export function EventHero({ event, prices }: { event: EventRow; prices: { label:
           </div>
           <a href="#tickets" className="btn-neon pulse">Get tickets</a>
         </div>
+        <a href="#tickets" aria-label="Scroll down to tickets" className="hero-cue mx-auto mt-8 flex w-fit flex-col items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.3em] text-zinc-400 hover:text-white">
+          Scroll
+          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden><path d="M6 9l6 6 6-6" /></svg>
+        </a>
       </div>
     </section>
   );

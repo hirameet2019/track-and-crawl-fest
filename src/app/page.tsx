@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { OrderForm } from "@/components/OrderForm";
 import { EventHero } from "@/components/EventHero";
+import { Reveal } from "@/components/Reveal";
 import { getActiveEvent, getAvailability, getTicketTypes, isSalesOpen, publicOrder } from "@/lib/queries";
 import { php } from "@/lib/money";
 
@@ -39,23 +40,23 @@ export default async function HomePage() {
       <EventHero event={event} prices={prices} />
 
       <section id="tickets" className="dark-zone mx-auto max-w-3xl px-4 pb-16 pt-6 sm:px-8">
-        <div className="mb-6 flex items-end justify-between">
+        <Reveal className="mb-8 flex items-end justify-between" from="left">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-cyan-300">Tickets</p>
-            <h2 className="text-2xl font-black uppercase italic">Secure your spot</h2>
+            <h2 className="reveal-title text-2xl font-black uppercase italic sm:text-3xl">Secure your spot</h2>
           </div>
           <p className="hidden text-right text-xs text-zinc-400 sm:block">
             Pay via GCash or Maya.<br />Tickets emailed after verification.
           </p>
-        </div>
+        </Reveal>
 
         {open ? (
           <OrderForm types={types} availability={availability} />
         ) : (
-          <div className="card text-center">
+          <Reveal from="zoom" className="card text-center">
             <h2 className="text-xl font-bold">Online ticket sales are closed</h2>
             <p className="mt-2 text-zinc-400">Tickets may still be available at the venue gate.</p>
-          </div>
+          </Reveal>
         )}
 
         <p className="mt-10 text-center text-xs text-zinc-500">

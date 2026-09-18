@@ -203,3 +203,40 @@ body {
 }
 .staff-shell select.input option { background: #18181b; color: #f4f4f5; }
 .staff-shell input[type="file"].input::file-selector-button { background: rgba(255,255,255,0.1); color: #f4f4f5; border: 0; border-radius: 6px; padding: 2px 8px; margin-right: 8px; }
+
+/* ---------- Scroll reveal (public ticket section) ---------- */
+html { scroll-behavior: smooth; }
+.reveal {
+  opacity: 0;
+  filter: blur(8px);
+  transition:
+    opacity 0.7s cubic-bezier(0.2, 0.8, 0.2, 1),
+    transform 0.8s cubic-bezier(0.2, 0.8, 0.2, 1),
+    filter 0.7s cubic-bezier(0.2, 0.8, 0.2, 1);
+  will-change: opacity, transform, filter;
+}
+.reveal-up    { transform: translate3d(0, 36px, 0); }
+.reveal-left  { transform: translate3d(-40px, 0, 0); }
+.reveal-right { transform: translate3d(40px, 0, 0); }
+.reveal-zoom  { transform: scale(0.94); }
+.reveal.in { opacity: 1; filter: blur(0); transform: none; }
+/* neon underline that sweeps in under the section title once revealed */
+.reveal-title { position: relative; display: inline-block; }
+.reveal-title::after {
+  content: ""; position: absolute; left: 0; bottom: -6px; height: 3px; width: 100%; border-radius: 2px;
+  background: linear-gradient(90deg, #ff3fd1, #b34cff 40%, #2fd8ff 75%, #6dff5c);
+  transform: scaleX(0); transform-origin: left; transition: transform 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) 0.35s;
+}
+.reveal.in .reveal-title::after { transform: scaleX(1); }
+/* ticket cards get a subtle lift + glow on hover */
+.ticket-card { transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease; }
+.ticket-card:hover { transform: translateY(-3px); border-color: rgba(47, 216, 255, 0.35); box-shadow: 0 12px 40px rgba(47, 216, 255, 0.12), 0 0 0 1px rgba(47, 216, 255, 0.15) inset; }
+/* bouncing "scroll" cue at the bottom of the hero */
+@keyframes hero-cue { 0%, 100% { transform: translateY(0); opacity: 0.55; } 50% { transform: translateY(8px); opacity: 1; } }
+.hero-cue { animation: hero-cue 1.8s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .reveal { opacity: 1; filter: none; transform: none; transition: none; }
+  .reveal-title::after { transform: scaleX(1); transition: none; }
+  .hero-cue { animation: none; }
+}

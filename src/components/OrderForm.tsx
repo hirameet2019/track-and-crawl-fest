@@ -7,6 +7,7 @@ import { shrinkImage } from "@/lib/image";
 import { php } from "@/lib/money";
 import type { AvailabilityRow, TicketTypeRow } from "@/lib/supabase/types";
 import { BandSwatch } from "@/components/BandSwatch";
+import { Reveal } from "@/components/Reveal";
 
 type Attendee = {
   holder_name: string;
@@ -157,13 +158,13 @@ export function OrderForm({ types, availability }: { types: TicketTypeRow[]; ava
   return (
     <form onSubmit={submit} className="space-y-6">
       <section className="space-y-3">
-        <h2 className="text-lg font-bold">1. Choose your tickets</h2>
-        {types.map((t) => {
+        <Reveal as="h2" className="text-lg font-bold" delay={80}>1. Choose your tickets</Reveal>
+        {types.map((t, idx) => {
           const left = sellable(t.id);
           const soldOut = left <= 0;
           const n = qty[t.id] ?? 0;
           return (
-            <div key={t.id} className={`card flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between ${soldOut ? "opacity-60" : ""}`}>
+            <Reveal key={t.id} delay={160 + idx * 110} from={idx % 2 ? "right" : "left"} className={`card ticket-card flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between ${soldOut ? "opacity-60" : ""}`}>
               <div>
                 <div className="flex flex-wrap items-center gap-2">
                   <h3 className="font-semibold">{t.name}</h3>
@@ -187,7 +188,7 @@ export function OrderForm({ types, availability }: { types: TicketTypeRow[]; ava
                 <input className="input w-14 text-center" inputMode="numeric" value={n} onChange={(e) => setQuantity(t, Number(e.target.value) || 0)} disabled={soldOut} aria-label={`${t.name} quantity`} />
                 <button type="button" className="btn-secondary h-9 w-9 px-0" onClick={() => setQuantity(t, n + 1)} disabled={soldOut || n >= Math.min(MAX_QTY_PER_TYPE, left)} aria-label="Increase">+</button>
               </div>
-            </div>
+            </Reveal>
           );
         })}
       </section>
@@ -241,7 +242,7 @@ export function OrderForm({ types, availability }: { types: TicketTypeRow[]; ava
         </section>
       )}
 
-      <section className="space-y-3">
+      <Reveal as="section" className="space-y-3" delay={120}>
         <h2 className="text-lg font-bold">{anySelected ? "3." : "2."} Your details</h2>
         <div className="card grid gap-3 sm:grid-cols-2">
           <div className="sm:col-span-2">
@@ -257,11 +258,11 @@ export function OrderForm({ types, availability }: { types: TicketTypeRow[]; ava
             <input className="input" inputMode="tel" placeholder="09171234567" value={buyer.buyer_mobile} onChange={(e) => setBuyer({ ...buyer, buyer_mobile: e.target.value })} required />
           </div>
         </div>
-      </section>
+      </Reveal>
 
       {error && <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p>}
 
-      <div className="sticky bottom-0 -mx-4 border-t border-white/10 bg-zinc-950/90 p-4 text-white backdrop-blur-md sm:static sm:mx-0 sm:rounded-2xl sm:border sm:border-white/10 sm:bg-white/[0.06]">
+      <Reveal from="zoom" delay={200} className="sticky bottom-0 -mx-4 border-t border-white/10 bg-zinc-950/90 p-4 text-white backdrop-blur-md sm:static sm:mx-0 sm:rounded-2xl sm:border sm:border-white/10 sm:bg-white/[0.06]">
         <div className="flex items-center justify-between gap-4">
           <div>
             <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-400">Total</div>
@@ -273,7 +274,7 @@ export function OrderForm({ types, availability }: { types: TicketTypeRow[]; ava
           </button>
         </div>
         <p className="mt-3 text-xs text-zinc-400">You will have 30 minutes to pay via GCash or Maya and upload your proof of payment.</p>
-      </div>
+      </Reveal>
     </form>
   );
 }
