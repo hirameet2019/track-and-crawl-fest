@@ -2,12 +2,13 @@
 
 import { useMemo, useRef, useState, useTransition } from "react";
 import { createOnlineOrder, type CreateOrderInput } from "@/app/actions/orders";
-import { MAX_QTY_PER_TYPE, SHIRT_SIZES } from "@/config/event";
+import { MAX_QTY_PER_TYPE, SHIRT_SIZES, SHIRT_SIZE_CHART } from "@/config/event";
 import { shrinkImage } from "@/lib/image";
 import { php } from "@/lib/money";
 import type { AvailabilityRow, TicketTypeRow } from "@/lib/supabase/types";
 import { BandSwatch } from "@/components/BandSwatch";
 import { Reveal } from "@/components/Reveal";
+import { ShirtSizeChartButton, ShirtSizeHint } from "@/components/ShirtSizeChart";
 
 type Attendee = {
   holder_name: string;
@@ -171,6 +172,12 @@ export function OrderForm({ types, availability }: { types: TicketTypeRow[]; ava
                   <BandSwatch color={t.band_color} className="rounded-full border border-white/15 bg-black/30 px-2 py-0.5 text-[11px] text-zinc-300" />
                 </div>
                 {t.description && <p className="mt-1 text-sm text-zinc-400">{t.description}</p>}
+                {t.includes_shirt && (
+                  <div className="mt-1 flex flex-wrap items-center gap-1 text-[11px]">
+                    <span className="rounded bg-cyan-400/15 px-1.5 py-0.5 font-semibold text-cyan-300">Includes event t-shirt</span>
+                    <ShirtSizeChartButton label="View size chart" />
+                  </div>
+                )}
                 {t.requires_vehicle && (
                   <p className="mt-1 flex flex-wrap gap-1 text-[11px]">
                     {["Car photo", "Plate number", "Car model"].map((x) => (
@@ -208,11 +215,19 @@ export function OrderForm({ types, availability }: { types: TicketTypeRow[]; ava
                   </div>
                   {t.includes_shirt && (
                     <div>
-                      <label className="label">T-shirt size *</label>
-                      <select className="input" value={a.shirt_size} onChange={(e) => updateAttendee(t.id, i, { shirt_size: e.target.value })} required>
+                      <div className="mb-1 flex items-center justify-between gap-2">
+                        <label className="label !mb-0" htmlFor={`shirt-${t.id}-${i}`}>T-shirt size *</label>
+                        <ShirtSizeChartButton highlight={a.shirt_size} />
+                      </div>
+                      <select id={`shirt-${t.id}-${i}`} className="input" value={a.shirt_size} onChange={(e) => updateAttendee(t.id, i, { shirt_size: e.target.value })} required>
                         <option value="">Select size</option>
-                        {SHIRT_SIZES.map((s) => <option key={s} value={s}>{s}</option>)}
+                        {SHIRT_SIZES.map((s) => (
+                          <option key={s} value={s}>
+                            {s} · {SHIRT_SIZE_CHART[s].width} x {SHIRT_SIZE_CHART[s].length} in
+                          </option>
+                        ))}
                       </select>
+                      <ShirtSizeHint size={a.shirt_size} />
                     </div>
                   )}
                   {t.requires_vehicle && (
