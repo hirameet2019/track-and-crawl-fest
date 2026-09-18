@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { recordSignOut } from "@/app/actions/auth";
 import type { StaffRole } from "@/lib/supabase/types";
 
 const LINKS: { href: string; label: string; min: StaffRole }[] = [
@@ -11,6 +12,7 @@ const LINKS: { href: string; label: string; min: StaffRole }[] = [
   { href: "/admin/orders", label: "Orders", min: "staff" },
   { href: "/admin/walkin", label: "Walk-in", min: "staff" },
   { href: "/admin/numbers", label: "Numbers", min: "admin" },
+  { href: "/admin/audit", label: "Audit", min: "admin" },
   { href: "/admin/settings", label: "Settings", min: "admin" },
   { href: "/scan", label: "Scan", min: "scanner" },
 ];
@@ -20,6 +22,7 @@ export function StaffNav({ name, role }: { name: string; role: StaffRole }) {
   const path = usePathname();
   const router = useRouter();
   async function signOut() {
+    await recordSignOut().catch(() => {});
     await createClient().auth.signOut();
     router.replace("/login");
     router.refresh();

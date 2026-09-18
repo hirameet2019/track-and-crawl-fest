@@ -5,6 +5,7 @@ import { z } from "zod";
 import { assertStaff } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getOrderBundle } from "@/lib/queries";
+import { audit } from "@/lib/audit";
 import { issueOrder, deliverOrder } from "@/lib/issue";
 import { sendRejectionEmail } from "@/lib/email";
 import type { ActionResult } from "./orders";
@@ -63,8 +64,9 @@ export async function rejectOrder(orderId: string, reason: string): Promise<Acti
 
 export async function resendTickets(orderId: string): Promise<ActionResult> {
   try {
-    await assertStaff("staff");
-    await deliverOrder(orderId);
+    const { userId } = await assertStaff("staff");
+    const r = await deliverOrder(orderId);
+    await audit(createAdminClient(), { actor: userId, action: "order.resent", entity: "order", entity_id: orderId, data: { emailed: r.emailed, to: r.bundle.order.buyer_email } });
     revalidatePath(`/admin/orders/${orderId}`);
     return { ok: true };
   } catch (e) {

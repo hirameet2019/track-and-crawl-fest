@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getStaff } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { actionMeta, describe } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
 
@@ -38,11 +39,36 @@ async function walkinCsv() {
   ]);
 }
 
-/** CSV export. `?type=walkin` for the gate tally; default is every ticket with its order. Staff only. */
+/** Audit trail, newest first. Admin only. */
+async function auditCsv() {
+  const admin = createAdminClient();
+  const [{ data }, { data: staff }] = await Promise.all([
+    admin.from("audit_log").select("id, created_at, actor, action, entity, entity_id, data").order("created_at", { ascending: false }).limit(50000),
+    admin.from("staff").select("id, full_name"),
+  ]);
+  const names = new Map((staff ?? []).map((s) => [s.id, s.full_name]));
+  return csv([
+    ["time_manila", "category", "action", "label", "actor", "entity", "entity_id", "summary", "data_json"],
+    ...(data ?? []).map((r) => {
+      const m = actionMeta(r.action);
+      return [
+        new Date(r.created_at).toLocaleString("en-PH", { timeZone: "Asia/Manila" }), m.cat, r.action, m.label,
+        r.actor ? names.get(r.actor) ?? r.actor : "buyer/system", r.entity, r.entity_id, describe(r.action, r.data as Record<string, unknown> | null), r.data ? JSON.stringify(r.data) : "",
+      ];
+    }),
+  ]);
+}
+
+/** CSV export. `?type=walkin` for the gate tally, `?type=audit` for the audit trail (admin); default is every ticket with its order. Staff only. */
 export async function GET(req: NextRequest) {
   const session = await getStaff();
   if (!session || session.staff.role === "scanner") return new NextResponse("Forbidden", { status: 403 });
-  if (req.nextUrl.searchParams.get("type") === "walkin") return download(await walkinCsv(), "walkin-tally");
+  const type = req.nextUrl.searchParams.get("type");
+  if (type === "walkin") return download(await walkinCsv(), "walkin-tally");
+  if (type === "audit") {
+    if (session.staff.role !== "admin") return new NextResponse("Forbidden", { status: 403 });
+    return download(await auditCsv(), "audit-log");
+  }
 
   const admin = createAdminClient();
   const { data } = await admin

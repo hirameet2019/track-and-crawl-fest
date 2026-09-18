@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { recordSignIn } from "@/app/actions/auth";
 
 export function LoginForm({ next, signedOutFirst = false }: { next?: string; signedOutFirst?: boolean }) {
   const router = useRouter();
@@ -24,6 +25,7 @@ export function LoginForm({ next, signedOutFirst = false }: { next?: string; sig
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setBusy(false);
     if (error) return setError(error.message);
+    await recordSignIn().catch(() => {});
     router.replace(next && next.startsWith("/") ? next : "/admin");
     router.refresh();
   }

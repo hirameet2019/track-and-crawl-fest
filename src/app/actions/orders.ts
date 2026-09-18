@@ -6,6 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getActiveEvent, getTicketTypes, isSalesOpen } from "@/lib/queries";
 import { MAX_QTY_PER_TYPE, PAYMENT_WINDOW_MINUTES, SHIRT_SIZES } from "@/config/event";
 import { IMAGE_MIME, MAX_UPLOAD_BYTES } from "@/lib/image";
+import { audit } from "@/lib/audit";
 
 export type ActionResult = { ok: true; warning?: string } | { ok: false; error: string };
 
@@ -108,6 +109,13 @@ export async function createOnlineOrder(formData: FormData): Promise<ActionResul
     p_expires_minutes: PAYMENT_WINDOW_MINUTES,
   });
   if (error || !orderId) return { ok: false, error: error?.message ?? "Could not create order" };
+  await audit(admin, {
+    actor: null,
+    action: "order.created",
+    entity: "order",
+    entity_id: orderId,
+    data: { buyer: parsed.data.buyer_name, items: parsed.data.items.reduce((n, i) => n + i.qty, 0), total_centavos: parsed.data.items.reduce((n, i) => n + i.qty * (types.find((t) => t.id === i.ticket_type_id)?.price_centavos ?? 0), 0) },
+  });
 
   redirect(`/pay/${orderId}`);
 }
@@ -172,6 +180,7 @@ export async function submitPaymentProof(formData: FormData): Promise<ActionResu
     })
     .eq("id", order.id);
   if (error) return { ok: false, error: error.message };
+  await audit(admin, { actor: null, action: "order.proof_submitted", entity: "order", entity_id: order.id, data: { method: parsed.data.payment_method, reference: parsed.data.payment_reference } });
 
   redirect(`/order/${order.id}`);
 }
