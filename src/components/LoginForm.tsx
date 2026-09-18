@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { recordSignIn } from "@/app/actions/auth";
+import { PasswordInput } from "@/components/PasswordInput";
 
 export function LoginForm({ next, signedOutFirst = false }: { next?: string; signedOutFirst?: boolean }) {
   const router = useRouter();
@@ -38,7 +39,7 @@ export function LoginForm({ next, signedOutFirst = false }: { next?: string; sig
       </div>
       <div>
         <label className="label">Password</label>
-        <input className="input" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+        <PasswordInput autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
       </div>
       {error && <p className="text-sm text-red-600">{error}</p>}
       <button className="btn-primary w-full" disabled={busy}>{busy ? "Signing in..." : "Sign in"}</button>

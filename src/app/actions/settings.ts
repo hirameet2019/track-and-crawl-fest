@@ -33,6 +33,12 @@ export async function saveEmailSettingsAction(formData: FormData): Promise<Actio
     if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
     const v = parsed.data;
 
+    // Implicit TLS is only valid on 465; on 587/25 the server expects a plain
+    // greeting first (STARTTLS) and the handshake fails with "wrong version number".
+    if (v.smtp_host && v.smtp_secure && v.smtp_port !== 465) {
+      return { ok: false, error: `Implicit TLS only works on port 465. Uncheck it for port ${v.smtp_port} (STARTTLS), or change the port to 465.` };
+    }
+
     // Blank password or API key means "keep the one already saved".
     const current = await getEmailSettings();
     if (!v.smtp_pass && current.source === "database") v.smtp_pass = current.smtp_pass;

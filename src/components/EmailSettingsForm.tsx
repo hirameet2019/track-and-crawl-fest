@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { saveEmailSettingsAction, sendTestEmailAction } from "@/app/actions/settings";
+import { PasswordInput } from "@/components/PasswordInput";
 
 export interface EmailSettingsView {
   provider: "smtp" | "resend" | "dry-run";
@@ -25,6 +26,10 @@ export function EmailSettingsForm({ current, defaultEmail }: { current: EmailSet
   const router = useRouter();
   const [host, setHost] = useState(current.smtp_host);
   const [port, setPort] = useState(String(current.smtp_port || 587));
+  const [secure, setSecure] = useState(current.smtp_secure);
+  // Implicit TLS on a STARTTLS port (587/25) makes the client speak TLS to a
+  // plain-text greeting: "SSL routines ... wrong version number". Flag it inline.
+  const tlsMismatch = secure && port.trim() !== "465";
   const [testTo, setTestTo] = useState(defaultEmail);
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
   const [pending, start] = useTransition();
@@ -83,12 +88,19 @@ export function EmailSettingsForm({ current, defaultEmail }: { current: EmailSet
           <div><label className="label">Username (mailbox)</label><input name="smtp_user" className="input" defaultValue={current.smtp_user} placeholder="tickets@yourdomain.com" autoComplete="off" /></div>
           <div>
             <label className="label">Password / app password</label>
-            <input name="smtp_pass" type="password" className="input" placeholder={current.has_smtp_pass ? "•••••••• (saved, leave blank to keep)" : ""} autoComplete="new-password" />
+            <PasswordInput name="smtp_pass" placeholder={current.has_smtp_pass ? "•••••••• (saved, leave blank to keep)" : ""} autoComplete="new-password" />
           </div>
         </div>
         <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" name="smtp_secure" defaultChecked={current.smtp_secure} /> Use implicit TLS (port 465 only). Leave off for 587.
+          <input type="checkbox" name="smtp_secure" checked={secure} onChange={(e) => setSecure(e.target.checked)} /> Use implicit TLS (port 465 only). Leave off for 587.
         </label>
+        {tlsMismatch && (
+          <p className="enter rounded-lg border border-amber-400/40 bg-amber-400/10 p-2 text-xs text-amber-200">
+            Implicit TLS only works on port 465. Port {port.trim() || "587"} uses STARTTLS, so leave this unchecked or sending fails with
+            <code className="mx-1 rounded bg-black/40 px-1">wrong version number</code>.
+            <button type="button" className="ml-1 font-semibold underline" onClick={() => setSecure(false)}>Uncheck it</button>
+          </p>
+        )}
         <div>
           <label className="label">From (shown to buyers)</label>
           <input name="from" className="input" defaultValue={current.from} placeholder='Drift Event Tickets <tickets@yourdomain.com>' />
@@ -96,7 +108,9 @@ export function EmailSettingsForm({ current, defaultEmail }: { current: EmailSet
         </div>
         <details className="text-sm">
           <summary className="cursor-pointer text-zinc-600">Alternative: Resend API key (used only when no SMTP host is set)</summary>
-          <input name="resend_api_key" type="password" className="input mt-2" placeholder={current.has_resend_key ? "•••••••• (saved, leave blank to keep)" : "re_..."} autoComplete="off" />
+          <div className="mt-2">
+            <PasswordInput name="resend_api_key" placeholder={current.has_resend_key ? "•••••••• (saved, leave blank to keep)" : "re_..."} autoComplete="off" />
+          </div>
         </details>
         <p className="text-xs text-zinc-500">{PRESETS.find((p) => p.host === host)?.hint}</p>
         <div className="flex flex-wrap gap-2">
