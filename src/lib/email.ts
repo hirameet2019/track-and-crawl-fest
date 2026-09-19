@@ -43,19 +43,12 @@ function smtp(s: EmailSettings): Transporter {
  */
 function textVersion(html: string): string {
   return html
-    .replace(/<br\s*\/?>/gi, "
-")
-    .replace(/<\/(p|div|tr|li|h[1-6])>/gi, "
-")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(p|div|tr|li|h[1-6])>/gi, "\n")
     .replace(/<a [^>]*href="([^"]+)"[^>]*>(.*?)<\/a>/gi, "$2 ($1)")
     .replace(/<[^>]+>/g, "")
     .replace(/&middot;/g, "-").replace(/&amp;/g, "&").replace(/&nbsp;/g, " ").replace(/&quot;/g, '"').replace(/&#39;/g, "'")
-    .replace(/[ 	]+
-/g, "
-").replace(/
-{3,}/g, "
-
-")
+    .replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n")
     .trim();
 }
 
