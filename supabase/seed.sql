@@ -10,9 +10,9 @@ values (
   '2026-12-01 14:00+08',
   now(),
   null,                                   -- sales cutoff: to be advised
-  'PLACEHOLDER Organizer Name',
+  'Meet & Drift 3',
   '000-000-000-000',
-  'PLACEHOLDER Organizer Address',
+  null,                                   -- organizer address: to be supplied
   false,
   'ACKNOWLEDGMENT RECEIPT',
   '/placeholders/gcash-qr.png', 'PLACEHOLDER GCash Name',
