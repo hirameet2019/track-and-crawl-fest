@@ -37,9 +37,32 @@ function smtp(s: EmailSettings): Transporter {
   return transport;
 }
 
+/**
+ * Plain-text twin of the HTML body. Spam filters score HTML-only mail worse, and
+ * some phone mail apps preview the text part; keep it readable.
+ */
+function textVersion(html: string): string {
+  return html
+    .replace(/<br\s*\/?>/gi, "
+")
+    .replace(/<\/(p|div|tr|li|h[1-6])>/gi, "
+")
+    .replace(/<a [^>]*href="([^"]+)"[^>]*>(.*?)<\/a>/gi, "$2 ($1)")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&middot;/g, "-").replace(/&amp;/g, "&").replace(/&nbsp;/g, " ").replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+    .replace(/[ 	]+
+/g, "
+").replace(/
+{3,}/g, "
+
+")
+    .trim();
+}
+
 export async function send(opts: MailMessage, settings?: EmailSettings) {
   const s = settings ?? (await getEmailSettings());
   const from = s.from || "Tickets <onboarding@resend.dev>";
+  const text = textVersion(opts.html);
   if (s.provider === "dry-run") {
     console.log(`[email:dry-run] to=${opts.to} subject="${opts.subject}" attachments=${opts.attachments?.length ?? 0}`);
     return { ok: true, dryRun: true as const, provider: s.provider };
@@ -50,12 +73,13 @@ export async function send(opts: MailMessage, settings?: EmailSettings) {
       to: opts.to,
       subject: opts.subject,
       html: opts.html,
+      text,
       attachments: opts.attachments?.map((a) => ({ filename: a.filename, content: a.content, contentType: "application/pdf" })),
     });
     return { ok: true, dryRun: false as const, provider: s.provider };
   }
   const resend = new Resend(s.resend_api_key);
-  const { error } = await resend.emails.send({ from, ...opts });
+  const { error } = await resend.emails.send({ from, text, ...opts });
   if (error) throw new Error(`Email failed: ${error.message}`);
   return { ok: true, dryRun: false as const, provider: s.provider };
 }
