@@ -45,3 +45,6 @@ next-env.d.ts
 
 # keep the template, ignore real env files
 !.env.example
+
+# local-only page used for the organizer announcement (screenshots)
+.announcement
