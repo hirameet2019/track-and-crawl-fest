@@ -43,7 +43,9 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ or
         <div className="card mt-6 border-blue-200 bg-blue-50">
           <h2 className="font-semibold text-blue-900">We received your proof of payment</h2>
           <p className="mt-1 text-sm text-blue-900">
-            Reference {order.payment_reference} via {order.payment_method?.toUpperCase()}. Our team is verifying it. Your receipt and tickets will be emailed to {order.buyer_email}. <b>If it does not arrive in your inbox, check your Spam or Junk folder</b> and mark it as Not spam. Bookmark this page to check back.
+            Reference {order.payment_reference} via {order.payment_method?.toUpperCase()}. A team member is now checking it against the account history.
+            Your receipt and QR tickets will be emailed to <b>{order.buyer_email}</b> <b>within 24 hours</b>, usually much sooner.
+            If it does not show up in your inbox, check your Spam or Junk folder and mark it as Not spam. Bookmark this page; it updates the moment your payment is confirmed.
           </p>
         </div>
       )}

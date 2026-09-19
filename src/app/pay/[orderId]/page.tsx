@@ -81,9 +81,17 @@ export default async function PayPage({ params }: { params: Promise<{ orderId: s
         <div className="mt-3">
           <ProofForm orderId={order.id} methods={methods} />
         </div>
-        <p className="mt-3 text-xs text-zinc-500">
-          Our team verifies payments manually. Once confirmed, your receipt and tickets are sent to <b>{order.buyer_email}</b>. <b>Check your Spam or Junk folder</b> if you do not see it, and mark it as Not spam. You can check the status any time at this link: <Link href={`/order/${order.id}`} className="underline">order status</Link>.
-        </p>
+        <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-amber-700">After you submit</div>
+          <p className="mt-1">
+            Every payment is checked by a real person against the account history, so your tickets are not instant.
+            Please allow <b>up to 24 hours</b> for your receipt and QR tickets to arrive at <b>{order.buyer_email}</b>. Most are sent much sooner.
+          </p>
+          <p className="mt-2">
+            If nothing arrives, look in your <b>Spam or Junk folder</b> first and mark the message as Not spam. You can also check your order any time at{" "}
+            <Link href={`/order/${order.id}`} className="font-semibold underline">this status page</Link>; it updates the moment your payment is confirmed.
+          </p>
+        </div>
       </section>
     </div>
     </main>

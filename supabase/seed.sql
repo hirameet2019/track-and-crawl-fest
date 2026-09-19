@@ -12,7 +12,7 @@ values (
   null,                                   -- sales cutoff: to be advised
   'Meet & Drift 3',
   '000-000-000-000',
-  null,                                   -- organizer address: to be supplied
+  'Philippine Arena Helipad Area, Bocaue, Bulacan',   -- organizer address shown under the name on the receipt
   false,
   'ACKNOWLEDGMENT RECEIPT',
   '/placeholders/gcash-qr.png', 'PLACEHOLDER GCash Name',
