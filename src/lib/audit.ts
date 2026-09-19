@@ -38,6 +38,7 @@ const ACTIONS: Record<string, { cat: AuditCategory; label: string }> = {
   "order.issued": { cat: "payments", label: "Payment approved, tickets issued" },
   "order.rejected": { cat: "payments", label: "Payment rejected" },
   "order.resent": { cat: "orders", label: "Tickets re-sent by email" },
+  "order.reverted": { cat: "orders", label: "Paid order reverted, wristband released" },
   "ticket.redeemed": { cat: "tickets", label: "Ticket scanned at gate" },
   "ticket.kit": { cat: "tickets", label: "Kit item handed over" },
   "walkin.recorded": { cat: "walkin", label: "Walk-in tally" },
@@ -45,6 +46,7 @@ const ACTIONS: Record<string, { cat: AuditCategory; label: string }> = {
   "numbers.imported": { cat: "numbers", label: "Wristband range imported" },
   "numbers.imported_list": { cat: "numbers", label: "Wristband list imported" },
   "number.voided": { cat: "numbers", label: "Wristband voided" },
+  "number.unvoided": { cat: "numbers", label: "Wristband restored to pool" },
   "staff.signed_in": { cat: "staff", label: "Staff signed in" },
   "staff.signed_out": { cat: "staff", label: "Staff signed out" },
   "settings.email_updated": { cat: "settings", label: "Email settings changed" },
@@ -72,6 +74,8 @@ export function describe(action: string, data: Record<string, unknown> | null | 
       return [d.method ? String(d.method).toUpperCase() : "", d.reference ? `ref ${d.reference}` : ""].filter(Boolean).join(" ");
     case "order.rejected":
       return d.reason ? `Reason: ${d.reason}` : "";
+    case "order.reverted":
+      return [d.order_no ? `Order #${d.order_no}` : "", Array.isArray(d.released_numbers) ? `released ${d.released_numbers.join(", ")}` : "", d.reason ? String(d.reason) : ""].filter(Boolean).join(" · ");
     case "walkin.recorded": {
       const qty = Number(d.qty ?? 0);
       return `${qty > 0 ? "+" : ""}${qty} band(s) · ${peso(d.unit_price_centavos)} each · ${String(d.method ?? "cash").toUpperCase()}`;
@@ -84,6 +88,8 @@ export function describe(action: string, data: Record<string, unknown> | null | 
       return `${d.count ?? ""} serial(s)`;
     case "number.voided":
       return d.reason ? `Reason: ${d.reason}` : "";
+    case "number.unvoided":
+      return [d.number ? String(d.number) : "", d.previous_reason ? `was void: ${d.previous_reason}` : ""].filter(Boolean).join(" · ");
     case "ticket.kit":
       return `${d.item ?? "item"} ${d.claimed ? "handed over" : "un-ticked"}`;
     case "staff.signed_in":

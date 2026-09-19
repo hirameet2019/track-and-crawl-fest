@@ -170,3 +170,30 @@ export async function voidNumber(numberId: string, reason: string): Promise<Acti
     return fail(e);
   }
 }
+
+/**
+ * Put a voided wristband number back into the pool. Only void -> available is
+ * allowed; numbers already assigned to a ticket are untouched. The old void
+ * reason is kept in the audit trail so the history stays explainable.
+ */
+export async function unvoidNumber(numberId: string): Promise<ActionResult> {
+  try {
+    const { userId } = await assertStaff("admin");
+    const admin = createAdminClient();
+    const { data: row, error: readErr } = await admin.from("ticket_numbers").select("number, status, void_reason").eq("id", numberId).maybeSingle();
+    if (readErr) return { ok: false, error: readErr.message };
+    if (!row) return { ok: false, error: "Number not found" };
+    if (row.status !== "void") return { ok: false, error: `${row.number} is ${row.status}, not void` };
+    const { error } = await admin
+      .from("ticket_numbers")
+      .update({ status: "available", void_reason: null })
+      .eq("id", numberId)
+      .eq("status", "void");
+    if (error) return { ok: false, error: error.message };
+    await admin.from("audit_log").insert({ actor: userId, action: "number.unvoided", entity: "ticket_number", entity_id: numberId, data: { number: row.number, previous_reason: row.void_reason } });
+    revalidatePath("/admin/numbers");
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
