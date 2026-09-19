@@ -161,6 +161,7 @@ export function OrderReviewModal({
               <li className="flex gap-2"><span className="grid h-5 w-5 shrink-0 place-items-center rounded bg-cyan-300 text-[11px] font-black text-black">2</span><span>Pay exactly <b className="text-white">{php(total)}</b> via {PAY_VIA} and upload the confirmation screenshot.</span></li>
               <li className="flex gap-2"><span className="grid h-5 w-5 shrink-0 place-items-center rounded bg-cyan-300 text-[11px] font-black text-black">3</span><span>A team member verifies the payment by hand and emails your QR tickets and receipt <b className="text-white">within 24 hours</b>, usually much sooner. <span className="text-amber-200">Check your Spam or Junk folder if it does not show up in your inbox.</span></span></li>
             </ol>
+            <p className="mt-2 text-xs text-zinc-400">Sa Tagalog: naka-hold ang wristbands ng {PAYMENT_WINDOW_MINUTES} minuto. Bayaran ang eksaktong {php(total)} via GoTyme, i-upload ang screenshot, at ipapadala ang tickets sa email pagkatapos ma-verify.</p>
           </section>
 
           <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-white/10 bg-black/30 p-3 text-sm">

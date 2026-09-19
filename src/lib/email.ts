@@ -1,6 +1,6 @@
 import { Resend } from "resend";
 import nodemailer, { type Transporter } from "nodemailer";
-import { SITE_URL } from "@/config/event";
+import { PAYMENT_WINDOW_MINUTES, PAY_VIA, SITE_URL } from "@/config/event";
 import { php } from "@/lib/money";
 import { getEmailSettings, type EmailSettings } from "@/lib/settings";
 import type { OrderBundle } from "@/lib/queries";
@@ -124,6 +124,45 @@ export async function sendTicketsEmail(b: OrderBundle, pdf: Uint8Array) {
     html,
     attachments: [{ filename: `tickets-order-${b.order.order_no}.pdf`, content: Buffer.from(pdf) }],
   });
+}
+
+/**
+ * Sent the moment an order is placed, before payment. Gives the buyer a way back
+ * to the pay page if they close the browser while paying in their bank app.
+ */
+export async function sendOrderReceivedEmail(b: OrderBundle) {
+  if (!b.order.buyer_email) return { ok: false, reason: "no email" as const };
+  const total = php(b.order.total_centavos);
+  const deadline = b.order.expires_at
+    ? new Date(b.order.expires_at).toLocaleString("en-PH", { timeZone: "Asia/Manila", dateStyle: "medium", timeStyle: "short" })
+    : null;
+  const payUrl = `${SITE_URL}/pay/${b.order.id}`;
+  const rows = b.items
+    .map(
+      (it) =>
+        `<tr><td style="padding:6px 10px;border-bottom:1px solid #eee">${it.ticket_type.name} &times; ${it.qty}</td>
+         <td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:right">${php(it.qty * it.unit_price_centavos)}</td></tr>`,
+    )
+    .join("");
+  const account = b.event.gotyme_account_name ? ` (account name: <b>${b.event.gotyme_account_name}</b>)` : "";
+  const html = `
+  <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#111">
+    <h2 style="margin-bottom:4px">${b.event.name}</h2>
+    <p style="margin-top:0;color:#555">We received your order <b>#${b.order.order_no}</b>. It is <b>not paid yet</b>.</p>
+    <table style="border-collapse:collapse;width:100%">${rows}
+      <tr><td style="padding:8px 10px;font-weight:bold">Total to pay</td><td style="padding:8px 10px;text-align:right;font-weight:bold">${total}</td></tr>
+    </table>
+    <ol style="padding-left:20px;line-height:1.6">
+      <li>Pay exactly <b>${total}</b> via ${PAY_VIA}${account}. The QR code is on the payment page below.</li>
+      <li>Take a screenshot of the confirmation and upload it, with the reference number, on the same page.</li>
+    </ol>
+    ${deadline ? `<p style="background:#fff7e0;border:1px solid #f1d58a;padding:10px;border-radius:6px"><b>Please finish within ${PAYMENT_WINDOW_MINUTES} minutes</b>, by ${deadline}. Already paid but the timer ran out? Open the link anyway and upload your proof; your order is restored while wristbands remain.</p>` : ""}
+    <p><a href="${payUrl}" style="background:#111;color:#fff;padding:12px 18px;text-decoration:none;border-radius:6px;display:inline-block;font-weight:bold">Pay and upload proof</a></p>
+    <p style="color:#555;font-size:13px">Bayaran ang eksaktong <b>${total}</b> via GoTyme, i-screenshot ang confirmation, at i-upload sa link sa itaas. Kapag na-verify, ipapadala ang tickets sa email na ito.</p>
+    <p style="color:#777;font-size:12px">After we verify your payment, your receipt and QR tickets are emailed here within 24 hours. Check your order any time: <a href="${SITE_URL}/order/${b.order.id}">${SITE_URL}/order/${b.order.id}</a></p>
+    <p style="color:#777;font-size:12px">Found this in Spam or Promotions? Mark it as "Not spam" so your tickets land in your inbox.</p>
+  </div>`;
+  return send({ to: b.order.buyer_email, subject: `Order #${b.order.order_no} received - pay ${total} within ${PAYMENT_WINDOW_MINUTES} minutes`, html });
 }
 
 export async function sendRejectionEmail(b: OrderBundle, reason: string) {

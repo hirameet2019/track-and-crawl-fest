@@ -7,7 +7,13 @@ export const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ?? "http://localhost:3000";
 
 /** Minutes a buyer has to pay and upload proof before the order expires. */
-export const PAYMENT_WINDOW_MINUTES = 30;
+export const PAYMENT_WINDOW_MINUTES = 60;
+/**
+ * An expired order can still accept a proof upload for this many hours after it
+ * was placed, as long as the wristbands are still available. Buyers who paid but
+ * ran out the timer are not punished for being slow in their bank app.
+ */
+export const EXPIRED_GRACE_HOURS = 24;
 
 /**
  * Shirt sizes offered on ticket types that include a shirt (VIP Standing, VIP Car

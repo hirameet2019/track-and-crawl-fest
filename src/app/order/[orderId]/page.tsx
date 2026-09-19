@@ -7,6 +7,8 @@ import { getOrderBundle } from "@/lib/queries";
 import { php } from "@/lib/money";
 import { ticketUrl } from "@/lib/pdf/ticket-pdf";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { SupportContact } from "@/components/SupportContact";
+import { EXPIRED_GRACE_HOURS } from "@/config/event";
 
 export const dynamic = "force-dynamic";
 
@@ -59,9 +61,15 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ or
       {order.status === "expired" && (
         <div className="card mt-6 border-zinc-300 bg-zinc-100">
           <h2 className="font-semibold">This order expired before payment was submitted</h2>
-          <p className="mt-1 text-sm">If you already paid, contact the organizer with your reference number. Otherwise <Link href="/" className="underline">place a new order</Link>.</p>
+          <p className="mt-1 text-sm">
+            <b>Already paid?</b> You can still <Link href={`/pay/${order.id}`} className="font-semibold underline">upload your proof here</Link> within {EXPIRED_GRACE_HOURS} hours of ordering and the order is restored while wristbands remain.
+            Otherwise <Link href="/" className="underline">place a new order</Link>.
+          </p>
+          <p className="mt-1 text-xs text-zinc-600">Nakabayad na? I-upload pa rin ang proof sa link sa itaas. Kung hindi pa, mag-order ulit.</p>
         </div>
       )}
+
+      {order.status !== "paid" && <SupportContact event={event} />}
 
       <div className="card mt-6">
         <h2 className="font-semibold">Summary</h2>

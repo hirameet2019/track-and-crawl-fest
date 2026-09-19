@@ -3,8 +3,9 @@
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getActiveEvent, getTicketTypes, isSalesOpen } from "@/lib/queries";
-import { MAX_COMPANIONS_PER_CAR, MAX_QTY_PER_TYPE, PAYMENT_WINDOW_MINUTES, SHIRT_SIZES } from "@/config/event";
+import { getActiveEvent, getOrderBundle, getTicketTypes, isSalesOpen } from "@/lib/queries";
+import { sendOrderReceivedEmail } from "@/lib/email";
+import { EXPIRED_GRACE_HOURS, MAX_COMPANIONS_PER_CAR, MAX_QTY_PER_TYPE, PAYMENT_WINDOW_MINUTES, SHIRT_SIZES } from "@/config/event";
 import { IMAGE_MIME, MAX_UPLOAD_BYTES } from "@/lib/image";
 import { MOBILE_RE, emailProblem, normalizeEmail, normalizeMobile } from "@/lib/contact";
 import { audit } from "@/lib/audit";
@@ -156,6 +157,14 @@ export async function createOnlineOrder(formData: FormData): Promise<ActionResul
     data: { buyer: parsed.data.buyer_name, companions, items: parsed.data.items.reduce((n, i) => n + i.qty, 0), total_centavos: parsed.data.items.reduce((n, i) => n + i.qty * (types.find((t) => t.id === i.ticket_type_id)?.price_centavos ?? 0), 0) },
   });
 
+  // A way back to the pay page if the buyer loses the tab while paying. Must never block the order.
+  try {
+    const bundle = await getOrderBundle(orderId);
+    if (bundle) await sendOrderReceivedEmail(bundle);
+  } catch (e) {
+    console.error(`[order] received-email failed for ${orderId}:`, e instanceof Error ? e.message : e);
+  }
+
   redirect(`/pay/${orderId}`);
 }
 
@@ -186,9 +195,23 @@ export async function submitPaymentProof(formData: FormData): Promise<ActionResu
   await admin.rpc("expire_stale_orders", {});
   const { data: order } = await admin.from("orders").select("*").eq("id", parsed.data.order_id).maybeSingle();
   if (!order) return { ok: false, error: "Order not found" };
-  if (order.status === "expired") return { ok: false, error: "This order expired. Please place a new order." };
-  if (order.status !== "pending_payment" && order.status !== "awaiting_verification")
+  if (order.status === "expired") {
+    // Grace period: the buyer paid but ran out the timer. Restore the order if
+    // the wristbands it wanted are still available.
+    const ageHours = (Date.now() - new Date(order.created_at).getTime()) / 3600000;
+    if (ageHours > EXPIRED_GRACE_HOURS)
+      return { ok: false, error: `This order expired more than ${EXPIRED_GRACE_HOURS} hours ago. Please place a new order, or contact the organizer with your reference number if you already paid.` };
+    const { data: items } = await admin.from("order_items").select("ticket_type_id, qty").eq("order_id", order.id);
+    const ids = (items ?? []).map((i) => i.ticket_type_id);
+    const { data: avail } = await admin.from("v_ticket_type_availability").select("ticket_type_id, name, sellable").in("ticket_type_id", ids);
+    for (const it of items ?? []) {
+      const a = (avail ?? []).find((x) => x.ticket_type_id === it.ticket_type_id);
+      if (!a || Number(a.sellable) < it.qty)
+        return { ok: false, error: `Sorry, ${a?.name ?? "some tickets"} sold out while this order was expired. If you already paid, contact the organizer with your reference number.` };
+    }
+  } else if (order.status !== "pending_payment" && order.status !== "awaiting_verification") {
     return { ok: false, error: `This order is already ${order.status.replace("_", " ")}` };
+  }
 
   // Reject reference numbers already used on another live order
   const { data: dupe } = await admin

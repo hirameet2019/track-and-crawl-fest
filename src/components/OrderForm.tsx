@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState, useTransition } from "react";
 import { createOnlineOrder, type CreateOrderInput } from "@/app/actions/orders";
-import { MAX_COMPANIONS_PER_CAR, MAX_QTY_PER_TYPE, SHIRT_SIZES, SHIRT_SIZE_CHART } from "@/config/event";
+import { MAX_COMPANIONS_PER_CAR, MAX_QTY_PER_TYPE, PAYMENT_WINDOW_MINUTES, SHIRT_SIZES, SHIRT_SIZE_CHART } from "@/config/event";
 import { shrinkImage } from "@/lib/image";
 import { php } from "@/lib/money";
 import type { AvailabilityRow, TicketTypeRow } from "@/lib/supabase/types";
@@ -260,7 +260,7 @@ export function OrderForm({ types, availability }: { types: TicketTypeRow[]; ava
     <>
     <form onSubmit={submit} className="space-y-6">
       <section className="space-y-3">
-        <Reveal as="h2" className="text-lg font-bold" delay={80}>1. Choose your tickets</Reveal>
+        <Reveal as="h2" className="text-lg font-bold" delay={80}>1. Choose your tickets <span className="block text-sm font-normal text-zinc-500">Piliin kung ilang ticket ang bibilhin. Pindutin ang + o −.</span></Reveal>
         {types.map((t, idx) => {
           const left = sellable(t.id);
           const soldOut = left <= 0;
@@ -308,7 +308,7 @@ export function OrderForm({ types, availability }: { types: TicketTypeRow[]; ava
 
       {anySelected && (
         <section className="enter space-y-3">
-          <h2 className="text-lg font-bold">2. Ticket holder details</h2>
+          <h2 className="text-lg font-bold">2. Ticket holder details <span className="block text-sm font-normal text-zinc-500">Pangalan ng gagamit ng bawat ticket. Ito ang lalabas sa wristband record.</span></h2>
           {types.filter((t) => (qty[t.id] ?? 0) > 0).map((t) => (
             <div key={t.id} className="card space-y-4">
               <h3 className="font-semibold">{t.name} <span className="text-zinc-500">x {qty[t.id]}</span></h3>
@@ -416,7 +416,7 @@ export function OrderForm({ types, availability }: { types: TicketTypeRow[]; ava
       )}
 
       <Reveal as="section" className="space-y-3" delay={120}>
-        <h2 className="text-lg font-bold">{anySelected ? "3." : "2."} Your details</h2>
+        <h2 className="text-lg font-bold">{anySelected ? "3." : "2."} Your details <span className="block text-sm font-normal text-zinc-500">Dito ipapadala ang tickets. Siguraduhing tama ang email at cellphone number.</span></h2>
         <div className="card grid gap-3 sm:grid-cols-2">
           <div className="sm:col-span-2">
             <label className="label">Full name *</label>
@@ -519,7 +519,7 @@ export function OrderForm({ types, availability }: { types: TicketTypeRow[]; ava
             {pending ? "Reserving..." : "Review & continue"}
           </button>
         </div>
-        <p className="mt-3 text-xs text-zinc-400">You will have 30 minutes to pay via GoTyme (InstaPay QR) and upload your proof of payment.</p>
+        <p className="mt-3 text-xs text-zinc-400">You will have {PAYMENT_WINDOW_MINUTES} minutes to pay via GoTyme (InstaPay QR) and upload your proof of payment. <span className="text-zinc-500">Sa susunod na page ang QR at ang pag-upload ng screenshot.</span></p>
       </Reveal>
     </form>
     {review && (

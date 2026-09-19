@@ -40,6 +40,9 @@ export interface EventRow {
   maya_qr_url: string | null;
   maya_account_name: string | null;
   refund_policy: string | null;
+  /** "Need help?" contact shown to buyers; hidden while null. */
+  support_contact_label: string | null;
+  support_contact_url: string | null;
   active: boolean;
   created_at: string;
 }

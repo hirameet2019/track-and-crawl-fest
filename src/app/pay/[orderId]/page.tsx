@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/purity -- server component: rendered once per request, Date.now() is intentional */
 import Image from "next/image";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -7,7 +8,8 @@ import { Countdown } from "@/components/Countdown";
 import { getOrderBundle } from "@/lib/queries";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { php } from "@/lib/money";
-import { PAYMENT_CHANNELS } from "@/config/event";
+import { EXPIRED_GRACE_HOURS, PAYMENT_CHANNELS } from "@/config/event";
+import { SupportContact } from "@/components/SupportContact";
 import type { OnlinePaymentMethod } from "@/lib/supabase/types";
 
 export const dynamic = "force-dynamic";
@@ -17,7 +19,9 @@ export default async function PayPage({ params }: { params: Promise<{ orderId: s
   await createAdminClient().rpc("expire_stale_orders", {});
   const b = await getOrderBundle(orderId);
   if (!b) notFound();
-  if (b.order.status !== "pending_payment") redirect(`/order/${orderId}`);
+  // An expired order may still upload proof within the grace period (the action re-checks stock).
+  const recoverable = b.order.status === "expired" && Date.now() - new Date(b.order.created_at).getTime() < EXPIRED_GRACE_HOURS * 3600000;
+  if (b.order.status !== "pending_payment" && !recoverable) redirect(`/order/${orderId}`);
 
   const { event, order, items } = b;
   // A channel is offered only when the organizer has set its QR image on the
@@ -37,10 +41,18 @@ export default async function PayPage({ params }: { params: Promise<{ orderId: s
     <EventBanner event={event} />
     <div className="mx-auto w-full max-w-3xl px-4 py-8">
       <h1 className="text-2xl font-bold">Pay {php(order.total_centavos)}</h1>
-      <p className="text-sm text-zinc-600">
-        Order #{order.order_no} for {order.buyer_name}. Your tickets are reserved for{" "}
-        {order.expires_at ? <Countdown until={order.expires_at} /> : "a limited time"}.
-      </p>
+      {recoverable ? (
+        <div className="mt-2 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
+          <b>The reservation timer has ended, but you can still finish.</b> If you already paid, upload your proof below and your order #{order.order_no} is restored as long as wristbands remain. If you have not paid yet, pay now and upload right after.
+          <div className="mt-1 text-xs text-amber-800">Tapos na ang oras, pero pwede pang ituloy. Kung nakabayad ka na, i-upload lang ang proof sa ibaba at maibabalik ang order mo.</div>
+        </div>
+      ) : (
+        <p className="text-sm text-zinc-600">
+          Order #{order.order_no} for {order.buyer_name}. Your tickets are reserved for{" "}
+          {order.expires_at ? <Countdown until={order.expires_at} /> : "a limited time"}.
+          <span className="block text-xs text-zinc-500">Naka-hold ang wristbands mo habang tumatakbo ang oras. Bayaran at i-upload ang proof bago ito matapos.</span>
+        </p>
+      )}
 
       <div className="card mt-6">
         <h2 className="font-semibold">Order summary</h2>
@@ -57,6 +69,7 @@ export default async function PayPage({ params }: { params: Promise<{ orderId: s
 
       <section className="mt-6">
         <h2 className="text-lg font-bold">Step 1. Scan and pay the exact amount</h2>
+        <p className="text-sm text-zinc-500">Open your GoTyme app (or any bank app with InstaPay QR), scan the code, and pay the exact amount. <span className="text-zinc-400">Buksan ang GoTyme app, i-scan ang QR, at bayaran ang eksaktong halaga.</span></p>
         <div className={`mt-3 grid gap-4 ${channels.length > 1 ? "sm:grid-cols-2" : "mx-auto max-w-sm"}`}>
           {channels.map((c) => {
             const ch = PAYMENT_CHANNELS[c.key];
@@ -73,11 +86,13 @@ export default async function PayPage({ params }: { params: Promise<{ orderId: s
         <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
           Pay exactly <b>{php(order.total_centavos)}</b>. Put <b>Order #{order.order_no}</b> in the message or note if your app allows it. Take a screenshot of the confirmation.
           Any InstaPay transfer fee is charged by your own bank on top, so the amount received must still be the full ticket price.
+          <span className="mt-1 block text-xs text-amber-800">Eksaktong <b>{php(order.total_centavos)}</b> ang ipadala. Pagkatapos magbayad, i-screenshot ang confirmation screen.</span>
         </p>
       </section>
 
       <section className="mt-6">
         <h2 className="text-lg font-bold">Step 2. Submit your proof of payment</h2>
+        <p className="text-sm text-zinc-500">Type the reference number and upload the screenshot of your confirmation. <span className="text-zinc-400">Ilagay ang reference number at i-upload ang screenshot ng confirmation.</span></p>
         <div className="mt-3">
           <ProofForm orderId={order.id} methods={methods} />
         </div>
@@ -91,7 +106,9 @@ export default async function PayPage({ params }: { params: Promise<{ orderId: s
             If nothing arrives, look in your <b>Spam or Junk folder</b> first and mark the message as Not spam. You can also check your order any time at{" "}
             <Link href={`/order/${order.id}`} className="font-semibold underline">this status page</Link>; it updates the moment your payment is confirmed.
           </p>
+          <p className="mt-2 text-xs text-amber-800">Pagkatapos i-submit, hintayin ang email na may receipt at QR tickets, hanggang 24 oras. Tingnan din ang Spam folder.</p>
         </div>
+        <SupportContact event={event} />
       </section>
     </div>
     </main>

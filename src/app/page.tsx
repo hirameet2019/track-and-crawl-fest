@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { OrderForm } from "@/components/OrderForm";
 import { EventHero } from "@/components/EventHero";
 import { Reveal } from "@/components/Reveal";
+import { SupportContact } from "@/components/SupportContact";
 import { getActiveEvent, getAvailability, getTicketTypes, isSalesOpen, publicOrder } from "@/lib/queries";
 import { php } from "@/lib/money";
 
@@ -62,7 +63,8 @@ export default async function HomePage() {
           </Reveal>
         )}
 
-        <p className="mt-10 text-center text-xs text-zinc-500">
+        <div className="mt-10 flex justify-center"><SupportContact event={event} compact /></div>
+        <p className="mt-3 text-center text-xs text-zinc-500">
           Payment via GoTyme Bank (InstaPay QR). Tickets are emailed after payment verification. <Link href="/login" className="underline">Staff login</Link>
         </p>
       </section>
