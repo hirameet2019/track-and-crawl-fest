@@ -23,7 +23,9 @@ export function LoginForm({ next, signedOutFirst = false }: { next?: string; sig
     setBusy(true);
     setError(null);
     const supabase = createClient();
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    // Gate staff get short usernames (e.g. "walkin1"); the account behind it is username@drift.local.
+    const id = email.trim().toLowerCase();
+    const { error } = await supabase.auth.signInWithPassword({ email: id.includes("@") ? id : `${id}@drift.local`, password });
     setBusy(false);
     if (error) return setError(error.message);
     await recordSignIn().catch(() => {});
@@ -34,8 +36,8 @@ export function LoginForm({ next, signedOutFirst = false }: { next?: string; sig
   return (
     <form onSubmit={submit} className="card space-y-4">
       <div>
-        <label className="label">Email</label>
-        <input className="input" type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required />
+        <label className="label">Username or email</label>
+        <input className="input" type="text" inputMode="email" autoCapitalize="none" autoCorrect="off" spellCheck={false} autoComplete="username" placeholder="e.g. walkin1" value={email} onChange={(e) => setEmail(e.target.value)} required />
       </div>
       <div>
         <label className="label">Password</label>
