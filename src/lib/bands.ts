@@ -14,6 +14,12 @@ const BASE: Record<string, string> = {
   purple: "#8b5cf6",
 };
 
+/** Hex colour for a wristband name ("Blue stripes" -> #2563eb); grey when unknown. */
+export function bandHex(color: string | null | undefined): string {
+  const key = bandKey(color);
+  return key ? BASE[key] : "#777777";
+}
+
 export function bandKey(color: string | null | undefined): string | null {
   const k = (color ?? "").toLowerCase();
   return Object.keys(BASE).find((b) => k.includes(b)) ?? null;

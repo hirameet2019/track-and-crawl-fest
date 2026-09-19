@@ -40,7 +40,10 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
     <div>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <h1 className="text-2xl font-bold">Orders</h1>
-        <a href="/api/admin/export" className="btn-secondary">Export CSV</a>
+        <div className="flex gap-2">
+          <a href="/api/admin/export" className="btn-secondary" title="Excel: Summary plus one colour-coded sheet per wristband label">Export Excel</a>
+          <a href="/api/admin/export?type=csv" className="btn-secondary" title="Flat CSV, one row per ticket">CSV</a>
+        </div>
       </div>
       <form className="mt-4 flex flex-wrap gap-2">
         <input name="q" defaultValue={q} className="input max-w-xs" placeholder="Name, email, mobile, reference, order #, ticket #" />

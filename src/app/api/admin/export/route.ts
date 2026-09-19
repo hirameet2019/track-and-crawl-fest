@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getStaff } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { actionMeta, describe } from "@/lib/audit";
+import { buildTicketsWorkbook } from "@/lib/export-xlsx";
 
 export const dynamic = "force-dynamic";
 
@@ -59,7 +60,11 @@ async function auditCsv() {
   ]);
 }
 
-/** CSV export. `?type=walkin` for the gate tally, `?type=audit` for the audit trail (admin); default is every ticket with its order. Staff only. */
+/**
+ * Exports. `?type=walkin` (CSV) for the gate tally, `?type=audit` (CSV, admin) for the audit
+ * trail, `?type=csv` for the flat one-row-per-ticket CSV. Default is the Excel workbook with
+ * a Summary sheet and one colour-coded sheet per wristband label. Staff only.
+ */
 export async function GET(req: NextRequest) {
   const session = await getStaff();
   if (!session || session.staff.role === "scanner") return new NextResponse("Forbidden", { status: 403 });
@@ -68,6 +73,17 @@ export async function GET(req: NextRequest) {
   if (type === "audit") {
     if (session.staff.role !== "admin") return new NextResponse("Forbidden", { status: 403 });
     return download(await auditCsv(), "audit-log");
+  }
+
+  if (type !== "csv") {
+    const xlsx = await buildTicketsWorkbook();
+    return new NextResponse(new Uint8Array(xlsx), {
+      headers: {
+        "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "Content-Disposition": `attachment; filename="tickets-by-wristband-${new Date().toISOString().slice(0, 10)}.xlsx"`,
+        "Cache-Control": "private, no-store",
+      },
+    });
   }
 
   const admin = createAdminClient();

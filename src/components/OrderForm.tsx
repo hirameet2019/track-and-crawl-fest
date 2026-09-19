@@ -262,7 +262,7 @@ export function OrderForm({ types, availability }: { types: TicketTypeRow[]; ava
     <>
     <form onSubmit={submit} className="space-y-6">
       <section className="space-y-3">
-        <Reveal as="h2" className="text-lg font-bold" delay={80}>1. Choose your tickets <span className="block text-sm font-normal text-zinc-500">Piliin kung ilang ticket ang bibilhin. Pindutin ang + o −.</span></Reveal>
+        <Reveal as="h2" className="text-lg font-bold" delay={80}>1. Choose your tickets <span className="block text-sm font-normal text-zinc-500">Piliin kung ilang ticket ang bibilhin. Pindutin ang + or -.</span></Reveal>
         {types.map((t, idx) => {
           const left = sellable(t.id);
           const closed = isTypeClosed(t);
