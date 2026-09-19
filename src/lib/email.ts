@@ -165,6 +165,36 @@ export async function sendOrderReceivedEmail(b: OrderBundle) {
   return send({ to: b.order.buyer_email, subject: `Order #${b.order.order_no} received - pay ${total} within ${PAYMENT_WINDOW_MINUTES} minutes`, html });
 }
 
+/**
+ * Sent when staff void one or more issued tickets (wrong approval, duplicate
+ * payment, buyer request). Lists the affected wristband numbers and the reason,
+ * and points to the organizer contact for refunds or disputes.
+ */
+export async function sendVoidEmail(b: OrderBundle, voided: OrderBundle["tickets"], reason: string) {
+  if (!b.order.buyer_email || voided.length === 0) return { ok: false, reason: "no email" as const };
+  const all = b.tickets.length > 0 && b.tickets.every((t) => t.status === "void");
+  const rows = voided
+    .map((t) => `<tr><td style="padding:6px 10px;border-bottom:1px solid #eee">${t.ticket_type.name}</td><td style="padding:6px 10px;border-bottom:1px solid #eee"><b>${t.number}</b></td><td style="padding:6px 10px;border-bottom:1px solid #eee">${t.holder_name ?? ""}</td></tr>`)
+    .join("");
+  const contact = b.event.support_contact_label
+    ? `<p>Questions or a refund? ${b.event.support_contact_url ? `<a href="${b.event.support_contact_url}">${b.event.support_contact_label}</a>` : b.event.support_contact_label} and mention order <b>#${b.order.order_no}</b>.</p>`
+    : `<p>Questions or a refund? Reply to this email and mention order <b>#${b.order.order_no}</b>.</p>`;
+  const html = `
+  <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#111">
+    <h2 style="margin-bottom:4px">${b.event.name}</h2>
+    <p style="margin-top:0;color:#555">${all ? "All tickets in" : `${voided.length} ticket${voided.length === 1 ? "" : "s"} in`} order <b>#${b.order.order_no}</b> ${voided.length === 1 && !all ? "has" : "have"} been <b>voided</b> and will not be accepted at the gate.</p>
+    <p style="background:#fff4f4;border:1px solid #f3c2c2;padding:10px;border-radius:6px"><b>Reason:</b> ${reason}</p>
+    <table style="border-collapse:collapse;width:100%">
+      <thead><tr style="text-align:left;background:#f5f5f5"><th style="padding:6px 10px">Ticket</th><th style="padding:6px 10px">Wristband No.</th><th style="padding:6px 10px">Holder</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    ${all ? "" : `<p>Your other tickets in this order stay valid. The updated PDF is at <a href="${SITE_URL}/order/${b.order.id}">${SITE_URL}/order/${b.order.id}</a>.</p>`}
+    ${contact}
+    <p style="color:#555;font-size:13px">Na-void ang ${all ? "lahat ng tickets" : "ilang tickets"} sa order #${b.order.order_no}. Kung may tanong o refund, kontakin ang organizer at banggitin ang order number.</p>
+  </div>`;
+  return send({ to: b.order.buyer_email, subject: `Ticket${voided.length === 1 ? "" : "s"} voided - ${b.event.name} (Order #${b.order.order_no})`, html });
+}
+
 export async function sendRejectionEmail(b: OrderBundle, reason: string) {
   if (!b.order.buyer_email) return { ok: false, reason: "no email" as const };
   const html = `

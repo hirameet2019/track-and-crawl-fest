@@ -69,6 +69,17 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ or
         </div>
       )}
 
+      {(order.status === "voided" || tickets.some((t) => t.status === "void")) && (
+        <div className="card mt-6 border-red-200 bg-red-50">
+          <h2 className="font-semibold text-red-900">{order.status === "voided" ? "This order was voided" : "Some tickets in this order were voided"}</h2>
+          <p className="mt-1 text-sm text-red-900">
+            Voided tickets are marked below and will not be accepted at the gate.
+            {order.status === "voided" ? "" : " Your other tickets stay valid."} Reason: {tickets.find((t) => t.void_reason)?.void_reason ?? "see the email we sent"}.
+          </p>
+          <p className="mt-1 text-xs text-red-900/80">Hindi na tatanggapin sa gate ang mga naka-VOID na ticket. Kung may tanong o refund, kontakin ang organizer.</p>
+        </div>
+      )}
+
       {order.status !== "paid" && <SupportContact event={event} />}
 
       <div className="card mt-6">
@@ -82,23 +93,27 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ or
           ))}
           <li className="flex justify-between py-2 font-bold"><span>Total</span><span>{php(order.total_centavos)}</span></li>
         </ul>
-        {order.status === "paid" && (
+        {(order.status === "paid" || order.status === "voided") && (
           <a href={`/api/orders/${order.id}/pdf`} className="btn-primary mt-4 w-full sm:w-auto">Download receipt &amp; tickets (PDF)</a>
         )}
       </div>
 
-      {order.status === "paid" && (
+      {(order.status === "paid" || order.status === "voided") && (
         <section className="mt-6">
           <h2 className="text-lg font-bold">Your tickets</h2>
           <p className="text-sm text-zinc-600">Show each QR code at the gate. Each one admits one person once.</p>
           <div className="mt-3 grid gap-4 sm:grid-cols-2">
             {tickets.map((t, i) => (
-              <div key={t.id} className="card flex flex-col items-center text-center">
+              <div key={t.id} className={`card flex flex-col items-center text-center ${t.status === "void" ? "opacity-60 grayscale" : ""}`}>
                 <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{t.ticket_type.name}</div>
                 <div className="text-3xl font-black">{t.number}</div>
                 {t.ticket_type.band_color && <div className="text-xs text-zinc-500">{t.ticket_type.band_color} wristband</div>}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={qrs[i]} alt={`QR for ticket ${t.number}`} className="my-3 h-48 w-48" />
+                {t.status === "void" ? (
+                  <div className="my-3 flex h-48 w-48 items-center justify-center rounded-lg border-2 border-dashed border-red-300 text-3xl font-black text-red-600">VOID</div>
+                ) : (
+                  <img src={qrs[i]} alt={`QR for ticket ${t.number}`} className="my-3 h-48 w-48" />
+                )}
                 <div className="text-sm font-medium">{t.holder_name}</div>
                 <div className="text-xs text-zinc-500">
                   {t.shirt_size && <>Shirt {t.shirt_size} </>}
@@ -110,6 +125,7 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ or
                   <img src={photos[i]!} alt={`Car ${t.vehicle_plate ?? ""}`} className="mt-2 h-24 w-36 rounded-lg border border-white/10 object-cover" />
                 )}
                 <div className="mt-2"><TicketStatusBadge status={t.status} /></div>
+                {t.status === "void" && t.void_reason && <div className="mt-1 text-xs text-red-700">{t.void_reason}</div>}
               </div>
             ))}
           </div>

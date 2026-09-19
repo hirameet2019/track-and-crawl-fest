@@ -71,7 +71,8 @@ export async function getOrderBundle(orderId: string): Promise<OrderBundle | nul
       .from("tickets")
       .select("*, ticket_type:ticket_types(*)")
       .eq("order_id", orderId)
-      .order("created_at"),
+      .order("created_at")
+      .order("number"),
   ]);
   if (!event) return null;
   return {

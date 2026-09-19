@@ -5,7 +5,7 @@ import { OrderStatusBadge } from "@/components/StatusBadge";
 import { php } from "@/lib/money";
 import type { OrderStatus } from "@/lib/supabase/types";
 
-const STATUSES: OrderStatus[] = ["awaiting_verification", "paid", "pending_payment", "rejected", "expired", "cancelled"];
+const STATUSES: OrderStatus[] = ["awaiting_verification", "paid", "voided", "pending_payment", "rejected", "expired", "cancelled"];
 
 export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ q?: string; status?: string }> }) {
   await requireStaff("staff");

@@ -503,6 +503,26 @@ async function drawTicketPage(doc: PDFDocument, f: Fonts, b: OrderBundle, t: Ord
     page.drawText(label, { x: tx, y: sY + sH - 22, size, font: f.display, color: isVip ? BRAND.gold : BRAND.cyan });
   }
 
+  // ---------------------------------------------------------- void stamp
+  if (t.status === "void") {
+    const RED = rgb(0.8, 0.1, 0.1);
+    // hide the QR codes so a voided page cannot be mistaken for a live one
+    page.drawRectangle({ x: px, y: py, width: panelW, height: panelH, color: PANEL, borderColor: LINE, borderWidth: 0.6 });
+    const v = "VOID";
+    const vs = 44;
+    page.drawText(v, { x: px + (panelW - f.display.widthOfTextAtSize(v, vs)) / 2, y: py + panelH / 2 + 10, size: vs, font: f.display, color: RED });
+    const why = wrap(f.regular, `Not valid for entry. ${t.void_reason ?? ""}`.trim(), 8.5, panelW - 24);
+    let wy = py + panelH / 2 - 14;
+    for (const line of why.slice(0, 4)) { text(page, line, px + (panelW - f.regular.widthOfTextAtSize(line, 8.5)) / 2, wy, 8.5, f.regular, INK); wy -= 11; }
+    page.drawRectangle({ x: right - 12 - sq, y: sY + 10, width: sq, height: sq, color: rgb(0.05, 0.03, 0.09) });
+    // big diagonal watermark across the body card and the stub
+    for (const [cx, cy] of [[W / 2, (cardTop + cardBottom) / 2], [W / 2, sY + sH / 2]] as [number, number][]) {
+      const size = cx === W / 2 && cy > 300 ? 150 : 70;
+      const tw = f.display.widthOfTextAtSize(v, size);
+      page.drawText(v, { x: cx - tw * 0.42, y: cy - size * 0.55, size, font: f.display, color: RED, opacity: 0.28, rotate: degrees(22) });
+    }
+  }
+
   // ---------------------------------------------------------- footer
   text(page, "Each QR code admits one person once. Keep your wristband on for the whole event. Do not share screenshots of your QR code.", MARGIN, 44, 7.5, f.regular, MUTED);
   text(page, `Ticket ID ${t.id}   |   ${safe(event.org_name)}`, MARGIN, 32, 7, f.regular, rgb(0.6, 0.6, 0.65));

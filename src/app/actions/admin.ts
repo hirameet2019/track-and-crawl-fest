@@ -7,7 +7,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getOrderBundle } from "@/lib/queries";
 import { audit } from "@/lib/audit";
 import { issueOrder, deliverOrder } from "@/lib/issue";
-import { sendRejectionEmail } from "@/lib/email";
+import { sendRejectionEmail, sendVoidEmail } from "@/lib/email";
 import type { ActionResult } from "./orders";
 
 function fail(e: unknown): ActionResult {
@@ -69,6 +69,87 @@ export async function resendTickets(orderId: string): Promise<ActionResult> {
     await audit(createAdminClient(), { actor: userId, action: "order.resent", entity: "order", entity_id: orderId, data: { emailed: r.emailed, to: r.bundle.order.buyer_email } });
     revalidatePath(`/admin/orders/${orderId}`);
     return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/* ------------------------------------------------------------------ void */
+/**
+ * Void one issued ticket (wrong approval, duplicate payment, buyer request).
+ * Admin only. The wristband number stays with the voided ticket and is marked
+ * void in the pool; the buyer is emailed. Reversible with unvoidTicket.
+ */
+export async function voidTicket(ticketId: string, reason: string): Promise<ActionResult> {
+  try {
+    const { userId } = await assertStaff("admin");
+    const r = reason.trim();
+    if (r.length < 3) return { ok: false, error: "Give a short reason (the buyer will see it)" };
+    const admin = createAdminClient();
+    const { data, error } = await admin.rpc("void_ticket", { p_ticket_id: ticketId, p_actor: userId, p_reason: r });
+    if (error) return { ok: false, error: error.message };
+    const orderId = (data as { order_id: string } | null)?.order_id;
+    if (!orderId) return { ok: true };
+    const bundle = await getOrderBundle(orderId);
+    let warning: string | undefined;
+    if (bundle) {
+      const voided = bundle.tickets.filter((t) => t.id === ticketId);
+      const sent = await sendVoidEmail(bundle, voided, r).catch((e) => { console.error(e); return { ok: false as const }; });
+      if (!sent.ok) warning = bundle.order.buyer_email ? "Ticket voided, but the notice email could not be sent." : "Ticket voided. No email on order, so the buyer was not notified.";
+    }
+    revalidatePath("/admin");
+    revalidatePath(`/admin/orders/${orderId}`);
+    return warning ? { ok: true, warning } : { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/** Undo a void: ticket becomes valid again and the fresh PDF is re-sent to the buyer. */
+export async function unvoidTicket(ticketId: string): Promise<ActionResult> {
+  try {
+    const { userId } = await assertStaff("admin");
+    const admin = createAdminClient();
+    const { data, error } = await admin.rpc("unvoid_ticket", { p_ticket_id: ticketId, p_actor: userId });
+    if (error) return { ok: false, error: error.message };
+    const orderId = (data as { order_id: string } | null)?.order_id;
+    if (!orderId) return { ok: true };
+    let warning: string | undefined;
+    try {
+      const r = await deliverOrder(orderId);
+      if (!r.emailed) warning = "Ticket restored. No email on order, so nothing was sent.";
+    } catch (e) {
+      warning = `Ticket restored, but the ticket email could not be re-sent: ${e instanceof Error ? e.message : "error"}`;
+    }
+    revalidatePath("/admin");
+    revalidatePath(`/admin/orders/${orderId}`);
+    return warning ? { ok: true, warning } : { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/** Void every unused ticket of a paid order; tickets already scanned are skipped. */
+export async function voidOrder(orderId: string, reason: string): Promise<ActionResult> {
+  try {
+    const { userId } = await assertStaff("admin");
+    const r = reason.trim();
+    if (r.length < 3) return { ok: false, error: "Give a short reason (the buyer will see it)" };
+    const admin = createAdminClient();
+    const { data, error } = await admin.rpc("void_order", { p_order_id: orderId, p_actor: userId, p_reason: r });
+    if (error) return { ok: false, error: error.message };
+    const n = Number(data ?? 0);
+    const bundle = await getOrderBundle(orderId);
+    let warning: string | undefined;
+    if (bundle && n > 0) {
+      const voided = bundle.tickets.filter((t) => t.status === "void");
+      const sent = await sendVoidEmail(bundle, voided, r).catch((e) => { console.error(e); return { ok: false as const }; });
+      if (!sent.ok) warning = bundle.order.buyer_email ? `${n} ticket(s) voided, but the notice email could not be sent.` : `${n} ticket(s) voided. No email on order, so the buyer was not notified.`;
+    }
+    if (n === 0) warning = "Nothing to void: every ticket in this order was already scanned or void.";
+    revalidatePath("/admin");
+    revalidatePath(`/admin/orders/${orderId}`);
+    return warning ? { ok: true, warning } : { ok: true };
   } catch (e) {
     return fail(e);
   }

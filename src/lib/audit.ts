@@ -40,6 +40,9 @@ const ACTIONS: Record<string, { cat: AuditCategory; label: string }> = {
   "order.resent": { cat: "orders", label: "Tickets re-sent by email" },
   "order.reverted": { cat: "orders", label: "Paid order reverted, wristband released" },
   "ticket.redeemed": { cat: "tickets", label: "Ticket scanned at gate" },
+  "ticket.voided": { cat: "payments", label: "Ticket voided" },
+  "ticket.unvoided": { cat: "payments", label: "Voided ticket restored" },
+  "order.voided": { cat: "payments", label: "Paid order voided" },
   "ticket.kit": { cat: "tickets", label: "Kit item handed over" },
   "walkin.recorded": { cat: "walkin", label: "Walk-in tally" },
   "ticket_type.walkin_price": { cat: "walkin", label: "Gate price changed" },
@@ -74,6 +77,12 @@ export function describe(action: string, data: Record<string, unknown> | null | 
       return [d.method ? String(d.method).toUpperCase() : "", d.reference ? `ref ${d.reference}` : ""].filter(Boolean).join(" ");
     case "order.rejected":
       return d.reason ? `Reason: ${d.reason}` : "";
+    case "ticket.voided":
+      return [d.number ? String(d.number) : "", d.reason ? `Reason: ${d.reason}` : "", d.order_voided ? "whole order now void" : ""].filter(Boolean).join(" · ");
+    case "ticket.unvoided":
+      return d.number ? String(d.number) : "";
+    case "order.voided":
+      return [d.order_no ? `Order #${d.order_no}` : "", d.tickets !== undefined ? `${d.tickets} ticket(s)` : "", d.reason ? `Reason: ${d.reason}` : ""].filter(Boolean).join(" · ");
     case "order.reverted":
       return [d.order_no ? `Order #${d.order_no}` : "", Array.isArray(d.released_numbers) ? `released ${d.released_numbers.join(", ")}` : "", d.reason ? String(d.reason) : ""].filter(Boolean).join(" · ");
     case "walkin.recorded": {

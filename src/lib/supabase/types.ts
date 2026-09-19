@@ -10,7 +10,8 @@ export type OrderStatus =
   | "paid"
   | "rejected"
   | "expired"
-  | "cancelled";
+  | "cancelled"
+  | "voided";
 export type OrderChannel = "online" | "onsite" | "import";
 export type PaymentMethod = "gotyme" | "gcash" | "maya" | "cash";
 /** Channels a buyer can pay through online (everything except cash at the gate). */
@@ -149,6 +150,9 @@ export interface TicketRow {
   status: TicketStatus;
   redeemed_at: string | null;
   redeemed_by: string | null;
+  void_reason: string | null;
+  voided_at: string | null;
+  voided_by: string | null;
   kit_claimed: Record<string, boolean>;
   created_at: string;
 }

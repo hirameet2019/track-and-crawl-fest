@@ -6,11 +6,13 @@ import { OrderStatusBadge, TicketStatusBadge } from "@/components/StatusBadge";
 import { OrderActions } from "@/components/OrderActions";
 import { php } from "@/lib/money";
 import { SignedImage } from "@/components/SignedImage";
+import { TicketActions } from "@/components/TicketActions";
 
 const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleString("en-PH", { timeZone: "Asia/Manila" }) : "-");
 
 export default async function OrderDetailPage({ params }: { params: Promise<{ orderId: string }> }) {
-  await requireStaff("staff");
+  const session = await requireStaff("staff");
+  const isAdmin = session.staff.role === "admin";
   const { orderId } = await params;
   const b = await getOrderBundle(orderId);
   if (!b) notFound();
@@ -51,7 +53,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ or
         </div>
         <div className="card">
           <h2 className="font-semibold">Actions</h2>
-          <OrderActions orderId={order.id} status={order.status} proofPath={order.payment_proof_path} hasEmail={!!order.buyer_email} />
+          <OrderActions orderId={order.id} status={order.status} proofPath={order.payment_proof_path} hasEmail={!!order.buyer_email} isAdmin={isAdmin} />
         </div>
       </div>
 
@@ -59,7 +61,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ or
         <div className="card overflow-x-auto">
           <h2 className="font-semibold">Tickets</h2>
           <table className="mt-2 w-full text-sm">
-            <thead className="text-left text-xs uppercase text-zinc-500"><tr><th className="py-1">Number</th><th>Type</th><th>Holder</th><th>Shirt</th><th>Vehicle</th><th>Car photo</th><th>Status</th><th>Redeemed</th><th></th></tr></thead>
+            <thead className="text-left text-xs uppercase text-zinc-500"><tr><th className="py-1">Number</th><th>Type</th><th>Holder</th><th>Shirt</th><th>Vehicle</th><th>Car photo</th><th>Status</th><th>Redeemed</th><th></th>{isAdmin && <th></th>}</tr></thead>
             <tbody>
               {tickets.map((t) => (
                 <tr key={t.id} className="border-t">
@@ -72,6 +74,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ or
                   <td><TicketStatusBadge status={t.status} /></td>
                   <td className="text-xs text-zinc-500">{fmt(t.redeemed_at)}</td>
                   <td><Link href={`/t/${t.qr_token}`} className="text-xs underline" target="_blank">View QR</Link></td>
+                  {isAdmin && <td className="py-2"><TicketActions ticketId={t.id} number={t.number} status={t.status} voidReason={t.void_reason} /></td>}
                 </tr>
               ))}
             </tbody>

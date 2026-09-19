@@ -7,6 +7,7 @@ const ORDER: Record<OrderStatus, { label: string; cls: string }> = {
   rejected: { label: "Rejected", cls: "bg-red-100 text-red-800" },
   expired: { label: "Expired", cls: "bg-zinc-200 text-zinc-700" },
   cancelled: { label: "Cancelled", cls: "bg-zinc-200 text-zinc-700" },
+  voided: { label: "Voided", cls: "bg-red-100 text-red-800" },
 };
 
 const TICKET: Record<TicketStatus, { label: string; cls: string }> = {

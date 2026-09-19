@@ -12,7 +12,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ orderId: strin
   const { orderId } = await ctx.params;
   const bundle = await getOrderBundle(orderId);
   if (!bundle) return new NextResponse("Not found", { status: 404 });
-  if (bundle.order.status !== "paid") return new NextResponse("Order not paid", { status: 409 });
+  if (bundle.order.status !== "paid" && bundle.order.status !== "voided") return new NextResponse("Order not paid", { status: 409 });
 
   const pdf = await buildOrderPdf(bundle);
   return new NextResponse(Buffer.from(pdf), {
