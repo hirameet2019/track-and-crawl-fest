@@ -6,7 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getActiveEvent, getTicketTypes, isSalesOpen } from "@/lib/queries";
 import { MAX_QTY_PER_TYPE, PAYMENT_WINDOW_MINUTES, SHIRT_SIZES } from "@/config/event";
 import { IMAGE_MIME, MAX_UPLOAD_BYTES } from "@/lib/image";
-import { MOBILE_RE, normalizeMobile } from "@/lib/contact";
+import { MOBILE_RE, emailProblem, normalizeEmail, normalizeMobile } from "@/lib/contact";
 import { audit } from "@/lib/audit";
 
 export type ActionResult = { ok: true; warning?: string } | { ok: false; error: string };
@@ -22,7 +22,18 @@ const attendeeSchema = z.object({
 
 const createOrderSchema = z.object({
   buyer_name: z.string().trim().min(2, "Enter your full name").max(80),
-  buyer_email: z.string().trim().email("Enter a valid email"),
+  buyer_email: z.preprocess(
+    (v) => normalizeEmail(String(v ?? "")),
+    z
+      .string()
+      .min(1, "Enter your email")
+      .max(120)
+      .email("Enter a valid email")
+      .superRefine((e, ctx) => {
+        const problem = emailProblem(e);
+        if (problem) ctx.addIssue({ code: "custom", message: `Email: ${problem}` });
+      }),
+  ),
   // Accept "+63 917 123 4567", "0917-123-4567" etc.; store the canonical 09XXXXXXXXX.
   buyer_mobile: z.preprocess(
     (v) => normalizeMobile(String(v ?? "")),
@@ -105,7 +116,7 @@ export async function createOnlineOrder(formData: FormData): Promise<ActionResul
     p_event_id: event.id,
     p_channel: "online",
     p_buyer_name: parsed.data.buyer_name,
-    p_buyer_email: parsed.data.buyer_email.toLowerCase(),
+    p_buyer_email: parsed.data.buyer_email,
     p_buyer_mobile: parsed.data.buyer_mobile,
     p_items: parsed.data.items,
     p_expires_minutes: PAYMENT_WINDOW_MINUTES,

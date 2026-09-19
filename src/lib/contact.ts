@@ -31,6 +31,57 @@ export function mobileProblem(raw: string): string | null {
 
 const COMMON_DOMAINS = ["gmail.com", "yahoo.com", "yahoo.com.ph", "outlook.com", "hotmail.com", "icloud.com", "live.com", "proton.me", "protonmail.com"];
 
+/**
+ * Trim, lowercase, drop stray spaces and full-width "＠" that phone keyboards
+ * insert. Both the form and the server run this, so the stored address is the
+ * one the buyer actually sees on the review screen.
+ */
+export function normalizeEmail(raw: string): string {
+  return raw.replace(/＠/g, "@").replace(/\s+/g, "").trim().toLowerCase();
+}
+
+/** ".con", ".cm" and friends: the address is well-formed but nobody lives there. */
+const TLD_TYPOS: Record<string, string> = {
+  con: "com", cm: "com", cmo: "com", ocm: "com", cpm: "com", clm: "com", cim: "com", vom: "com", xom: "com", comm: "com", coom: "com", om: "com", co: "com",
+  nett: "net", ner: "net", ogr: "org", prg: "org",
+};
+
+/**
+ * Human-readable reason the address will not work, or null when it looks
+ * deliverable (or is still empty). Stricter than the HTML "email" type on
+ * purpose: the ticket PDF is only ever sent here, there is no second chance.
+ */
+export function emailProblem(raw: string): string | null {
+  const e = normalizeEmail(raw);
+  if (!e) return null;
+  if (/\s/.test(raw.trim())) return "Remove the space in the email address";
+  const at = e.split("@");
+  if (at.length < 2) return "Missing @ in the email address";
+  if (at.length > 2) return "Only one @ is allowed";
+  const [local, domain] = at;
+  if (!local) return "Type the part before the @";
+  if (!domain) return "Type the part after the @, e.g. gmail.com";
+  if (!/^[a-z0-9!#$%&'*+/=?^_`{|}~.-]+$/.test(local)) return "The part before @ has a character that is not allowed";
+  if (local.startsWith(".") || local.endsWith(".") || local.includes("..")) return "Dots cannot start, end, or repeat before the @";
+  if (!domain.includes(".")) return `"${domain}" is missing its ending, e.g. gmail.com`;
+  if (domain.includes("..") || domain.startsWith(".") || domain.endsWith(".") || domain.startsWith("-") || domain.endsWith("-")) return "Check the dots in the domain";
+  if (!/^[a-z0-9.-]+$/.test(domain)) return "The domain has a character that is not allowed";
+  const labels = domain.split(".");
+  const tld = labels[labels.length - 1];
+  if (TLD_TYPOS[tld]) return `".${tld}" is not a real ending, did you mean ".${TLD_TYPOS[tld]}"?`;
+  if (!/^[a-z]{2,}$/.test(tld)) return "The email ending should be letters only, e.g. .com or .ph";
+  if (domain === "gmail.com") {
+    const bare = local.replace(/\./g, "");
+    if (!/^[a-z0-9]+$/.test(bare)) return "Gmail addresses only use letters, numbers and dots before the @";
+  }
+  return null;
+}
+
+/** True when both boxes hold the same deliverable address. */
+export function emailsMatch(a: string, b: string): boolean {
+  return normalizeEmail(a) !== "" && normalizeEmail(a) === normalizeEmail(b);
+}
+
 function editDistance(a: string, b: string): number {
   const prev = Array.from({ length: b.length + 1 }, (_, i) => i);
   for (let i = 1; i <= a.length; i++) {
@@ -51,7 +102,7 @@ function editDistance(a: string, b: string): number {
  * common consumer domains; company domains are left alone.
  */
 export function suggestEmail(email: string): string | null {
-  const m = email.trim().toLowerCase().match(/^([^@\s]+)@([^@\s]+\.[^@\s]+)$/);
+  const m = normalizeEmail(email).match(/^([^@\s]+)@([^@\s]+\.[^@\s]+)$/);
   if (!m) return null;
   const [, local, domain] = m;
   if (COMMON_DOMAINS.includes(domain)) return null;

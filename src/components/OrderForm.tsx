@@ -9,7 +9,7 @@ import type { AvailabilityRow, TicketTypeRow } from "@/lib/supabase/types";
 import { BandSwatch } from "@/components/BandSwatch";
 import { Reveal } from "@/components/Reveal";
 import { ShirtSizeChartButton, ShirtSizeHint } from "@/components/ShirtSizeChart";
-import { mobileProblem, normalizeMobile, suggestEmail } from "@/lib/contact";
+import { emailProblem, emailsMatch, mobileProblem, normalizeEmail, normalizeMobile, suggestEmail } from "@/lib/contact";
 import { OrderReviewModal, type ReviewLine } from "@/components/OrderReviewModal";
 
 type Attendee = {
@@ -84,6 +84,7 @@ export function OrderForm({ types, availability }: { types: TicketTypeRow[]; ava
   const [qty, setQty] = useState<Record<string, number>>({});
   const [attendees, setAttendees] = useState<Record<string, Attendee[]>>({});
   const [buyer, setBuyer] = useState({ buyer_name: "", buyer_email: "", buyer_mobile: "" });
+  const [emailConfirm, setEmailConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [review, setReview] = useState(false);
   const [pending, start] = useTransition();
@@ -99,7 +100,9 @@ export function OrderForm({ types, availability }: { types: TicketTypeRow[]; ava
   // Live contact checks: the server validates again, but a wrong digit or a
   // "gmail.cim" typo is much cheaper to catch while the buyer is still typing.
   const mobileIssue = mobileProblem(buyer.buyer_mobile);
-  const emailSuggestion = suggestEmail(buyer.buyer_email);
+  const emailIssue = emailProblem(buyer.buyer_email);
+  const emailSuggestion = emailIssue ? null : suggestEmail(buyer.buyer_email);
+  const emailMismatch = emailConfirm.trim() !== "" && !emailsMatch(buyer.buyer_email, emailConfirm);
 
   function setQuantity(t: TicketTypeRow, n: number) {
     const max = Math.min(MAX_QTY_PER_TYPE, sellable(t.id));
@@ -133,6 +136,16 @@ export function OrderForm({ types, availability }: { types: TicketTypeRow[]; ava
   function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    if (emailIssue) {
+      setError(`Email: ${emailIssue}.`);
+      document.getElementById("buyer-email")?.focus();
+      return;
+    }
+    if (!emailsMatch(buyer.buyer_email, emailConfirm)) {
+      setError("The two email addresses do not match. Tickets are sent there, so please type it again carefully.");
+      document.getElementById("buyer-email-confirm")?.focus();
+      return;
+    }
     if (mobileIssue) {
       setError(`Mobile number: ${mobileIssue}.`);
       document.getElementById("buyer-mobile")?.focus();
@@ -166,7 +179,7 @@ export function OrderForm({ types, availability }: { types: TicketTypeRow[]; ava
     }));
     start(async () => {
       const fd = new FormData();
-      fd.set("payload", JSON.stringify({ ...buyer, buyer_mobile: normalizeMobile(buyer.buyer_mobile), items }));
+      fd.set("payload", JSON.stringify({ ...buyer, buyer_email: normalizeEmail(buyer.buyer_email), buyer_mobile: normalizeMobile(buyer.buyer_mobile), items }));
       for (const t of selected) {
         if (!t.requires_vehicle) continue;
         for (const [i, a] of (attendees[t.id] ?? []).entries()) {
@@ -301,18 +314,65 @@ export function OrderForm({ types, availability }: { types: TicketTypeRow[]; ava
             <label className="label">Full name *</label>
             <input className="input" value={buyer.buyer_name} onChange={(e) => setBuyer({ ...buyer, buyer_name: e.target.value })} required />
           </div>
-          <div>
-            <label className="label">Email * (tickets are sent here)</label>
-            <input className="input" type="email" inputMode="email" autoComplete="email" value={buyer.buyer_email} onChange={(e) => setBuyer({ ...buyer, buyer_email: e.target.value })} required aria-describedby={emailSuggestion ? "buyer-email-hint" : undefined} />
-            {emailSuggestion && (
-              <p id="buyer-email-hint" className="enter mt-1 text-xs text-amber-300">
-                Did you mean{" "}
-                <button type="button" className="font-semibold underline underline-offset-2" onClick={() => setBuyer({ ...buyer, buyer_email: emailSuggestion })}>
-                  {emailSuggestion}
-                </button>
-                ? Tickets are emailed to this address.
+          <div className="sm:col-span-2 grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="label">Email * (tickets are sent here)</label>
+              <input
+                id="buyer-email"
+                className={`input ${emailIssue ? "border-amber-400/60" : ""}`}
+                type="email"
+                inputMode="email"
+                autoComplete="email"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                placeholder="name@gmail.com"
+                value={buyer.buyer_email}
+                onChange={(e) => setBuyer({ ...buyer, buyer_email: e.target.value })}
+                onBlur={() => setBuyer((b) => ({ ...b, buyer_email: normalizeEmail(b.buyer_email) }))}
+                required
+                aria-invalid={emailIssue ? true : undefined}
+                aria-describedby="buyer-email-hint"
+              />
+              <p id="buyer-email-hint" className={`mt-1 text-xs ${emailIssue || emailSuggestion ? "enter text-amber-300" : "text-zinc-500"}`}>
+                {emailIssue ? (
+                  emailIssue
+                ) : emailSuggestion ? (
+                  <>
+                    Did you mean{" "}
+                    <button type="button" className="font-semibold underline underline-offset-2" onClick={() => setBuyer({ ...buyer, buyer_email: emailSuggestion })}>
+                      {emailSuggestion}
+                    </button>
+                    ?
+                  </>
+                ) : (
+                  "Your receipt and QR tickets go to this address only."
+                )}
               </p>
-            )}
+            </div>
+            <div>
+              <label className="label">Confirm email *</label>
+              <input
+                id="buyer-email-confirm"
+                className={`input ${emailMismatch ? "border-rose-400/60" : emailConfirm && !emailMismatch ? "border-emerald-400/50" : ""}`}
+                type="email"
+                inputMode="email"
+                autoComplete="off"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                placeholder="Type it again"
+                value={emailConfirm}
+                onChange={(e) => setEmailConfirm(e.target.value)}
+                onBlur={() => setEmailConfirm((v) => normalizeEmail(v))}
+                required
+                aria-invalid={emailMismatch ? true : undefined}
+                aria-describedby="buyer-email-confirm-hint"
+              />
+              <p id="buyer-email-confirm-hint" className={`mt-1 text-xs ${emailMismatch ? "enter text-rose-300" : emailConfirm && !emailIssue ? "text-emerald-300" : "text-zinc-500"}`}>
+                {emailMismatch ? "Does not match the email above" : emailConfirm && !emailIssue ? "Emails match" : "Retype it so a typo cannot send your tickets elsewhere."}
+              </p>
+            </div>
           </div>
           <div>
             <label className="label">Mobile number *</label>
