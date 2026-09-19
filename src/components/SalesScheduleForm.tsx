@@ -43,38 +43,32 @@ export function SalesScheduleForm({ types }: { types: TicketTypeRow[] }) {
                 ? { label: `Closes in ${Math.max(1, Math.round(hrs))} h`, cls: "bg-amber-100 text-amber-800" }
                 : { label: `Open until ${fmtCutoff(t.sales_close_at!)}`, cls: "bg-emerald-100 text-emerald-800" };
           return (
-            <li key={t.id} className="flex flex-col gap-2 py-3 lg:flex-row lg:items-center lg:justify-between">
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-semibold">{t.name}</span>
-                  <BandSwatch color={t.band_color} className="rounded-full border border-white/15 bg-black/30 px-2 py-0.5 text-[11px] text-zinc-300" />
-                  <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${status.cls}`}>{status.label}</span>
-                </div>
-                {msg[t.id] && <div className="mt-1 text-xs text-zinc-400">{msg[t.id]}</div>}
+            <li key={t.id} className="space-y-2 py-4">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <span className="font-semibold">{t.name}</span>
+                <BandSwatch color={t.band_color} className="rounded-full border border-white/15 bg-black/30 px-2 py-0.5 text-[11px] text-zinc-300" />
+                <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${status.cls}`}>{status.label}</span>
               </div>
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="grid grid-cols-[1fr_auto] gap-2 sm:grid-cols-[minmax(0,15rem)_auto_auto_auto]">
                 <input
                   type="datetime-local"
-                  className="input w-auto"
+                  className="input h-10 min-w-0"
                   value={drafts[t.id] ?? ""}
                   onChange={(e) => setDrafts((d) => ({ ...d, [t.id]: e.target.value }))}
                   aria-label={`${t.name} cut-off`}
                 />
                 <button
                   type="button"
-                  className="btn-primary"
+                  className="btn-primary h-10 whitespace-nowrap px-4"
                   disabled={pending || !drafts[t.id] || fromManilaLocalInput(drafts[t.id]) === null}
                   onClick={() => { const iso = fromManilaLocalInput(drafts[t.id]); if (iso) apply(t, iso, `Saved. Closes ${fmtCutoff(iso)}.`); }}
                 >
                   Save date
                 </button>
-                {!closed && (
-                  <button type="button" className="btn-danger" disabled={pending} onClick={() => apply(t, new Date().toISOString(), "Closed. Buyers can no longer add this ticket.")}>Close now</button>
-                )}
-                {t.sales_close_at && (
-                  <button type="button" className="btn-secondary" disabled={pending} onClick={() => apply(t, null, "Reopened with no cut-off.")}>Reopen</button>
-                )}
+                <button type="button" className="btn-danger h-10 whitespace-nowrap px-4 disabled:opacity-40" disabled={pending || closed} onClick={() => apply(t, new Date().toISOString(), "Closed. Buyers can no longer add this ticket.")}>Close now</button>
+                <button type="button" className="btn-secondary h-10 whitespace-nowrap px-4 disabled:opacity-40" disabled={pending || !t.sales_close_at} onClick={() => apply(t, null, "Reopened with no cut-off.")}>Reopen</button>
               </div>
+              {msg[t.id] && <div className="text-xs text-zinc-400">{msg[t.id]}</div>}
             </li>
           );
         })}
