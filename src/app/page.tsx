@@ -5,6 +5,7 @@ import { EventHero } from "@/components/EventHero";
 import { Reveal } from "@/components/Reveal";
 import { SupportContact } from "@/components/SupportContact";
 import { getActiveEvent, getAvailability, getTicketTypes, isSalesOpen, publicOrder } from "@/lib/queries";
+import { fmtCutoff, isTypeClosed } from "@/lib/cutoff";
 import { php } from "@/lib/money";
 
 export const dynamic = "force-dynamic";
@@ -29,7 +30,8 @@ export default async function HomePage() {
   }
   const [allTypes, availability] = await Promise.all([getTicketTypes(event.id, { onlineOnly: true }), getAvailability(event.id)]);
   const types = publicOrder(allTypes);
-  const open = isSalesOpen(event);
+  const open = isSalesOpen(event) && types.some((t) => !isTypeClosed(t));
+  const lastClose = types.map((t) => t.sales_close_at).filter((x): x is string => !!x).sort().pop() ?? null;
 
   // Admission summary: cheapest general tickets first (adult / child), then VIPs
   const prices = types
@@ -59,7 +61,8 @@ export default async function HomePage() {
         ) : (
           <Reveal from="zoom" className="card text-center">
             <h2 className="text-xl font-bold">Online ticket sales are closed</h2>
-            <p className="mt-2 text-zinc-400">Tickets may still be available at the venue gate.</p>
+            <p className="mt-2 text-zinc-400">{lastClose ? `Online sales ended ${fmtCutoff(lastClose)}. ` : ""}Tickets may still be available at the venue gate.</p>
+            <p className="mt-1 text-xs text-zinc-500">Sarado na ang online ticket sales. Maaaring may tickets pa sa gate ng venue.</p>
           </Reveal>
         )}
 

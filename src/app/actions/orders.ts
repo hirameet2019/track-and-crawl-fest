@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getActiveEvent, getOrderBundle, getTicketTypes, isSalesOpen } from "@/lib/queries";
+import { fmtCutoff, isTypeClosed } from "@/lib/cutoff";
 import { sendOrderReceivedEmail } from "@/lib/email";
 import { EXPIRED_GRACE_HOURS, MAX_COMPANIONS_PER_CAR, MAX_QTY_PER_TYPE, PAYMENT_WINDOW_MINUTES, SHIRT_SIZES } from "@/config/event";
 import { IMAGE_MIME, MAX_UPLOAD_BYTES } from "@/lib/image";
@@ -93,6 +94,7 @@ export async function createOnlineOrder(formData: FormData): Promise<ActionResul
   for (const [ii, item] of parsed.data.items.entries()) {
     const tt = types.find((t) => t.id === item.ticket_type_id);
     if (!tt) return { ok: false, error: "Unknown ticket type" };
+    if (isTypeClosed(tt)) return { ok: false, error: `Online sales for ${tt.name} closed on ${fmtCutoff(tt.sales_close_at!)}. Remove it from your order.` };
     if (item.attendees.length !== item.qty) return { ok: false, error: `Fill in details for each ${tt.name} ticket` };
     const direct = item.attendees.filter((a) => !a.companion_of).length;
     if (direct > MAX_QTY_PER_TYPE) return { ok: false, error: `At most ${MAX_QTY_PER_TYPE} ${tt.name} tickets per order` };

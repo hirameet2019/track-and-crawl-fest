@@ -53,6 +53,7 @@ const ACTIONS: Record<string, { cat: AuditCategory; label: string }> = {
   "staff.signed_in": { cat: "staff", label: "Staff signed in" },
   "staff.signed_out": { cat: "staff", label: "Staff signed out" },
   "settings.email_updated": { cat: "settings", label: "Email settings changed" },
+  "ticket_type.cutoff": { cat: "settings", label: "Sales cut-off changed" },
 };
 
 export const ALL_ACTIONS = Object.keys(ACTIONS);
@@ -106,6 +107,8 @@ export function describe(action: string, data: Record<string, unknown> | null | 
       return [d.email, d.role].filter(Boolean).join(" · ");
     case "settings.email_updated":
       return d.provider ? `Provider ${d.provider}` : "";
+    case "ticket_type.cutoff":
+      return `${d.name ?? "Ticket type"}: ${d.sales_close_at ? `closes ${new Date(String(d.sales_close_at)).toLocaleString("en-PH", { timeZone: "Asia/Manila", dateStyle: "medium", timeStyle: "short" })}` : "open, no cut-off"}`;
     default:
       return Object.keys(d).length ? JSON.stringify(d) : "";
   }

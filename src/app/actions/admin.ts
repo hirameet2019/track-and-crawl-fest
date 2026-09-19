@@ -74,6 +74,30 @@ export async function resendTickets(orderId: string): Promise<ActionResult> {
   }
 }
 
+/* ------------------------------------------------------------ cut-off */
+/**
+ * Set or clear the online sales cut-off of one ticket type. Admin only. Null
+ * reopens sales with no end; a past instant closes them immediately. Takes
+ * effect on the next page load, no deploy needed.
+ */
+export async function setSalesCutoff(ticketTypeId: string, closeAtIso: string | null): Promise<ActionResult> {
+  try {
+    const { userId } = await assertStaff("admin");
+    z.string().uuid().parse(ticketTypeId);
+    if (closeAtIso !== null && Number.isNaN(new Date(closeAtIso).getTime())) return { ok: false, error: "Invalid date" };
+    const admin = createAdminClient();
+    const { data: tt, error } = await admin.from("ticket_types").update({ sales_close_at: closeAtIso }).eq("id", ticketTypeId).select("name, code").single();
+    if (error) return { ok: false, error: error.message };
+    await audit(admin, { actor: userId, action: "ticket_type.cutoff", entity: "ticket_type", entity_id: ticketTypeId, data: { name: tt.name, code: tt.code, sales_close_at: closeAtIso } });
+    revalidatePath("/");
+    revalidatePath("/admin");
+    revalidatePath("/admin/settings");
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
 /* ------------------------------------------------------------------ void */
 /**
  * Void one issued ticket (wrong approval, duplicate payment, buyer request).

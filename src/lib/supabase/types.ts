@@ -68,6 +68,8 @@ export interface TicketTypeRow {
   sell_online: boolean;
   /** Tally price; null falls back to price_centavos. */
   walkin_price_centavos: number | null;
+  /** Online sales stop at this instant; null = no cut-off. Set from Admin > Settings. */
+  sales_close_at: string | null;
 }
 
 export interface TicketNumberRow {

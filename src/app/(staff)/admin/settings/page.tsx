@@ -1,18 +1,23 @@
 import { requireStaff } from "@/lib/auth";
 import { getEmailSettings } from "@/lib/settings";
 import { EmailSettingsForm } from "@/components/EmailSettingsForm";
+import { SalesScheduleForm } from "@/components/SalesScheduleForm";
+import { getActiveEvent, getTicketTypes, publicOrder } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
   const session = await requireStaff("admin");
   const s = await getEmailSettings();
+  const event = await getActiveEvent();
+  const types = event ? publicOrder(await getTicketTypes(event.id, { onlineOnly: true })) : [];
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Settings</h1>
-        <p className="text-sm text-zinc-500">Outbound email for tickets, receipts, and rejection notices.</p>
+        <p className="text-sm text-zinc-500">Sales schedule and outbound email for tickets, receipts, and notices.</p>
       </div>
+      <SalesScheduleForm types={types} />
       <EmailSettingsForm
         defaultEmail={session.email ?? ""}
         current={{

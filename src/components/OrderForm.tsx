@@ -5,6 +5,7 @@ import { createOnlineOrder, type CreateOrderInput } from "@/app/actions/orders";
 import { MAX_COMPANIONS_PER_CAR, MAX_QTY_PER_TYPE, PAYMENT_WINDOW_MINUTES, SHIRT_SIZES, SHIRT_SIZE_CHART } from "@/config/event";
 import { shrinkImage } from "@/lib/image";
 import { php } from "@/lib/money";
+import { fmtCutoff, hoursUntilCutoff, isTypeClosed } from "@/lib/cutoff";
 import type { AvailabilityRow, TicketTypeRow } from "@/lib/supabase/types";
 import { BandSwatch } from "@/components/BandSwatch";
 import { Reveal } from "@/components/Reveal";
@@ -97,7 +98,8 @@ export function OrderForm({ types, availability }: { types: TicketTypeRow[]; ava
   // Companions ride inside a VIP Car Display ticket but are VIP Standing tickets
   // (shirt, lanyard, sticker, green band), priced from that ticket type.
   const carType = types.find((t) => t.requires_vehicle) ?? null;
-  const companionType = types.find((t) => t.includes_shirt && !t.requires_vehicle) ?? null;
+  // Companions are only offered while VIP Standing is still on sale.
+  const companionType = types.find((t) => t.includes_shirt && !t.requires_vehicle && !isTypeClosed(t)) ?? null;
   const companionCount = carType ? (attendees[carType.id] ?? []).reduce((n, a) => n + a.companions.length, 0) : 0;
   const companionPrice = companionType?.price_centavos ?? 0;
   /** VIP Standing wristbands still free after direct VIP Standing tickets and companions. */
@@ -117,7 +119,7 @@ export function OrderForm({ types, availability }: { types: TicketTypeRow[]; ava
   const emailMismatch = emailConfirm.trim() !== "" && !emailsMatch(buyer.buyer_email, emailConfirm);
 
   function setQuantity(t: TicketTypeRow, n: number) {
-    const max = Math.min(MAX_QTY_PER_TYPE, sellable(t.id));
+    const max = isTypeClosed(t) ? 0 : Math.min(MAX_QTY_PER_TYPE, sellable(t.id));
     const clamped = Math.max(0, Math.min(max, n));
     setQty((q) => ({ ...q, [t.id]: clamped }));
     setAttendees((a) => {
@@ -263,7 +265,10 @@ export function OrderForm({ types, availability }: { types: TicketTypeRow[]; ava
         <Reveal as="h2" className="text-lg font-bold" delay={80}>1. Choose your tickets <span className="block text-sm font-normal text-zinc-500">Piliin kung ilang ticket ang bibilhin. Pindutin ang + o −.</span></Reveal>
         {types.map((t, idx) => {
           const left = sellable(t.id);
-          const soldOut = left <= 0;
+          const closed = isTypeClosed(t);
+          const soldOut = closed || left <= 0;
+          const hrs = hoursUntilCutoff(t);
+          const closingSoon = !closed && hrs !== null && hrs <= 24 * 7;
           const n = qty[t.id] ?? 0;
           return (
             <Reveal key={t.id} delay={160 + idx * 110} from={idx % 2 ? "right" : "left"} className={`card ticket-card flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between ${soldOut ? "opacity-60" : ""}`}>
@@ -293,7 +298,8 @@ export function OrderForm({ types, availability }: { types: TicketTypeRow[]; ava
                 )}
                 <p className="mt-1 text-sm">
                   <span className="font-bold">{php(t.price_centavos)}</span>
-                  {soldOut ? <span className="ml-2 font-semibold text-red-600">Sold out</span> : left <= 20 ? <span className="ml-2 text-amber-700">Only {left} left</span> : null}
+                  {closed ? <span className="ml-2 font-semibold text-red-500">Online sales closed {fmtCutoff(t.sales_close_at!, { withTime: false })}</span> : soldOut ? <span className="ml-2 font-semibold text-red-600">Sold out</span> : left <= 20 ? <span className="ml-2 text-amber-700">Only {left} left</span> : null}
+                  {!closed && t.sales_close_at && <span className={`ml-2 text-xs ${closingSoon ? "font-semibold text-amber-300" : "text-zinc-400"}`}>Online sales until {fmtCutoff(t.sales_close_at)}</span>}
                 </p>
               </div>
               <div className="flex items-center gap-2">
