@@ -25,16 +25,23 @@ export default async function DashboardPage() {
   if (!event) return <p>No active event. Run the seed.</p>;
 
   const admin = createAdminClient();
-  const [availability, { data: paidOrders }, { data: walkins }, { count: queueCount }, { data: oldest }, { data: recent }] = await Promise.all([
+  const [availability, { data: paidOrders }, { data: walkins }, { count: queueCount }, { data: oldest }, { data: recent }, { data: voidRows }] = await Promise.all([
     getAvailability(event.id),
-    admin.from("orders").select("total_centavos, payment_method, channel, paid_at").eq("status", "paid").eq("event_id", event.id),
+    admin.from("orders").select("id, total_centavos, payment_method, channel, paid_at").eq("status", "paid").eq("event_id", event.id),
     admin.from("walkin_sales").select("qty, unit_price_centavos, payment_method, created_at").eq("event_id", event.id),
     admin.from("orders").select("id", { count: "exact", head: true }).eq("status", "awaiting_verification"),
     admin.from("orders").select("proof_submitted_at").eq("status", "awaiting_verification").order("proof_submitted_at").limit(1).maybeSingle(),
     admin.from("orders").select("id, order_no, buyer_name, total_centavos, status, channel, created_at").order("created_at", { ascending: false }).limit(10),
+    admin.from("v_order_void_deductions").select("order_id, void_tickets, void_centavos"),
   ]);
 
-  const paid = paidOrders ?? [];
+  // Partially voided paid orders: count only the tickets that are still valid.
+  // (Fully voided orders are status 'voided' and are not in `paidOrders` at all.)
+  const voidByOrder = new Map<string, number>();
+  for (const v of voidRows ?? []) voidByOrder.set(v.order_id as string, Number(v.void_centavos));
+  const paid = (paidOrders ?? []).map((o) => ({ ...o, total_centavos: Math.max(0, o.total_centavos - (voidByOrder.get(o.id) ?? 0)) }));
+  const voidedCentavos = (paidOrders ?? []).reduce((s, o) => s + (voidByOrder.get(o.id) ?? 0), 0);
+  const voidedTickets = (voidRows ?? []).filter((v) => (paidOrders ?? []).some((o) => o.id === v.order_id)).reduce((s, v) => s + Number(v.void_tickets), 0);
   const tally = walkins ?? [];
   const onlineRevenue = paid.reduce((s, o) => s + o.total_centavos, 0);
   const walkinRevenue = tally.reduce((s, w) => s + w.qty * w.unit_price_centavos, 0);
@@ -79,7 +86,7 @@ export default async function DashboardPage() {
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat label="Revenue (paid)" value={php(onlineRevenue + walkinRevenue)} sub={`${paid.length} online orders · ${walkinCount} walk-in bands`} />
+        <Stat label="Revenue (paid)" value={php(onlineRevenue + walkinRevenue)} sub={`${paid.length} online orders · ${walkinCount} walk-in bands${voidedCentavos ? ` · excludes ${php(voidedCentavos)} for ${voidedTickets} voided ticket${voidedTickets === 1 ? "" : "s"}` : ""}`} />
         <Stat label="Wristbands sold" value={String(sold)} sub={`${onlineSold} online · ${walkinCount} walk-in · ${redeemed} scanned at gate`} />
         <Stat label="Awaiting verification" value={String(queueCount ?? 0)} sub={oldestAgeMin != null ? `oldest ${oldestAgeMin} min` : "queue empty"} />
         <Stat label="Walk-in vs online" value={`${php(walkinRevenue)} / ${php(onlineRevenue)}`} />
