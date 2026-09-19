@@ -49,7 +49,7 @@ export default async function HomePage() {
             <h2 className="reveal-title text-2xl font-black uppercase italic sm:text-3xl">Secure your spot</h2>
           </div>
           <p className="hidden text-right text-xs text-zinc-400 sm:block">
-            Pay via GoTyme Bank (InstaPay QR).<br />Tickets emailed after verification.
+            Pay via GoTyme Bank (InstaPay QR).<br />Tickets emailed after verification (check Spam too).
           </p>
         </Reveal>
 

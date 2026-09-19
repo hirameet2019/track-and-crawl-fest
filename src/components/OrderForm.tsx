@@ -346,7 +346,7 @@ export function OrderForm({ types, availability }: { types: TicketTypeRow[]; ava
                     ?
                   </>
                 ) : (
-                  "Your receipt and QR tickets go to this address only."
+                  "Your receipt and QR tickets go to this address only. Check Spam or Junk if it does not arrive."
                 )}
               </p>
             </div>

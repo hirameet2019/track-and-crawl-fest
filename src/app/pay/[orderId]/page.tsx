@@ -82,7 +82,7 @@ export default async function PayPage({ params }: { params: Promise<{ orderId: s
           <ProofForm orderId={order.id} methods={methods} />
         </div>
         <p className="mt-3 text-xs text-zinc-500">
-          Our team verifies payments manually. Once confirmed, your receipt and tickets are sent to <b>{order.buyer_email}</b>. You can check the status any time at this link: <Link href={`/order/${order.id}`} className="underline">order status</Link>.
+          Our team verifies payments manually. Once confirmed, your receipt and tickets are sent to <b>{order.buyer_email}</b>. <b>Check your Spam or Junk folder</b> if you do not see it, and mark it as Not spam. You can check the status any time at this link: <Link href={`/order/${order.id}`} className="underline">order status</Link>.
         </p>
       </section>
     </div>

@@ -139,7 +139,7 @@ export function OrderReviewModal({
             <ol className="mt-2 space-y-1.5 text-zinc-300">
               <li className="flex gap-2"><span className="grid h-5 w-5 shrink-0 place-items-center rounded bg-cyan-300 text-[11px] font-black text-black">1</span><span>Your wristbands are held for <b className="text-white">{PAYMENT_WINDOW_MINUTES} minutes</b>.</span></li>
               <li className="flex gap-2"><span className="grid h-5 w-5 shrink-0 place-items-center rounded bg-cyan-300 text-[11px] font-black text-black">2</span><span>Pay exactly <b className="text-white">{php(total)}</b> via {PAY_VIA} and upload the confirmation screenshot.</span></li>
-              <li className="flex gap-2"><span className="grid h-5 w-5 shrink-0 place-items-center rounded bg-cyan-300 text-[11px] font-black text-black">3</span><span>Staff verify the payment and email your QR tickets and receipt.</span></li>
+              <li className="flex gap-2"><span className="grid h-5 w-5 shrink-0 place-items-center rounded bg-cyan-300 text-[11px] font-black text-black">3</span><span>Staff verify the payment and email your QR tickets and receipt. <span className="text-amber-200">Check your Spam or Junk folder if it does not show up in your inbox.</span></span></li>
             </ol>
           </section>
 

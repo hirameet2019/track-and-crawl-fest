@@ -99,6 +99,7 @@ export async function sendTicketsEmail(b: OrderBundle, pdf: Uint8Array) {
     <p style="margin-top:20px">At the venue, show the QR code for each ticket (in the attached PDF or at the link below). Staff will scan it and hand you the matching wristband${b.tickets.some((t) => t.ticket_type.includes_shirt) ? " and t-shirt" : ""}.</p>
     <p><a href="${SITE_URL}/order/${b.order.id}" style="background:#111;color:#fff;padding:10px 16px;text-decoration:none;border-radius:6px;display:inline-block">View my tickets online</a></p>
     <p style="color:#777;font-size:12px">Each QR code admits one person once. Do not share screenshots of your QR codes.</p>
+    <p style="color:#777;font-size:12px">Found this in Spam or Promotions? Mark it as "Not spam" or move it to your inbox so future updates about your order arrive normally.</p>
   </div>`;
   return send({
     to: b.order.buyer_email,
