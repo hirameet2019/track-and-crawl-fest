@@ -295,3 +295,12 @@ dialog.sheet[open]::backdrop { background: rgba(0, 0, 0, 0.78); }
   .enter { animation: none; }
   dialog.sheet, dialog.sheet::backdrop { transition: none; }
 }
+
+/* ---------- Order review modal ---------- */
+@keyframes modal-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes modal-pop  { from { opacity: 0; transform: translateY(24px) scale(0.97); } to { opacity: 1; transform: none; } }
+.modal-backdrop { animation: modal-fade 0.25s ease-out both; }
+.modal-panel    { animation: modal-pop 0.42s cubic-bezier(0.22, 1, 0.36, 1) both; }
+@media (prefers-reduced-motion: reduce) {
+  .modal-backdrop, .modal-panel { animation: none; }
+}

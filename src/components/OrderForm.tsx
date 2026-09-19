@@ -10,6 +10,7 @@ import { BandSwatch } from "@/components/BandSwatch";
 import { Reveal } from "@/components/Reveal";
 import { ShirtSizeChartButton, ShirtSizeHint } from "@/components/ShirtSizeChart";
 import { mobileProblem, normalizeMobile, suggestEmail } from "@/lib/contact";
+import { OrderReviewModal, type ReviewLine } from "@/components/OrderReviewModal";
 
 type Attendee = {
   holder_name: string;
@@ -84,6 +85,7 @@ export function OrderForm({ types, availability }: { types: TicketTypeRow[]; ava
   const [attendees, setAttendees] = useState<Record<string, Attendee[]>>({});
   const [buyer, setBuyer] = useState({ buyer_name: "", buyer_email: "", buyer_mobile: "" });
   const [error, setError] = useState<string | null>(null);
+  const [review, setReview] = useState(false);
   const [pending, start] = useTransition();
 
   const sellable = (id: string) => Number(availability.find((a) => a.ticket_type_id === id)?.sellable ?? 0);
@@ -124,6 +126,10 @@ export function OrderForm({ types, availability }: { types: TicketTypeRow[]; ava
     updateAttendee(typeId, i, { vehicle_photo: file, photo_preview: file ? URL.createObjectURL(file) : null });
   }
 
+  const selectedTypes = types.filter((t) => (qty[t.id] ?? 0) > 0);
+  const reviewLines: ReviewLine[] = selectedTypes.map((t) => ({ type: t, qty: qty[t.id], attendees: attendees[t.id] ?? [] }));
+
+  /** Stage 1: the form's own validation has passed; check what HTML cannot, then show the review. */
   function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -132,7 +138,22 @@ export function OrderForm({ types, availability }: { types: TicketTypeRow[]; ava
       document.getElementById("buyer-mobile")?.focus();
       return;
     }
-    const selected = types.filter((t) => (qty[t.id] ?? 0) > 0);
+    for (const t of selectedTypes) {
+      if (!t.requires_vehicle) continue;
+      for (const [i, a] of (attendees[t.id] ?? []).entries()) {
+        if (!a.vehicle_photo) {
+          setError(`Add a photo of the car for ${t.name} ticket ${i + 1}`);
+          return;
+        }
+      }
+    }
+    setReview(true);
+  }
+
+  /** Stage 2: buyer confirmed the review; compress photos, reserve, and go to payment. */
+  function confirm() {
+    setError(null);
+    const selected = selectedTypes;
     const items: CreateOrderInput["items"] = selected.map((t) => ({
       ticket_type_id: t.id,
       qty: qty[t.id],
@@ -150,11 +171,13 @@ export function OrderForm({ types, availability }: { types: TicketTypeRow[]; ava
         if (!t.requires_vehicle) continue;
         for (const [i, a] of (attendees[t.id] ?? []).entries()) {
           if (!a.vehicle_photo) {
+            setReview(false);
             setError(`Add a photo of the car for ${t.name} ticket ${i + 1}`);
             return;
           }
           const small = await shrinkImage(a.vehicle_photo);
           if (small.size > 8 * 1024 * 1024) {
+            setReview(false);
             setError(`The car photo for ${t.name} ticket ${i + 1} is too large. Please use a smaller photo.`);
             return;
           }
@@ -162,11 +185,15 @@ export function OrderForm({ types, availability }: { types: TicketTypeRow[]; ava
         }
       }
       const res = await createOnlineOrder(fd);
-      if (res && !res.ok) setError(res.error);
+      if (res && !res.ok) {
+        setReview(false);
+        setError(res.error);
+      }
     });
   }
 
   return (
+    <>
     <form onSubmit={submit} className="space-y-6">
       <section className="space-y-3">
         <Reveal as="h2" className="text-lg font-bold" delay={80}>1. Choose your tickets</Reveal>
@@ -321,11 +348,22 @@ export function OrderForm({ types, availability }: { types: TicketTypeRow[]; ava
             {anySelected && <div className="text-xs text-zinc-400">{count} ticket{count === 1 ? "" : "s"}</div>}
           </div>
           <button className="btn-neon" disabled={!anySelected || pending}>
-            {pending ? "Reserving..." : "Continue to payment"}
+            {pending ? "Reserving..." : "Review & continue"}
           </button>
         </div>
         <p className="mt-3 text-xs text-zinc-400">You will have 30 minutes to pay via GoTyme (InstaPay QR) and upload your proof of payment.</p>
       </Reveal>
     </form>
+    {review && (
+      <OrderReviewModal
+        lines={reviewLines}
+        buyer={{ ...buyer, buyer_mobile: normalizeMobile(buyer.buyer_mobile) || buyer.buyer_mobile }}
+        total={total}
+        pending={pending}
+        onClose={() => !pending && setReview(false)}
+        onConfirm={confirm}
+      />
+    )}
+    </>
   );
 }
