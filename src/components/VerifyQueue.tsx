@@ -86,6 +86,13 @@ function Card({ o, onDone }: { o: QueueOrder; onDone: (id: string, warning?: str
                   <div>
                     <div className="font-mono font-bold tracking-wide">{a.vehicle_plate ?? "-"}</div>
                     <div className="text-xs text-zinc-500">{a.vehicle_model ?? "-"} &middot; {a.holder_name ?? ""}</div>
+                    {(() => {
+                      const key = (p?: string | null) => (p ?? "").replace(/\s+/g, "").toUpperCase();
+                      const riders = o.order_items.flatMap((x) => x.attendees).filter((c) => c.companion_of && key(c.companion_of) === key(a.vehicle_plate));
+                      return riders.length ? (
+                        <div className="mt-0.5 text-xs text-emerald-300">Companions: {riders.map((c) => `${c.holder_name ?? ""} (${c.shirt_size ?? "?"})`).join(", ")}</div>
+                      ) : null;
+                    })()}
                   </div>
                 </li>
               )))}

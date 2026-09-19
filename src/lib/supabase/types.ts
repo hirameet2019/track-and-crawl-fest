@@ -117,6 +117,8 @@ export interface Attendee {
   vehicle_model?: string;
   /** Object path in the private vehicle-photos bucket (VIP Car Display). */
   vehicle_photo_path?: string;
+  /** Plate of the VIP Car Display car this (VIP Standing) ticket rides with. */
+  companion_of?: string;
 }
 
 export interface OrderItemRow {
@@ -140,6 +142,7 @@ export interface TicketRow {
   vehicle_plate: string | null;
   vehicle_model: string | null;
   vehicle_photo_path: string | null;
+  companion_of: string | null;
   status: TicketStatus;
   redeemed_at: string | null;
   redeemed_by: string | null;

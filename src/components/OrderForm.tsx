@@ -12,6 +12,8 @@ import { ShirtSizeChartButton, ShirtSizeHint } from "@/components/ShirtSizeChart
 import { emailProblem, emailsMatch, mobileProblem, normalizeEmail, normalizeMobile, suggestEmail } from "@/lib/contact";
 import { OrderReviewModal, type ReviewLine } from "@/components/OrderReviewModal";
 
+/** A passenger riding with a VIP Car Display car: becomes a VIP Standing ticket linked to the plate. */
+type Companion = { holder_name: string; shirt_size: string };
 type Attendee = {
   holder_name: string;
   shirt_size: string;
@@ -19,8 +21,9 @@ type Attendee = {
   vehicle_model: string;
   vehicle_photo: File | null;
   photo_preview: string | null;
+  companions: Companion[];
 };
-const emptyAttendee = (): Attendee => ({ holder_name: "", shirt_size: "", vehicle_plate: "", vehicle_model: "", vehicle_photo: null, photo_preview: null });
+const emptyAttendee = (): Attendee => ({ holder_name: "", shirt_size: "", vehicle_plate: "", vehicle_model: "", vehicle_photo: null, photo_preview: null, companions: [] });
 
 /**
  * Car photo picker for VIP Car Display. Two hidden file inputs: one with
@@ -91,11 +94,20 @@ export function OrderForm({ types, availability }: { types: TicketTypeRow[]; ava
 
   const sellable = (id: string) => Number(availability.find((a) => a.ticket_type_id === id)?.sellable ?? 0);
 
+  // Companions ride inside a VIP Car Display ticket but are VIP Standing tickets
+  // (shirt, lanyard, sticker, green band), priced from that ticket type.
+  const carType = types.find((t) => t.requires_vehicle) ?? null;
+  const companionType = types.find((t) => t.includes_shirt && !t.requires_vehicle) ?? null;
+  const companionCount = carType ? (attendees[carType.id] ?? []).reduce((n, a) => n + a.companions.length, 0) : 0;
+  const companionPrice = companionType?.price_centavos ?? 0;
+  /** VIP Standing wristbands still free after direct VIP Standing tickets and companions. */
+  const companionsLeft = companionType ? sellable(companionType.id) - (qty[companionType.id] ?? 0) - companionCount : 0;
+
   const total = useMemo(
-    () => types.reduce((sum, t) => sum + (qty[t.id] ?? 0) * t.price_centavos, 0),
-    [types, qty],
+    () => types.reduce((sum, t) => sum + (qty[t.id] ?? 0) * t.price_centavos, 0) + companionCount * companionPrice,
+    [types, qty, companionCount, companionPrice],
   );
-  const count = Object.values(qty).reduce((a, b) => a + b, 0);
+  const count = Object.values(qty).reduce((a, b) => a + b, 0) + companionCount;
   const anySelected = count > 0;
   // Live contact checks: the server validates again, but a wrong digit or a
   // "gmail.cim" typo is much cheaper to catch while the buyer is still typing.
@@ -121,6 +133,10 @@ export function OrderForm({ types, availability }: { types: TicketTypeRow[]; ava
       list[i] = { ...list[i], ...patch };
       return { ...a, [typeId]: list };
     });
+  }
+
+  function setCompanions(typeId: string, i: number, list: Companion[]) {
+    updateAttendee(typeId, i, { companions: list });
   }
 
   function setPhoto(typeId: string, i: number, file: File | null) {
@@ -158,7 +174,21 @@ export function OrderForm({ types, availability }: { types: TicketTypeRow[]; ava
           setError(`Add a photo of the car for ${t.name} ticket ${i + 1}`);
           return;
         }
+        if (a.companions.length > 0 && a.vehicle_plate.trim().length < 3) {
+          setError(`Enter the plate number of ${t.name} ticket ${i + 1} before adding companions; companions are linked to the car by its plate.`);
+          return;
+        }
+        for (const [k, c] of a.companions.entries()) {
+          if (c.holder_name.trim().length < 2 || !c.shirt_size) {
+            setError(`Companion ${k + 1} of ${t.name} ticket ${i + 1} needs a full name and a t-shirt size.`);
+            return;
+          }
+        }
       }
+    }
+    if (companionType && companionsLeft < 0) {
+      setError(`Only ${Math.max(0, sellable(companionType.id))} VIP Standing wristbands are left for companions.`);
+      return;
     }
     setReview(true);
   }
@@ -177,6 +207,23 @@ export function OrderForm({ types, availability }: { types: TicketTypeRow[]; ava
         vehicle_model: a.vehicle_model.trim() || undefined,
       })),
     }));
+    // Companions become VIP Standing attendees carrying the plate they ride with.
+    if (carType && companionType && companionCount > 0) {
+      const comps = (attendees[carType.id] ?? []).flatMap((a) =>
+        a.companions.map((c) => ({
+          holder_name: c.holder_name.trim(),
+          shirt_size: c.shirt_size as CreateOrderInput["items"][number]["attendees"][number]["shirt_size"],
+          companion_of: a.vehicle_plate.trim().toUpperCase(),
+        })),
+      );
+      const g = items.find((i) => i.ticket_type_id === companionType.id);
+      if (g) {
+        g.attendees.push(...comps);
+        g.qty = g.attendees.length;
+      } else {
+        items.push({ ticket_type_id: companionType.id, qty: comps.length, attendees: comps });
+      }
+    }
     start(async () => {
       const fd = new FormData();
       fd.set("payload", JSON.stringify({ ...buyer, buyer_email: normalizeEmail(buyer.buyer_email), buyer_mobile: normalizeMobile(buyer.buyer_mobile), items }));
@@ -235,6 +282,11 @@ export function OrderForm({ types, availability }: { types: TicketTypeRow[]; ava
                     ))}
                   </p>
                 )}
+                {t.requires_vehicle && companionType && (
+                  <p className="mt-1 text-xs text-emerald-300">
+                    Bringing passengers? Add companions inside this ticket, {php(companionPrice)} each: a {companionType.name} wristband with event t-shirt, linked to your car.
+                  </p>
+                )}
                 <p className="mt-1 text-sm">
                   <span className="font-bold">{php(t.price_centavos)}</span>
                   {soldOut ? <span className="ml-2 font-semibold text-red-600">Sold out</span> : left <= 20 ? <span className="ml-2 text-amber-700">Only {left} left</span> : null}
@@ -243,7 +295,7 @@ export function OrderForm({ types, availability }: { types: TicketTypeRow[]; ava
               <div className="flex items-center gap-2">
                 <button type="button" className="btn-secondary h-9 w-9 px-0" onClick={() => setQuantity(t, n - 1)} disabled={n === 0} aria-label="Decrease">-</button>
                 <input className="input w-14 text-center" inputMode="numeric" value={n} onChange={(e) => setQuantity(t, Number(e.target.value) || 0)} disabled={soldOut} aria-label={`${t.name} quantity`} />
-                <button type="button" className="btn-secondary h-9 w-9 px-0" onClick={() => setQuantity(t, n + 1)} disabled={soldOut || n >= Math.min(MAX_QTY_PER_TYPE, left)} aria-label="Increase">+</button>
+                <button type="button" className="btn-secondary h-9 w-9 px-0" onClick={() => setQuantity(t, n + 1)} disabled={soldOut || n >= Math.min(MAX_QTY_PER_TYPE, left - (t.id === companionType?.id ? companionCount : 0))} aria-label="Increase">+</button>
               </div>
             </Reveal>
           );
@@ -298,6 +350,57 @@ export function OrderForm({ types, availability }: { types: TicketTypeRow[]; ava
                           onPick={(file) => setPhoto(t.id, i, file)}
                         />
                       </div>
+                      {companionType && (
+                        <div className="sm:col-span-2 rounded-lg border border-emerald-400/25 bg-emerald-400/5 p-3">
+                          <div className="flex flex-wrap items-start justify-between gap-2">
+                            <div>
+                              <div className="text-xs font-semibold uppercase tracking-wide text-emerald-300">Companions riding with this car</div>
+                              <p className="mt-0.5 text-xs text-zinc-400">
+                                Each companion gets a <b>{companionType.name}</b> wristband with event t-shirt, <b>{php(companionPrice)}</b> per person, added to your total. Their wristband is linked to plate <b>{a.vehicle_plate.trim() || "…"}</b>.
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              className="btn-secondary text-xs"
+                              disabled={companionsLeft <= 0}
+                              onClick={() => setCompanions(t.id, i, [...a.companions, { holder_name: "", shirt_size: "" }])}
+                            >
+                              + Add companion
+                            </button>
+                          </div>
+                          {a.companions.map((c, k) => (
+                            <div key={k} className="mt-2 grid items-end gap-2 sm:grid-cols-[1fr_150px_auto]">
+                              <div>
+                                <label className="label">Companion {k + 1} full name *</label>
+                                <input
+                                  className="input"
+                                  value={c.holder_name}
+                                  onChange={(e) => setCompanions(t.id, i, a.companions.map((x, j) => (j === k ? { ...x, holder_name: e.target.value } : x)))}
+                                  placeholder="Passenger's full name"
+                                  required
+                                  minLength={2}
+                                />
+                              </div>
+                              <div>
+                                <label className="label">T-shirt size *</label>
+                                <select className="input" value={c.shirt_size} onChange={(e) => setCompanions(t.id, i, a.companions.map((x, j) => (j === k ? { ...x, shirt_size: e.target.value } : x)))} required>
+                                  <option value="">Select size</option>
+                                  {SHIRT_SIZES.map((s) => <option key={s} value={s}>{s}</option>)}
+                                </select>
+                              </div>
+                              <button type="button" className="btn-secondary h-9 px-3 text-xs" onClick={() => setCompanions(t.id, i, a.companions.filter((_, j) => j !== k))} aria-label={`Remove companion ${k + 1}`}>
+                                Remove
+                              </button>
+                            </div>
+                          ))}
+                          {a.companions.length > 0 && (
+                            <div className="mt-2 text-right text-sm text-zinc-300">
+                              {a.companions.length} companion{a.companions.length === 1 ? "" : "s"} × {php(companionPrice)} = <b className="text-white">{php(a.companions.length * companionPrice)}</b>
+                            </div>
+                          )}
+                          {companionsLeft <= 0 && <p className="mt-2 text-xs text-amber-300">No {companionType.name} wristbands are left for more companions.</p>}
+                        </div>
+                      )}
                     </>
                   )}
                 </div>
@@ -417,6 +520,8 @@ export function OrderForm({ types, availability }: { types: TicketTypeRow[]; ava
     {review && (
       <OrderReviewModal
         lines={reviewLines}
+        companionPrice={companionPrice}
+        companionLabel={companionType?.name ?? "VIP Standing"}
         buyer={{ ...buyer, buyer_mobile: normalizeMobile(buyer.buyer_mobile) || buyer.buyer_mobile }}
         total={total}
         pending={pending}

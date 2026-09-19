@@ -95,6 +95,7 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ or
                 <div className="text-xs text-zinc-500">
                   {t.shirt_size && <>Shirt {t.shirt_size} </>}
                   {t.vehicle_plate && <>&middot; {t.vehicle_plate} {t.vehicle_model}</>}
+                  {t.companion_of && <>&middot; Companion of car {t.companion_of}</>}
                 </div>
                 {photos[i] && (
                   // eslint-disable-next-line @next/next/no-img-element

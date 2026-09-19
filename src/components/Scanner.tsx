@@ -205,6 +205,7 @@ function ResultCard({ r, onKit }: { r: AnyResult; onKit: (id: string, item: stri
       <div className="text-lg font-semibold">{t.ticket_type.name}{t.ticket_type.band_color ? ` · ${t.ticket_type.band_color} band` : ""}</div>
       <div className="mt-1 text-sm">{t.holder_name} &middot; Order #{t.order.order_no}</div>
       {t.vehicle_plate && <div className="text-sm">Vehicle: {t.vehicle_plate} {t.vehicle_model}</div>}
+      {t.companion_of && <div className="mt-1 inline-block rounded bg-black/25 px-2 py-0.5 text-sm font-semibold">Companion of car {t.companion_of}</div>}
       {t.vehicle_photo_url && (
         <a href={t.vehicle_photo_url} target="_blank" rel="noreferrer" className="mt-2 block">
           {/* eslint-disable-next-line @next/next/no-img-element */}

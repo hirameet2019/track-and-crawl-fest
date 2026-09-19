@@ -14,6 +14,8 @@ export interface ScanTicket {
   vehicle_model: string | null;
   /** Signed URL (10 min) of the car photo, VIP Car Display only. */
   vehicle_photo_url?: string | null;
+  /** Plate of the car this companion ticket rides with. */
+  companion_of: string | null;
   redeemed_at: string | null;
   kit_claimed: Record<string, boolean>;
   ticket_type: Pick<
@@ -39,7 +41,7 @@ async function loadTicket(ticketId: string): Promise<ScanTicket | null> {
   const { data } = await admin
     .from("tickets")
     .select(
-      "id, number, status, holder_name, shirt_size, vehicle_plate, vehicle_model, vehicle_photo_path, redeemed_at, kit_claimed, ticket_type:ticket_types(name, code, band_color, includes_shirt, includes_lanyard, includes_sticker, includes_car_pass), order:orders(order_no, buyer_name, buyer_mobile)",
+      "id, number, status, holder_name, shirt_size, vehicle_plate, vehicle_model, vehicle_photo_path, companion_of, redeemed_at, kit_claimed, ticket_type:ticket_types(name, code, band_color, includes_shirt, includes_lanyard, includes_sticker, includes_car_pass), order:orders(order_no, buyer_name, buyer_mobile)",
     )
     .eq("id", ticketId)
     .maybeSingle();

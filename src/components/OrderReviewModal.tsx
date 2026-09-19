@@ -12,6 +12,8 @@ export interface ReviewAttendee {
   vehicle_plate: string;
   vehicle_model: string;
   photo_preview: string | null;
+  /** Passengers added inside a VIP Car Display ticket (become VIP Standing tickets). */
+  companions?: { holder_name: string; shirt_size: string }[];
 }
 export interface ReviewLine {
   type: TicketTypeRow;
@@ -31,8 +33,12 @@ export function OrderReviewModal({
   pending,
   onClose,
   onConfirm,
+  companionPrice = 0,
+  companionLabel = "VIP Standing",
 }: {
   lines: ReviewLine[];
+  companionPrice?: number;
+  companionLabel?: string;
   buyer: { buyer_name: string; buyer_email: string; buyer_mobile: string };
   total: number;
   pending: boolean;
@@ -41,7 +47,8 @@ export function OrderReviewModal({
 }) {
   const [agreed, setAgreed] = useState(false);
   const titleId = useId();
-  const count = lines.reduce((n, l) => n + l.qty, 0);
+  const companionsOf = (attendees: ReviewAttendee[]) => attendees.reduce((n, a) => n + (a.companions?.length ?? 0), 0);
+  const count = lines.reduce((n, l) => n + l.qty + companionsOf(l.attendees), 0);
 
   // Escape closes; lock page scroll while open.
   useEffect(() => {
@@ -98,9 +105,12 @@ export function OrderReviewModal({
                         <span className="font-semibold">{t.name}</span>
                         <BandSwatch color={t.band_color} size={11} className="text-[11px] text-zinc-400" />
                       </div>
-                      <div className="mt-0.5 text-xs text-zinc-500">{qty} × {php(t.price_centavos)}</div>
+                      <div className="mt-0.5 text-xs text-zinc-500">
+                        {qty} × {php(t.price_centavos)}
+                        {companionsOf(attendees) > 0 && <> + {companionsOf(attendees)} companion{companionsOf(attendees) === 1 ? "" : "s"} × {php(companionPrice)}</>}
+                      </div>
                     </div>
-                    <div className="shrink-0 text-right font-bold tabular-nums">{php(qty * t.price_centavos)}</div>
+                    <div className="shrink-0 text-right font-bold tabular-nums">{php(qty * t.price_centavos + companionsOf(attendees) * companionPrice)}</div>
                   </div>
                   <ol className="mt-2 space-y-1.5">
                     {attendees.map((a, i) => (
@@ -116,6 +126,16 @@ export function OrderReviewModal({
                           <div className="truncate text-xs text-zinc-400">
                             {[t.includes_shirt ? `Shirt ${a.shirt_size || "?"}` : null, t.requires_vehicle ? `${a.vehicle_plate || "no plate"} · ${a.vehicle_model || "no model"}` : null].filter(Boolean).join(" · ") || "General admission"}
                           </div>
+                          {(a.companions?.length ?? 0) > 0 && (
+                            <ul className="mt-1.5 space-y-1 border-l-2 border-emerald-400/40 pl-2">
+                              {a.companions!.map((c, k) => (
+                                <li key={k} className="flex items-center justify-between gap-2 text-xs">
+                                  <span className="truncate"><span className="text-emerald-300">Riding with this car:</span> {c.holder_name || <span className="text-rose-300">No name</span>} · Shirt {c.shirt_size || "?"} · {companionLabel}, Green wristband</span>
+                                  <span className="shrink-0 tabular-nums text-zinc-300">{php(companionPrice)}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
                         </div>
                       </li>
                     ))}

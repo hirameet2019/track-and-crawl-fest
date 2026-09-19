@@ -18,7 +18,12 @@ const attendeeSchema = z.object({
   vehicle_model: z.string().trim().max(60).optional(),
   // Set server-side after upload; anything the client sends here is discarded.
   vehicle_photo_path: z.string().optional(),
+  // VIP Standing ticket bought from inside a VIP Car Display ticket: the car's plate.
+  companion_of: z.string().trim().max(20).optional(),
 });
+
+/** Plates compare without spaces or case: "NBC 8821" == "nbc8821". */
+const plateKey = (p: string | undefined | null) => (p ?? "").replace(/\s+/g, "").toUpperCase();
 
 const createOrderSchema = z.object({
   buyer_name: z.string().trim().min(2, "Enter your full name").max(80),
@@ -43,7 +48,8 @@ const createOrderSchema = z.object({
     .array(
       z.object({
         ticket_type_id: z.string().uuid(),
-        qty: z.number().int().min(1).max(MAX_QTY_PER_TYPE),
+        // Direct tickets are capped at MAX_QTY_PER_TYPE below; companions are only limited by the pool.
+        qty: z.number().int().min(1).max(500),
         attendees: z.array(attendeeSchema),
       }),
     )
@@ -74,12 +80,28 @@ export async function createOnlineOrder(formData: FormData): Promise<ActionResul
   // Validate vehicle/shirt requirements against the ticket types sold online
   const types = await getTicketTypes(event.id, { onlineOnly: true });
   const photos: { item: number; index: number; file: File }[] = [];
+  // Plates of the cars in this order; a companion must ride with one of them.
+  const plates = new Set(
+    parsed.data.items
+      .filter((i) => types.find((t) => t.id === i.ticket_type_id)?.requires_vehicle)
+      .flatMap((i) => i.attendees.map((a) => plateKey(a.vehicle_plate)))
+      .filter(Boolean),
+  );
+  let companions = 0;
   for (const [ii, item] of parsed.data.items.entries()) {
     const tt = types.find((t) => t.id === item.ticket_type_id);
     if (!tt) return { ok: false, error: "Unknown ticket type" };
     if (item.attendees.length !== item.qty) return { ok: false, error: `Fill in details for each ${tt.name} ticket` };
+    const direct = item.attendees.filter((a) => !a.companion_of).length;
+    if (direct > MAX_QTY_PER_TYPE) return { ok: false, error: `At most ${MAX_QTY_PER_TYPE} ${tt.name} tickets per order` };
     for (const [i, a] of item.attendees.entries()) {
       a.vehicle_photo_path = undefined;
+      if (a.companion_of) {
+        if (!tt.includes_shirt || tt.requires_vehicle) return { ok: false, error: "Companions must be VIP Standing tickets" };
+        if (!plates.has(plateKey(a.companion_of))) return { ok: false, error: `Companion ${a.holder_name || i + 1} must belong to a car in this order` };
+        a.companion_of = a.companion_of.replace(/\s+/g, " ").trim().toUpperCase();
+        companions += 1;
+      }
       if (!a.holder_name) return { ok: false, error: `Enter the holder's full name for each ${tt.name} ticket` };
       if (tt.includes_shirt && !a.shirt_size) return { ok: false, error: `Choose a shirt size for each ${tt.name} ticket` };
       if (tt.requires_vehicle) {
@@ -127,7 +149,7 @@ export async function createOnlineOrder(formData: FormData): Promise<ActionResul
     action: "order.created",
     entity: "order",
     entity_id: orderId,
-    data: { buyer: parsed.data.buyer_name, items: parsed.data.items.reduce((n, i) => n + i.qty, 0), total_centavos: parsed.data.items.reduce((n, i) => n + i.qty * (types.find((t) => t.id === i.ticket_type_id)?.price_centavos ?? 0), 0) },
+    data: { buyer: parsed.data.buyer_name, companions, items: parsed.data.items.reduce((n, i) => n + i.qty, 0), total_centavos: parsed.data.items.reduce((n, i) => n + i.qty * (types.find((t) => t.id === i.ticket_type_id)?.price_centavos ?? 0), 0) },
   });
 
   redirect(`/pay/${orderId}`);

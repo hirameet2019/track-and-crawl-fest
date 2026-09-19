@@ -173,7 +173,8 @@ function drawReceiptPage(doc: PDFDocument, f: Fonts, b: OrderBundle) {
 
   let rowIdx = 0;
   for (const it of items) {
-    const descLines = wrap(f.regular, it.ticket_type.name, 10, colQty - MARGIN - 60);
+    const companionCount = (it.attendees ?? []).filter((a) => a.companion_of).length;
+    const descLines = wrap(f.regular, companionCount ? `${it.ticket_type.name} (incl. ${companionCount} companion${companionCount === 1 ? "" : "s"} of VIP Car Display)` : it.ticket_type.name, 10, colQty - MARGIN - 60);
     const rowH = Math.max(24, 10 + descLines.length * 13);
     if (rowIdx % 2 === 1) page.drawRectangle({ x: MARGIN, y: y - rowH, width: contentW, height: rowH, color: PANEL });
     let ty = y - 16;
@@ -410,7 +411,10 @@ async function drawTicketPage(doc: PDFDocument, f: Fonts, b: OrderBundle, t: Ord
   if (tt.requires_vehicle) {
     y = labelValue(page, f, "VEHICLE PLATE", t.vehicle_plate ?? "Not specified", lx, y);
     y = labelValue(page, f, "VEHICLE", t.vehicle_model ?? "Not specified", lx, y);
+    const riders = b.tickets.filter((x) => x.companion_of && plateKey(x.companion_of) === plateKey(t.vehicle_plate));
+    if (riders.length) y = labelValue(page, f, "COMPANIONS", `${riders.length}: ${riders.map((r) => r.holder_name ?? "").join(", ")}`, lx, y);
   }
+  if (t.companion_of) y = labelValue(page, f, "RIDING WITH CAR", t.companion_of, lx, y);
   y = labelValue(page, f, "ORDER", `#${order.order_no}`, lx, y);
   const includes: string[] = [];
   if (tt.includes_shirt) includes.push("Event T-shirt");
@@ -479,7 +483,7 @@ async function drawTicketPage(doc: PDFDocument, f: Fonts, b: OrderBundle, t: Ord
   const bigText = tt.includes_car_pass ? (t.vehicle_plate ?? "PLATE TBA") : t.number;
   const smallText = tt.includes_car_pass
     ? `${t.vehicle_model ?? ""}   |   ${t.holder_name ?? order.buyer_name}   |   Band ${t.number}`
-    : `${tt.name}   |   ${t.holder_name ?? order.buyer_name}   |   Order #${order.order_no}`;
+    : `${tt.name}${t.companion_of ? ` (companion of ${t.companion_of})` : ""}   |   ${t.holder_name ?? order.buyer_name}   |   Order #${order.order_no}`;
   {
     const maxW = right - 12 - (sH - 20) - 24 - sx;
     let size = 26;
@@ -519,6 +523,8 @@ async function vehiclePhoto(doc: PDFDocument, storagePath: string): Promise<PDFI
     return null;
   }
 }
+
+const plateKey = (p: string | null | undefined) => (p ?? "").replace(/\s+/g, "").toUpperCase();
 
 async function qrPngBytes(data: string): Promise<Uint8Array> {
   return qrPng(data);

@@ -74,22 +74,22 @@ export async function GET(req: NextRequest) {
   const { data } = await admin
     .from("tickets")
     .select(
-      "number, status, holder_name, shirt_size, vehicle_plate, vehicle_model, vehicle_photo_path, redeemed_at, ticket_type:ticket_types(code, name, band_color), order:orders(order_no, receipt_no, status, channel, buyer_name, buyer_email, buyer_mobile, total_centavos, payment_method, payment_reference, paid_at)",
+      "number, status, holder_name, shirt_size, vehicle_plate, vehicle_model, vehicle_photo_path, companion_of, redeemed_at, ticket_type:ticket_types(code, name, band_color), order:orders(order_no, receipt_no, status, channel, buyer_name, buyer_email, buyer_mobile, total_centavos, payment_method, payment_reference, paid_at)",
     )
     .order("created_at")
     .limit(50000);
 
   type Row = {
-    number: string; status: string; holder_name: string | null; shirt_size: string | null; vehicle_plate: string | null; vehicle_model: string | null; vehicle_photo_path: string | null; redeemed_at: string | null;
+    number: string; status: string; holder_name: string | null; shirt_size: string | null; vehicle_plate: string | null; vehicle_model: string | null; vehicle_photo_path: string | null; companion_of: string | null; redeemed_at: string | null;
     ticket_type: { code: string; name: string; band_color: string | null } | null;
     order: { order_no: number; receipt_no: number | null; status: string; channel: string; buyer_name: string; buyer_email: string | null; buyer_mobile: string | null; total_centavos: number; payment_method: string | null; payment_reference: string | null; paid_at: string | null } | null;
   };
   const rows = (data ?? []) as unknown as Row[];
 
   const out = csv([
-    ["wristband_no", "code", "ticket_type", "band_color", "ticket_status", "holder", "shirt_size", "plate", "vehicle", "car_photo", "redeemed_at", "order_no", "receipt_no", "order_status", "channel", "buyer", "email", "mobile", "order_total_php", "payment_method", "reference", "paid_at"],
+    ["wristband_no", "code", "ticket_type", "band_color", "ticket_status", "holder", "shirt_size", "plate", "vehicle", "car_photo", "companion_of", "redeemed_at", "order_no", "receipt_no", "order_status", "channel", "buyer", "email", "mobile", "order_total_php", "payment_method", "reference", "paid_at"],
     ...rows.map((t) => [
-      t.number, t.ticket_type?.code, t.ticket_type?.name, t.ticket_type?.band_color, t.status, t.holder_name, t.shirt_size, t.vehicle_plate, t.vehicle_model, t.vehicle_photo_path ? "yes" : "", t.redeemed_at,
+      t.number, t.ticket_type?.code, t.ticket_type?.name, t.ticket_type?.band_color, t.status, t.holder_name, t.shirt_size, t.vehicle_plate, t.vehicle_model, t.vehicle_photo_path ? "yes" : "", t.companion_of, t.redeemed_at,
       t.order?.order_no, t.order?.receipt_no, t.order?.status, t.order?.channel, t.order?.buyer_name, t.order?.buyer_email, t.order?.buyer_mobile,
       t.order ? (t.order.total_centavos / 100).toFixed(2) : "", t.order?.payment_method, t.order?.payment_reference, t.order?.paid_at,
     ]),

@@ -67,7 +67,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ or
                   <td>{t.ticket_type.name}</td>
                   <td>{t.holder_name}</td>
                   <td>{t.shirt_size ?? "-"}</td>
-                  <td>{t.vehicle_plate ? `${t.vehicle_plate} ${t.vehicle_model ?? ""}` : "-"}</td>
+                  <td>{t.vehicle_plate ? `${t.vehicle_plate} ${t.vehicle_model ?? ""}` : t.companion_of ? <span className="text-emerald-300">Companion of {t.companion_of}</span> : "-"}</td>
                   <td>{t.vehicle_photo_path ? <SignedImage bucket="vehicle-photos" path={t.vehicle_photo_path} alt={`Car ${t.vehicle_plate ?? ""}`} className="h-12 w-16 rounded-md object-cover" /> : "-"}</td>
                   <td><TicketStatusBadge status={t.status} /></td>
                   <td className="text-xs text-zinc-500">{fmt(t.redeemed_at)}</td>
