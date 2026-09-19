@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState, useTransition } from "react";
 import { createOnlineOrder, type CreateOrderInput } from "@/app/actions/orders";
-import { MAX_QTY_PER_TYPE, SHIRT_SIZES, SHIRT_SIZE_CHART } from "@/config/event";
+import { MAX_COMPANIONS_PER_CAR, MAX_QTY_PER_TYPE, SHIRT_SIZES, SHIRT_SIZE_CHART } from "@/config/event";
 import { shrinkImage } from "@/lib/image";
 import { php } from "@/lib/money";
 import type { AvailabilityRow, TicketTypeRow } from "@/lib/supabase/types";
@@ -176,6 +176,10 @@ export function OrderForm({ types, availability }: { types: TicketTypeRow[]; ava
         }
         if (a.companions.length > 0 && a.vehicle_plate.trim().length < 3) {
           setError(`Enter the plate number of ${t.name} ticket ${i + 1} before adding companions; companions are linked to the car by its plate.`);
+          return;
+        }
+        if (a.companions.length > MAX_COMPANIONS_PER_CAR) {
+          setError(`Up to ${MAX_COMPANIONS_PER_CAR} companions per car. Please remove ${a.companions.length - MAX_COMPANIONS_PER_CAR} from ${t.name} ticket ${i + 1}.`);
           return;
         }
         for (const [k, c] of a.companions.entries()) {
@@ -356,13 +360,13 @@ export function OrderForm({ types, availability }: { types: TicketTypeRow[]; ava
                             <div>
                               <div className="text-xs font-semibold uppercase tracking-wide text-emerald-300">Companions riding with this car</div>
                               <p className="mt-0.5 text-xs text-zinc-400">
-                                Each companion gets a <b>{companionType.name}</b> wristband with event t-shirt, <b>{php(companionPrice)}</b> per person, added to your total. Their wristband is linked to plate <b>{a.vehicle_plate.trim() || "…"}</b>.
+                                Each companion gets a <b>{companionType.name}</b> wristband with event t-shirt, <b>{php(companionPrice)}</b> per person, added to your total. Their wristband is linked to plate <b>{a.vehicle_plate.trim() || "…"}</b>. Up to {MAX_COMPANIONS_PER_CAR} companions per car.
                               </p>
                             </div>
                             <button
                               type="button"
                               className="btn-secondary text-xs"
-                              disabled={companionsLeft <= 0}
+                              disabled={companionsLeft <= 0 || a.companions.length >= MAX_COMPANIONS_PER_CAR}
                               onClick={() => setCompanions(t.id, i, [...a.companions, { holder_name: "", shirt_size: "" }])}
                             >
                               + Add companion
@@ -399,6 +403,7 @@ export function OrderForm({ types, availability }: { types: TicketTypeRow[]; ava
                             </div>
                           )}
                           {companionsLeft <= 0 && <p className="mt-2 text-xs text-amber-300">No {companionType.name} wristbands are left for more companions.</p>}
+                          {a.companions.length >= MAX_COMPANIONS_PER_CAR && <p className="mt-2 text-xs text-amber-300">This car already has the maximum of {MAX_COMPANIONS_PER_CAR} companions.</p>}
                         </div>
                       )}
                     </>

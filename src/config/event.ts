@@ -49,6 +49,8 @@ export function shirtSizeSummary(size: ShirtSize): string {
 
 /** Maximum tickets per online order. */
 export const MAX_QTY_PER_TYPE = 10;
+/** Passengers that can be added inside one VIP Car Display ticket. */
+export const MAX_COMPANIONS_PER_CAR = 12;
 
 /**
  * Display details per payment method. Which online channels are actually

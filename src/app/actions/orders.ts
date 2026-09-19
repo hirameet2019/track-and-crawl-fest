@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getActiveEvent, getTicketTypes, isSalesOpen } from "@/lib/queries";
-import { MAX_QTY_PER_TYPE, PAYMENT_WINDOW_MINUTES, SHIRT_SIZES } from "@/config/event";
+import { MAX_COMPANIONS_PER_CAR, MAX_QTY_PER_TYPE, PAYMENT_WINDOW_MINUTES, SHIRT_SIZES } from "@/config/event";
 import { IMAGE_MIME, MAX_UPLOAD_BYTES } from "@/lib/image";
 import { MOBILE_RE, emailProblem, normalizeEmail, normalizeMobile } from "@/lib/contact";
 import { audit } from "@/lib/audit";
@@ -88,6 +88,7 @@ export async function createOnlineOrder(formData: FormData): Promise<ActionResul
       .filter(Boolean),
   );
   let companions = 0;
+  const companionsPerCar = new Map<string, number>();
   for (const [ii, item] of parsed.data.items.entries()) {
     const tt = types.find((t) => t.id === item.ticket_type_id);
     if (!tt) return { ok: false, error: "Unknown ticket type" };
@@ -101,6 +102,9 @@ export async function createOnlineOrder(formData: FormData): Promise<ActionResul
         if (!plates.has(plateKey(a.companion_of))) return { ok: false, error: `Companion ${a.holder_name || i + 1} must belong to a car in this order` };
         a.companion_of = a.companion_of.replace(/\s+/g, " ").trim().toUpperCase();
         companions += 1;
+        const perCar = (companionsPerCar.get(plateKey(a.companion_of)) ?? 0) + 1;
+        companionsPerCar.set(plateKey(a.companion_of), perCar);
+        if (perCar > MAX_COMPANIONS_PER_CAR) return { ok: false, error: `Up to ${MAX_COMPANIONS_PER_CAR} companions per car (${a.companion_of})` };
       }
       if (!a.holder_name) return { ok: false, error: `Enter the holder's full name for each ${tt.name} ticket` };
       if (tt.includes_shirt && !a.shirt_size) return { ok: false, error: `Choose a shirt size for each ${tt.name} ticket` };
