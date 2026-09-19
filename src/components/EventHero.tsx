@@ -29,8 +29,8 @@ export function EventHero({ event, prices }: { event: EventRow; prices: { label:
       <div className="hero-glow-a absolute -left-1/4 -top-1/4 -z-10 h-[70vh] w-[70vw] rounded-full bg-[radial-gradient(closest-side,rgba(255,63,209,0.55),transparent_70%)] mix-blend-screen blur-2xl" aria-hidden />
       <div className="hero-glow-b absolute -right-1/4 top-0 -z-10 h-[60vh] w-[60vw] rounded-full bg-[radial-gradient(closest-side,rgba(47,216,255,0.5),transparent_70%)] mix-blend-screen blur-2xl" aria-hidden />
       {/* tire smoke rolling across the lower half */}
-      <div className="hero-smoke absolute bottom-[18%] left-0 -z-10 h-40 w-[45vw] rounded-full bg-white/25 blur-3xl" aria-hidden />
-      <div className="hero-smoke hero-smoke-2 absolute bottom-[8%] left-0 -z-10 h-56 w-[55vw] rounded-full bg-white/20 blur-3xl" aria-hidden />
+      <div className="hero-smoke absolute bottom-[18%] left-0 -z-10 h-40 w-[45vw] rounded-full bg-white/18 blur-3xl" aria-hidden />
+      <div className="hero-smoke hero-smoke-2 absolute bottom-[8%] left-0 -z-10 h-56 w-[55vw] rounded-full bg-white/14 blur-3xl" aria-hidden />
       <div className="hero-smoke hero-smoke-3 absolute bottom-[30%] left-0 -z-10 h-32 w-[35vw] rounded-full bg-fuchsia-200/15 blur-3xl" aria-hidden />
       {/* speed streaks */}
       <div className="hero-streak absolute left-0 top-[22%] -z-10 h-px w-[40vw] bg-gradient-to-r from-transparent via-cyan-200 to-transparent" aria-hidden />

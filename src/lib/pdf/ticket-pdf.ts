@@ -273,7 +273,7 @@ let posterCache: Uint8Array | null | undefined;
 async function posterBytes(): Promise<Uint8Array | null> {
   if (posterCache !== undefined) return posterCache;
   try {
-    posterCache = new Uint8Array(await readFile(path.join(process.cwd(), "public", "poster.jpg")));
+    posterCache = new Uint8Array(await readFile(path.join(process.cwd(), "public", "poster-1x.jpg")));
   } catch {
     posterCache = null;
   }

@@ -11,7 +11,7 @@ const nextConfig: NextConfig = {
   // The PDF generator reads these from disk at runtime (fs.readFile), which the
   // bundler cannot see. Include them in every serverless function bundle.
   outputFileTracingIncludes: {
-    "/**": ["./src/lib/pdf/fonts/**", "./src/lib/pdf/logo-pdf.png", "./public/poster.jpg"],
+    "/**": ["./src/lib/pdf/fonts/**", "./src/lib/pdf/logo-pdf.png", "./public/poster-1x.jpg"],
   },
 };
 
