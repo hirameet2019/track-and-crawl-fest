@@ -1,15 +1,14 @@
-import Link from "next/link";
 import { requireStaff } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { OrderStatusBadge } from "@/components/StatusBadge";
 import { LiveOrders } from "@/components/LiveOrders";
-import { php } from "@/lib/money";
+import { OrdersTable, type OrderRow } from "@/components/OrdersTable";
 import type { OrderStatus } from "@/lib/supabase/types";
 
 const STATUSES: OrderStatus[] = ["awaiting_verification", "paid", "voided", "pending_payment", "rejected", "expired", "cancelled"];
 
 export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ q?: string; status?: string }> }) {
-  await requireStaff("staff");
+  const session = await requireStaff("staff");
+  const isAdmin = session.staff.role === "admin";
   const { q = "", status = "" } = await searchParams;
   const admin = createAdminClient();
 
@@ -55,27 +54,8 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
         <button className="btn-primary">Search</button>
       </form>
 
-      <div className="card mt-4 overflow-x-auto p-0">
-        <table className="w-full text-sm">
-          <thead className="bg-zinc-50 text-left text-xs uppercase text-zinc-500">
-            <tr><th className="p-3">Order</th><th>Buyer</th><th>Channel</th><th>Payment</th><th className="text-right">Total</th><th>Status</th><th>Created</th></tr>
-          </thead>
-          <tbody>
-            {(orders ?? []).map((o) => (
-              <tr key={o.id} className="border-t hover:bg-zinc-50">
-                <td className="p-3"><Link prefetch={false} href={`/admin/orders/${o.id}`} className="font-semibold underline">#{o.order_no}</Link></td>
-                <td><div>{o.buyer_name}</div><div className="text-xs text-zinc-500">{o.buyer_email} {o.buyer_mobile}</div></td>
-                <td className="text-zinc-600">{o.channel}</td>
-                <td className="text-xs"><span className="uppercase">{o.payment_method}</span> <span className="font-mono text-zinc-500">{o.payment_reference}</span></td>
-                <td className="text-right">{php(o.total_centavos)}</td>
-                <td><OrderStatusBadge status={o.status} /></td>
-                <td className="text-xs text-zinc-500">{new Date(o.created_at).toLocaleString("en-PH", { timeZone: "Asia/Manila" })}</td>
-              </tr>
-            ))}
-            {(orders ?? []).length === 0 && <tr><td colSpan={7} className="p-6 text-center text-zinc-500">No orders match.</td></tr>}
-          </tbody>
-        </table>
-      </div>
+      <p className="mt-3 text-xs text-zinc-500">Tap a row to open the order here. Nothing else loads until you do.</p>
+      <OrdersTable rows={(orders ?? []) as OrderRow[]} isAdmin={isAdmin} />
     </div>
   );
 }

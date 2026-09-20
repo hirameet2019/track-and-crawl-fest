@@ -8,6 +8,8 @@ import { getOrderBundle } from "@/lib/queries";
 import { audit } from "@/lib/audit";
 import { issueOrder, deliverOrder } from "@/lib/issue";
 import { sendRejectionEmail, sendVoidEmail } from "@/lib/email";
+import { itemLabel } from "@/lib/items";
+import type { OrderStatus, TicketStatus } from "@/lib/supabase/types";
 import type { ActionResult } from "./orders";
 
 function fail(e: unknown): ActionResult {
@@ -177,6 +179,79 @@ export async function voidOrder(orderId: string, reason: string): Promise<Action
   } catch (e) {
     return fail(e);
   }
+}
+
+/* ------------------------------------------------------- order detail */
+/**
+ * Everything the Orders page shows when a row is expanded. Fetched on demand, one
+ * order at a time, so opening the list costs nothing extra.
+ */
+export interface OrderDetail {
+  id: string;
+  order_no: number;
+  status: OrderStatus;
+  channel: string;
+  buyer_name: string;
+  buyer_email: string | null;
+  buyer_mobile: string | null;
+  payment_method: string | null;
+  payment_reference: string | null;
+  payment_proof_path: string | null;
+  proof_submitted_at: string | null;
+  paid_at: string | null;
+  email_sent_at: string | null;
+  receipt_no: number | null;
+  rejection_reason: string | null;
+  created_at: string;
+  total_centavos: number;
+  items: { id: string; label: string; amount_centavos: number }[];
+  tickets: {
+    id: string; number: string; type: string; holder_name: string | null; shirt_size: string | null;
+    vehicle: string | null; vehicle_photo_path: string | null; companion_of: string | null; included: boolean;
+    status: TicketStatus; redeemed_at: string | null; void_reason: string | null; qr_token: string;
+  }[];
+}
+
+export async function getOrderDetail(orderId: string): Promise<OrderDetail | null> {
+  await assertStaff("staff");
+  const b = await getOrderBundle(orderId);
+  if (!b) return null;
+  const { order, items, tickets } = b;
+  return {
+    id: order.id,
+    order_no: order.order_no,
+    status: order.status,
+    channel: order.channel,
+    buyer_name: order.buyer_name,
+    buyer_email: order.buyer_email,
+    buyer_mobile: order.buyer_mobile,
+    payment_method: order.payment_method,
+    payment_reference: order.payment_reference,
+    payment_proof_path: order.payment_proof_path,
+    proof_submitted_at: order.proof_submitted_at,
+    paid_at: order.paid_at,
+    email_sent_at: order.email_sent_at,
+    receipt_no: order.receipt_no,
+    rejection_reason: order.rejection_reason,
+    created_at: order.created_at,
+    total_centavos: order.total_centavos,
+    items: items.map((it) => ({ id: it.id, label: itemLabel(it), amount_centavos: it.qty * it.unit_price_centavos })),
+    tickets: tickets.map((t) => ({
+      id: t.id,
+      number: t.number,
+      type: t.ticket_type.name,
+      holder_name: t.holder_name,
+      shirt_size: t.shirt_size,
+      vehicle: t.vehicle_plate ? `${t.vehicle_plate} ${t.vehicle_model ?? ""}`.trim() : null,
+      vehicle_photo_path: t.vehicle_photo_path,
+      companion_of: t.companion_of,
+      included: t.included,
+      status: t.status,
+      redeemed_at: t.redeemed_at,
+      void_reason: t.void_reason,
+      qr_token: t.qr_token,
+    })),
+  };
 }
 
 export type PrivateBucket = "payment-proofs" | "vehicle-photos";
