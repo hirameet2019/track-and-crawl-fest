@@ -52,8 +52,19 @@ export function StaffNav({ name, role }: { name: string; role: StaffRole }) {
             </Link>
           );
         })}
-        <span className="ml-auto hidden text-xs text-zinc-400 sm:inline">{name} &middot; {role}</span>
-        <button onClick={signOut} className="rounded-md px-3 py-1.5 text-zinc-300 hover:bg-white/10 hover:text-white">Sign out</button>
+        <div className="ml-auto flex items-center gap-2">
+          <a
+            href="/#tickets"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-cyan-300/40 bg-cyan-300/10 px-3 py-1.5 font-medium text-cyan-200 transition hover:bg-cyan-300/20 hover:text-white"
+            title="Open the public ticket page in a new tab"
+          >
+            Tickets <span aria-hidden className="text-[10px] text-cyan-300/70">&#8599;</span>
+          </a>
+          <span className="hidden whitespace-nowrap text-xs text-zinc-400 lg:inline">{name} &middot; {role}</span>
+          <button onClick={signOut} className="whitespace-nowrap rounded-md px-3 py-1.5 text-zinc-300 hover:bg-white/10 hover:text-white">Sign out</button>
+        </div>
       </div>
       <div className="h-[3px] w-full bg-gradient-to-r from-fuchsia-500 via-violet-500 via-50% to-cyan-400" aria-hidden />
     </nav>
