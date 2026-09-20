@@ -33,7 +33,7 @@ export function StaffNav({ name, role }: { name: string; role: StaffRole }) {
       <div className="absolute inset-0 -z-10 bg-[url(/poster.jpg)] bg-cover bg-[position:center_40%] opacity-25 blur-[2px]" aria-hidden />
       <div className="absolute inset-0 -z-10 bg-gradient-to-r from-zinc-950 via-zinc-950/90 to-zinc-950/70" aria-hidden />
       <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-1 gap-y-2 px-3 py-2 text-sm">
-        <Link href={RANK[role] >= RANK.staff ? "/admin" : "/scan"} className="mr-3 flex items-center gap-2" aria-label="Meet & Drift 3 staff home">
+        <Link prefetch={false} href={RANK[role] >= RANK.staff ? "/admin" : "/scan"} className="mr-3 flex items-center gap-2" aria-label="Meet & Drift 3 staff home">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo.png" alt="Meet & Drift 3" className="h-9 w-auto sm:h-11" />
           <span className="hidden rounded border border-white/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-zinc-300 md:inline">Staff</span>
@@ -41,7 +41,7 @@ export function StaffNav({ name, role }: { name: string; role: StaffRole }) {
         {LINKS.filter((l) => RANK[role] >= RANK[l.min]).map((l) => {
           const active = l.href === "/admin" ? path === "/admin" : path.startsWith(l.href);
           return (
-            <Link
+            <Link prefetch={false}
               key={l.href}
               href={l.href}
               className={`rounded-md px-3 py-1.5 font-medium transition ${

@@ -79,8 +79,8 @@ export default async function DashboardPage() {
           <p className="text-sm text-zinc-500">Sales dashboard</p>
         </div>
         <div className="flex gap-2">
-          <Link href="/admin/walkin" className="btn-secondary">Walk-in tally</Link>
-          <Link href="/admin/verify" className={`btn-primary ${queueCount ? "" : "opacity-60"}`}>
+          <Link prefetch={false} href="/admin/walkin" className="btn-secondary">Walk-in tally</Link>
+          <Link prefetch={false} href="/admin/verify" className={`btn-primary ${queueCount ? "" : "opacity-60"}`}>
             Verify queue {queueCount ? <span className="rounded-full bg-amber-400 px-2 text-xs text-black">{queueCount}</span> : null}
           </Link>
         </div>
@@ -158,13 +158,13 @@ export default async function DashboardPage() {
         <div className="card overflow-x-auto">
           <div className="flex items-center justify-between">
             <h2 className="font-semibold">Recent online orders</h2>
-            <Link href="/admin/orders" className="text-sm underline">All orders</Link>
+            <Link prefetch={false} href="/admin/orders" className="text-sm underline">All orders</Link>
           </div>
           <table className="mt-3 w-full text-sm">
             <tbody>
               {(recent ?? []).map((o) => (
                 <tr key={o.id} className="border-t">
-                  <td className="py-1.5"><Link href={`/admin/orders/${o.id}`} className="font-medium underline">#{o.order_no}</Link></td>
+                  <td className="py-1.5"><Link prefetch={false} href={`/admin/orders/${o.id}`} className="font-medium underline">#{o.order_no}</Link></td>
                   <td>{o.buyer_name}</td>
                   <td className="text-zinc-500">{o.channel}</td>
                   <td className="text-right">{php(o.total_centavos)}</td>

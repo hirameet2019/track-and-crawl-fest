@@ -21,7 +21,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ or
 
   return (
     <div className="space-y-6">
-      <Link href="/admin/orders" className="text-sm text-zinc-500 hover:underline">&larr; Orders</Link>
+      <Link prefetch={false} href="/admin/orders" className="text-sm text-zinc-500 hover:underline">&larr; Orders</Link>
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-2xl font-bold">Order #{order.order_no}</h1>
         <OrderStatusBadge status={order.status} />
@@ -74,7 +74,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ or
                   <td>{t.vehicle_photo_path ? <SignedImage bucket="vehicle-photos" path={t.vehicle_photo_path} alt={`Car ${t.vehicle_plate ?? ""}`} className="h-12 w-16 rounded-md object-cover" /> : "-"}</td>
                   <td><TicketStatusBadge status={t.status} /></td>
                   <td className="text-xs text-zinc-500">{fmt(t.redeemed_at)}</td>
-                  <td><Link href={`/t/${t.qr_token}`} className="text-xs underline" target="_blank">View QR</Link></td>
+                  <td><Link prefetch={false} href={`/t/${t.qr_token}`} className="text-xs underline" target="_blank">View QR</Link></td>
                   {isAdmin && <td className="py-2"><TicketActions ticketId={t.id} number={t.number} status={t.status} voidReason={t.void_reason} /></td>}
                 </tr>
               ))}

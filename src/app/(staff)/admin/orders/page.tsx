@@ -63,7 +63,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
           <tbody>
             {(orders ?? []).map((o) => (
               <tr key={o.id} className="border-t hover:bg-zinc-50">
-                <td className="p-3"><Link href={`/admin/orders/${o.id}`} className="font-semibold underline">#{o.order_no}</Link></td>
+                <td className="p-3"><Link prefetch={false} href={`/admin/orders/${o.id}`} className="font-semibold underline">#{o.order_no}</Link></td>
                 <td><div>{o.buyer_name}</div><div className="text-xs text-zinc-500">{o.buyer_email} {o.buyer_mobile}</div></td>
                 <td className="text-zinc-600">{o.channel}</td>
                 <td className="text-xs"><span className="uppercase">{o.payment_method}</span> <span className="font-mono text-zinc-500">{o.payment_reference}</span></td>

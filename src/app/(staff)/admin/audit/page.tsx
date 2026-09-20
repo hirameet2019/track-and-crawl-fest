@@ -143,15 +143,15 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
           <input name="to" type="date" defaultValue={to} className="input w-auto" />
         </div>
         <button className="btn-primary">Filter</button>
-        {(q || cat || actor || from || to) && <Link href="/admin/audit" className="btn-secondary">Clear</Link>}
+        {(q || cat || actor || from || to) && <Link prefetch={false} href="/admin/audit" className="btn-secondary">Clear</Link>}
       </form>
 
       <div className="card overflow-x-auto p-0">
         <div className="flex items-center justify-between px-4 py-2 text-xs text-zinc-500">
           <span>{total.toLocaleString()} event{total === 1 ? "" : "s"}{cat || actor || q || from || to ? " match" : ""} · page {page} of {pages}</span>
           <span className="flex gap-2">
-            {page > 1 && <Link href={qs({ page: page - 1 })} className="underline">&larr; Newer</Link>}
-            {page < pages && <Link href={qs({ page: page + 1 })} className="underline">Older &rarr;</Link>}
+            {page > 1 && <Link prefetch={false} href={qs({ page: page - 1 })} className="underline">&larr; Newer</Link>}
+            {page < pages && <Link prefetch={false} href={qs({ page: page + 1 })} className="underline">Older &rarr;</Link>}
           </span>
         </div>
         <table className="w-full text-sm">
@@ -177,7 +177,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
                   </td>
                   <td className="py-3 pr-3 text-zinc-300">{summary || <span className="text-zinc-600">—</span>}</td>
                   <td className="py-3 pr-3 font-mono text-xs">
-                    {href ? <Link href={href} className="underline">{r.entity} {r.entity_id?.slice(0, 8)}</Link> : <span className="text-zinc-500">{r.entity} {r.entity_id?.slice(0, 8)}</span>}
+                    {href ? <Link prefetch={false} href={href} className="underline">{r.entity} {r.entity_id?.slice(0, 8)}</Link> : <span className="text-zinc-500">{r.entity} {r.entity_id?.slice(0, 8)}</span>}
                   </td>
                   <td className="py-3 pr-3 text-xs">
                     {r.data && (
