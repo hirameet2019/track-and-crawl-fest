@@ -73,7 +73,7 @@ export function SalesScheduleForm({ types }: { types: TicketTypeRow[] }) {
           );
         })}
       </ul>
-      <p className="text-xs text-zinc-500">Organizer&apos;s schedule: Early Bird and Early Bird Kids close end of Oct 8; VIP Car Display and VIP Pass close end of Oct 4. Companions inside a VIP Car ticket follow the VIP Pass cut-off.</p>
+      <p className="text-xs text-zinc-500">Organizer&apos;s schedule: Early Bird and Early Bird Kids close end of Oct 8; VIP Car Display and VIP Pass close end of Oct 4. The passenger included with each VIP Car ticket follows the VIP Pass cut-off.</p>
     </div>
   );
 }

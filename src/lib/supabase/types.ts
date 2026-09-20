@@ -155,6 +155,8 @@ export interface TicketRow {
   vehicle_model: string | null;
   vehicle_photo_path: string | null;
   companion_of: string | null;
+  /** VIP Pass bundled free with a VIP Car Display ticket: no shirt in the kit. */
+  included: boolean;
   status: TicketStatus;
   redeemed_at: string | null;
   redeemed_by: string | null;

@@ -407,17 +407,17 @@ async function drawTicketPage(doc: PDFDocument, f: Fonts, b: OrderBundle, t: Ord
   }
   y -= 30;
   y = labelValue(page, f, "HOLDER", t.holder_name ?? order.buyer_name, lx, y, 13);
-  if (tt.includes_shirt) y = labelValue(page, f, "T-SHIRT SIZE", t.shirt_size ?? "Not specified", lx, y);
+  if (tt.includes_shirt && !t.included) y = labelValue(page, f, "T-SHIRT SIZE", t.shirt_size ?? "Not specified", lx, y);
   if (tt.requires_vehicle) {
     y = labelValue(page, f, "VEHICLE PLATE", t.vehicle_plate ?? "Not specified", lx, y);
     y = labelValue(page, f, "VEHICLE", t.vehicle_model ?? "Not specified", lx, y);
     const riders = b.tickets.filter((x) => x.companion_of && plateKey(x.companion_of) === plateKey(t.vehicle_plate));
     if (riders.length) y = labelValue(page, f, "COMPANIONS", `${riders.length}: ${riders.map((r) => r.holder_name ?? "").join(", ")}`, lx, y);
   }
-  if (t.companion_of) y = labelValue(page, f, "RIDING WITH CAR", t.companion_of, lx, y);
+  if (t.companion_of) y = labelValue(page, f, t.included ? "PASSENGER OF CAR (INCLUDED)" : "RIDING WITH CAR", t.companion_of, lx, y);
   y = labelValue(page, f, "ORDER", `#${order.order_no}`, lx, y);
   const includes: string[] = [];
-  if (tt.includes_shirt) includes.push("Event T-shirt");
+  if (tt.includes_shirt && !t.included) includes.push("Event T-shirt");
   if (tt.includes_lanyard) includes.push("ID Lanyard");
   if (tt.includes_sticker) includes.push(tt.includes_car_pass ? "2 Event Decals" : "Event Decal");
   if (tt.includes_car_pass) includes.push("Car Pass");

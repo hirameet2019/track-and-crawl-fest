@@ -236,7 +236,7 @@ export function OrderForm({ types, availability }: { types: TicketTypeRow[]; ava
           const name = c.holder_name.trim();
           const att: Att = {
             holder_name: name || `Passenger ${k + 1} (car ${plate})`,
-            shirt_size: (c.shirt_size || undefined) as Att["shirt_size"],
+            shirt_size: (c.included ? undefined : c.shirt_size || undefined) as Att["shirt_size"],
             companion_of: plate,
           };
           if (c.included) { att.included = true; included.push(att); } else paid.push(att);
@@ -313,7 +313,7 @@ export function OrderForm({ types, availability }: { types: TicketTypeRow[]; ava
                 {t.requires_vehicle && companionType && (
                   <p className="mt-1 text-xs text-emerald-300">
                     {t.included_companions > 0
-                      ? <>Includes <b>{t.included_companions} {companionType.name}</b> for your passengers. Need more? Add companions inside this ticket at {php(companionPrice)} each.</>
+                      ? <>Includes <b>{t.included_companions} {companionType.name}</b> for your passenger{t.included_companions === 1 ? "" : "s"}. Bringing more people? Add companions inside this ticket at {php(companionPrice)} each.</>
                       : <>Bringing passengers? Add companions inside this ticket, {php(companionPrice)} each: a {companionType.name} wristband with event t-shirt, linked to your car.</>}
                   </p>
                 )}
@@ -387,7 +387,7 @@ export function OrderForm({ types, availability }: { types: TicketTypeRow[]; ava
                             <div>
                               <div className="text-xs font-semibold uppercase tracking-wide text-emerald-300">Passengers riding with this car</div>
                               <p className="mt-0.5 text-xs text-zinc-400">
-                                {includedPerCar > 0 && <>This package includes <b>{includedPerCar} {companionType.name}</b> for your passengers at no extra cost. Names and shirt sizes can be left blank for now. </>}
+                                {includedPerCar > 0 && <>This package includes <b>{includedPerCar} {companionType.name}</b> for your passenger{includedPerCar === 1 ? "" : "s"} at no extra cost (no shirt; the package has one t-shirt, for the driver). The name can be left blank for now. </>}
                                 {includedPerCar > 0 ? "Extra" : "Each"} companion{includedPerCar > 0 ? "s" : ""}: <b>{php(companionPrice)}</b> per person, a <b>{companionType.name}</b> wristband with event t-shirt, added to your total. Wristbands are linked to plate <b>{a.vehicle_plate.trim() || "…"}</b>. Up to {MAX_COMPANIONS_PER_CAR} passengers per car.
                               </p>
                             </div>
@@ -413,13 +413,17 @@ export function OrderForm({ types, availability }: { types: TicketTypeRow[]; ava
                                   minLength={c.included ? undefined : 2}
                                 />
                               </div>
-                              <div>
-                                <label className="label">T-shirt size {c.included ? "" : "*"}</label>
-                                <select className="input" value={c.shirt_size} onChange={(e) => setCompanions(t.id, i, a.companions.map((x, j) => (j === k ? { ...x, shirt_size: e.target.value } : x)))} required={!c.included}>
-                                  <option value="">Select size</option>
-                                  {SHIRT_SIZES.map((s) => <option key={s} value={s}>{s}</option>)}
-                                </select>
-                              </div>
+                              {c.included ? (
+                                <div className="text-xs text-zinc-400 sm:pb-2">VIP Pass wristband, lanyard and decal. No shirt.</div>
+                              ) : (
+                                <div>
+                                  <label className="label">T-shirt size *</label>
+                                  <select className="input" value={c.shirt_size} onChange={(e) => setCompanions(t.id, i, a.companions.map((x, j) => (j === k ? { ...x, shirt_size: e.target.value } : x)))} required>
+                                    <option value="">Select size</option>
+                                    {SHIRT_SIZES.map((s) => <option key={s} value={s}>{s}</option>)}
+                                  </select>
+                                </div>
+                              )}
                               {c.included ? (
                                 <span className="h-9 px-2 text-xs leading-9 text-emerald-300">{php(0)}</span>
                               ) : (

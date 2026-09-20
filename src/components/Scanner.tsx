@@ -190,7 +190,8 @@ function ResultCard({ r, onKit }: { r: AnyResult; onKit: (id: string, item: stri
   }
   const t = r.ticket;
   const kit: { key: string; label: string; show: boolean }[] = [
-    { key: "shirt", label: `T-shirt ${t.shirt_size ?? ""}`, show: t.ticket_type.includes_shirt },
+    // Passengers bundled with a VIP Car Display package get no shirt: the package has one, for the driver.
+    { key: "shirt", label: `T-shirt ${t.shirt_size ?? ""}`, show: t.ticket_type.includes_shirt && !t.included },
     { key: "lanyard", label: "ID lanyard", show: t.ticket_type.includes_lanyard },
     { key: "sticker", label: t.ticket_type.includes_car_pass ? "Event decals (2)" : "Event decal", show: t.ticket_type.includes_sticker },
     { key: "car_pass", label: "Car pass", show: t.ticket_type.includes_car_pass },
