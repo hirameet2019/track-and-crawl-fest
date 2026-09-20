@@ -344,6 +344,11 @@ async function drawTicketPage(doc: PDFDocument, f: Fonts, b: OrderBundle, t: Ord
   const tt = t.ticket_type;
   const W = A4[0], H = A4[1], right = W - MARGIN, contentW = W - 2 * MARGIN;
   const isVip = tt.includes_shirt || tt.includes_car_pass;
+  // A passenger riding with a car wears a car wristband but drives nothing: no plate
+  // block, no car pass stub, no car photo.
+  const isCarPass = tt.includes_car_pass && !t.companion_of;
+  /** What this ticket is called on the badges: a bundled passenger is not a car. */
+  const typeLabel = t.companion_of && t.included && tt.requires_vehicle ? "VIP Car Passenger" : tt.name;
 
   // ---------------------------------------------------------- banner
   const bannerH = 222;
@@ -371,7 +376,7 @@ async function drawTicketPage(doc: PDFDocument, f: Fonts, b: OrderBundle, t: Ord
 
   // ticket type badge (top right)
   {
-    const label = safe(tt.name.toUpperCase());
+    const label = safe(typeLabel.toUpperCase());
     let size = 13;
     while (f.display.widthOfTextAtSize(label, size) > 210 && size > 8) size -= 0.5;
     const bw = f.display.widthOfTextAtSize(label, size) + 28, bh = 30;
@@ -408,7 +413,7 @@ async function drawTicketPage(doc: PDFDocument, f: Fonts, b: OrderBundle, t: Ord
   y -= 30;
   y = labelValue(page, f, "HOLDER", t.holder_name ?? order.buyer_name, lx, y, 13);
   if (tt.includes_shirt && !t.included) y = labelValue(page, f, "T-SHIRT SIZE", t.shirt_size ?? "Not specified", lx, y);
-  if (tt.requires_vehicle) {
+  if (tt.requires_vehicle && !t.companion_of) {
     y = labelValue(page, f, "VEHICLE PLATE", t.vehicle_plate ?? "Not specified", lx, y);
     y = labelValue(page, f, "VEHICLE", t.vehicle_model ?? "Not specified", lx, y);
     const riders = b.tickets.filter((x) => x.companion_of && plateKey(x.companion_of) === plateKey(t.vehicle_plate));
@@ -419,8 +424,8 @@ async function drawTicketPage(doc: PDFDocument, f: Fonts, b: OrderBundle, t: Ord
   const includes: string[] = [];
   if (tt.includes_shirt && !t.included) includes.push("Event T-shirt");
   if (tt.includes_lanyard) includes.push("ID Lanyard");
-  if (tt.includes_sticker) includes.push(tt.includes_car_pass ? "2 Event Decals" : "Event Decal");
-  if (tt.includes_car_pass) includes.push("Car Pass");
+  if (tt.includes_sticker) includes.push(isCarPass ? "2 Event Decals" : "Event Decal");
+  if (isCarPass) includes.push("Car Pass");
 
   // gate steps, anchored to the bottom of the card
   {
@@ -463,14 +468,14 @@ async function drawTicketPage(doc: PDFDocument, f: Fonts, b: OrderBundle, t: Ord
   // ---------------------------------------------------------- stub (perforated)
   const stubTop = cardBottom - 18;
   page.drawLine({ start: { x: MARGIN, y: stubTop }, end: { x: right, y: stubTop }, thickness: 0.8, color: rgb(0.55, 0.55, 0.6), dashArray: [4, 4] });
-  text(page, tt.includes_car_pass ? "CAR PASS  -  cut along the line and display on the dashboard" : "STUB  -  cut along the line and keep", MARGIN, stubTop - 12, 7.5, f.bold, MUTED);
+  text(page, isCarPass ? "CAR PASS  -  cut along the line and display on the dashboard" : "STUB  -  cut along the line and keep", MARGIN, stubTop - 12, 7.5, f.bold, MUTED);
 
   const sY = 70, sH = stubTop - 24 - sY;
   page.drawRectangle({ x: MARGIN, y: sY, width: contentW, height: sH, color: rgb(0.05, 0.03, 0.09) });
   stripe(page, MARGIN, sY + sH - 4, contentW, 4);
   // Car pass stubs show the registered car instead of the logo, so marshals can match it.
   let sx = MARGIN + 14 + 150 + 22;
-  const carImg = tt.includes_car_pass && t.vehicle_photo_path ? await vehiclePhoto(doc, t.vehicle_photo_path) : null;
+  const carImg = isCarPass && t.vehicle_photo_path ? await vehiclePhoto(doc, t.vehicle_photo_path) : null;
   if (carImg) {
     const ph = sH - 16, pw = Math.min(160, ph * (carImg.width / carImg.height));
     page.drawRectangle({ x: MARGIN + 12, y: sY + 6, width: pw + 4, height: ph + 4, color: WHITE });
@@ -480,10 +485,10 @@ async function drawTicketPage(doc: PDFDocument, f: Fonts, b: OrderBundle, t: Ord
     const brandW = 150;
     await drawBrand(doc, page, f, MARGIN + 14, sY + sH - 4 - (sH - 8 - brandW * 0.33) / 2, brandW);
   }
-  const bigText = tt.includes_car_pass ? (t.vehicle_plate ?? "PLATE TBA") : t.number;
-  const smallText = tt.includes_car_pass
+  const bigText = isCarPass ? (t.vehicle_plate ?? "PLATE TBA") : t.number;
+  const smallText = isCarPass
     ? `${t.vehicle_model ?? ""}   |   ${t.holder_name ?? order.buyer_name}   |   Band ${t.number}`
-    : `${tt.name}${t.companion_of ? ` (companion of ${t.companion_of})` : ""}   |   ${t.holder_name ?? order.buyer_name}   |   Order #${order.order_no}`;
+    : `${typeLabel}${t.companion_of ? ` (${t.included ? "passenger" : "companion"} of ${t.companion_of})` : ""}   |   ${t.holder_name ?? order.buyer_name}   |   Order #${order.order_no}`;
   {
     const maxW = right - 12 - (sH - 20) - 24 - sx;
     let size = 26;
@@ -496,7 +501,7 @@ async function drawTicketPage(doc: PDFDocument, f: Fonts, b: OrderBundle, t: Ord
   page.drawRectangle({ x: right - 12 - sq - 6, y: sY + 10 - 3, width: sq + 12, height: sq + 6, color: WHITE });
   page.drawImage(qrPng, { x: right - 12 - sq, y: sY + 10, width: sq, height: sq });
   {
-    const label = safe(tt.name.toUpperCase());
+    const label = safe(typeLabel.toUpperCase());
     let size = 9;
     while (f.display.widthOfTextAtSize(label, size) > 150 && size > 6) size -= 0.5;
     const tx = right - 12 - sq - 18 - f.display.widthOfTextAtSize(label, size);

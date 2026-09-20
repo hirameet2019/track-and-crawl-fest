@@ -98,11 +98,23 @@ export function OrderForm({ types, availability }: { types: TicketTypeRow[]; ava
   const [pending, start] = useTransition();
 
   const sellable = (id: string) => Number(availability.find((a) => a.ticket_type_id === id)?.sellable ?? 0);
-  /** Wristbands left ignoring the per-type cap; companions (included or paid) draw from this. */
+  /** Wristbands left ignoring the per-type cap; paid companions draw from this. */
   const poolSellable = (id: string) => Number(availability.find((a) => a.ticket_type_id === id)?.pool_sellable ?? sellable(id));
+  /**
+   * How many of a type a buyer may still add. A VIP Car Display ticket also takes a
+   * second wristband from the same pool for its free passenger, so the pool limit is
+   * halved for cars while the 40-car cap still applies on its own.
+   */
+  const addable = (t: TicketTypeRow) => {
+    const row = availability.find((a) => a.ticket_type_id === t.id);
+    const bandsPerTicket = 1 + (t.requires_vehicle ? t.included_companions : 0);
+    const byPool = Math.floor(poolSellable(t.id) / bandsPerTicket);
+    const byCap = row?.online_cap == null ? Infinity : Number(row.online_cap) - Number(row.cap_used);
+    return Math.max(0, Math.min(byPool, byCap));
+  };
 
-  // Companions ride inside a VIP Car Display ticket but are VIP Pass tickets
-  // (shirt, lanyard, sticker, green band), priced from that ticket type.
+  // Passengers ride inside a VIP Car Display ticket. The free one wears a VIP Car Display
+  // wristband from the car pool; extra companions buy a VIP Pass (shirt, green band).
   const carType = types.find((t) => t.requires_vehicle) ?? null;
   // Companions are only offered while VIP Pass is still on sale.
   const companionType = types.find((t) => t.includes_shirt && !t.requires_vehicle && !isTypeClosed(t)) ?? null;
@@ -111,8 +123,8 @@ export function OrderForm({ types, availability }: { types: TicketTypeRow[]; ava
   const paidCompanionCount = carType ? (attendees[carType.id] ?? []).reduce((n, a) => n + a.companions.filter((c) => !c.included).length, 0) : 0;
   const includedPerCar = carType?.included_companions ?? 0;
   const companionPrice = companionType?.price_centavos ?? 0;
-  /** VIP Pass wristbands still free after direct VIP Pass tickets and all companions. */
-  const companionsLeft = companionType ? poolSellable(companionType.id) - (qty[companionType.id] ?? 0) - companionCount : 0;
+  /** VIP Pass wristbands still free after direct VIP Pass tickets and paid companions. */
+  const companionsLeft = companionType ? poolSellable(companionType.id) - (qty[companionType.id] ?? 0) - paidCompanionCount : 0;
 
   const total = useMemo(
     () => types.reduce((sum, t) => sum + (qty[t.id] ?? 0) * t.price_centavos, 0) + paidCompanionCount * companionPrice,
@@ -128,7 +140,7 @@ export function OrderForm({ types, availability }: { types: TicketTypeRow[]; ava
   const emailMismatch = emailConfirm.trim() !== "" && !emailsMatch(buyer.buyer_email, emailConfirm);
 
   function setQuantity(t: TicketTypeRow, n: number) {
-    const max = isTypeClosed(t) ? 0 : Math.min(MAX_QTY_PER_TYPE, sellable(t.id));
+    const max = isTypeClosed(t) ? 0 : Math.min(MAX_QTY_PER_TYPE, addable(t));
     const clamped = Math.max(0, Math.min(max, n));
     setQty((q) => ({ ...q, [t.id]: clamped }));
     setAttendees((a) => {
@@ -203,7 +215,7 @@ export function OrderForm({ types, availability }: { types: TicketTypeRow[]; ava
       }
     }
     if (companionType && companionsLeft < 0) {
-      setError(`Not enough ${companionType.name} wristbands are left for the passengers in this order (${Math.max(0, poolSellable(companionType.id) - (qty[companionType.id] ?? 0))} left).`);
+      setError(`Not enough ${companionType.name} wristbands are left for the extra companions in this order (${Math.max(0, poolSellable(companionType.id) - (qty[companionType.id] ?? 0))} left).`);
       return;
     }
     setReview(true);
@@ -247,7 +259,9 @@ export function OrderForm({ types, availability }: { types: TicketTypeRow[]; ava
         if (g) { g.attendees.push(...paid); g.qty = g.attendees.length; }
         else items.push({ ticket_type_id: companionType.id, qty: paid.length, attendees: paid });
       }
-      if (included.length) items.push({ ticket_type_id: companionType.id, qty: included.length, attendees: included, unit_price_centavos: 0 });
+      // The free passenger takes a wristband from the car pool, so it is a second VIP Car
+      // Display line that the server prices at zero.
+      if (included.length) items.push({ ticket_type_id: carType.id, qty: included.length, attendees: included, unit_price_centavos: 0 });
     }
     start(async () => {
       const fd = new FormData();
@@ -283,7 +297,7 @@ export function OrderForm({ types, availability }: { types: TicketTypeRow[]; ava
       <section className="space-y-3">
         <Reveal as="h2" className="text-lg font-bold" delay={80}>1. Choose your tickets <span className="block text-sm font-normal text-zinc-500">Piliin kung ilang ticket ang bibilhin. Pindutin ang + or -.</span></Reveal>
         {types.map((t, idx) => {
-          const left = sellable(t.id);
+          const left = addable(t);
           const closed = isTypeClosed(t);
           const soldOut = closed || left <= 0;
           const hrs = hoursUntilCutoff(t);
@@ -313,7 +327,7 @@ export function OrderForm({ types, availability }: { types: TicketTypeRow[]; ava
                 {t.requires_vehicle && companionType && (
                   <p className="mt-1 text-xs text-emerald-300">
                     {t.included_companions > 0
-                      ? <>Includes <b>{t.included_companions} {companionType.name}</b> for your passenger{t.included_companions === 1 ? "" : "s"}. Bringing more people? Add companions inside this ticket at {php(companionPrice)} each.</>
+                      ? <>Includes a wristband for <b>{t.included_companions} passenger{t.included_companions === 1 ? "" : "s"}</b>. Bringing more people? Add companions inside this ticket at {php(companionPrice)} each, each a {companionType.name} with event t-shirt.</>
                       : <>Bringing passengers? Add companions inside this ticket, {php(companionPrice)} each: a {companionType.name} wristband with event t-shirt, linked to your car.</>}
                   </p>
                 )}
@@ -387,7 +401,7 @@ export function OrderForm({ types, availability }: { types: TicketTypeRow[]; ava
                             <div>
                               <div className="text-xs font-semibold uppercase tracking-wide text-emerald-300">Passengers riding with this car</div>
                               <p className="mt-0.5 text-xs text-zinc-400">
-                                {includedPerCar > 0 && <>This package includes <b>{includedPerCar} {companionType.name}</b> for your passenger{includedPerCar === 1 ? "" : "s"} at no extra cost (no shirt; the package has one t-shirt, for the driver). The name can be left blank for now. </>}
+                                {includedPerCar > 0 && <>This package includes a wristband for <b>{includedPerCar} passenger{includedPerCar === 1 ? "" : "s"}</b> at no extra cost: the same <b>{t.band_color}</b> band as the car, no shirt, since the package has one t-shirt for the driver. The name can be left blank for now. </>}
                                 {includedPerCar > 0 ? "Extra" : "Each"} companion{includedPerCar > 0 ? "s" : ""}: <b>{php(companionPrice)}</b> per person, a <b>{companionType.name}</b> wristband with event t-shirt, added to your total. Wristbands are linked to plate <b>{a.vehicle_plate.trim() || "…"}</b>. Up to {MAX_COMPANIONS_PER_CAR} passengers per car.
                               </p>
                             </div>
@@ -403,7 +417,7 @@ export function OrderForm({ types, availability }: { types: TicketTypeRow[]; ava
                           {a.companions.map((c, k) => (
                             <div key={k} className="mt-2 grid items-end gap-2 sm:grid-cols-[1fr_150px_auto]">
                               <div>
-                                <label className="label">{c.included ? <>Passenger {k + 1} full name <span className="ml-1 rounded bg-emerald-400/20 px-1.5 py-0.5 text-[10px] font-semibold normal-case tracking-normal text-emerald-200">Included</span></> : <>Companion {k + 1} full name *</>}</label>
+                                <label className="label">{c.included ? <>Passenger {k + 1} full name <span className="ml-1 rounded bg-emerald-400/20 px-1.5 py-0.5 text-[10px] font-semibold normal-case tracking-normal text-emerald-200">Included</span></> : <>Extra companion {k + 1} full name *</>}</label>
                                 <input
                                   className="input"
                                   value={c.holder_name}
@@ -414,7 +428,7 @@ export function OrderForm({ types, availability }: { types: TicketTypeRow[]; ava
                                 />
                               </div>
                               {c.included ? (
-                                <div className="text-xs text-zinc-400 sm:pb-2">VIP Pass wristband, lanyard and decal. No shirt.</div>
+                                <div className="text-xs text-zinc-400 sm:pb-2">{t.band_color} wristband, lanyard and decal. No shirt.</div>
                               ) : (
                                 <div>
                                   <label className="label">T-shirt size *</label>

@@ -110,7 +110,7 @@ export function OrderReviewModal({
                       </div>
                       <div className="mt-0.5 text-xs text-zinc-500">
                         {qty} × {php(t.price_centavos)}
-                        {includedOf(attendees) > 0 && <> · {includedOf(attendees)} {companionLabel} included</>}
+                        {includedOf(attendees) > 0 && <> · {includedOf(attendees)} passenger wristband{includedOf(attendees) === 1 ? "" : "s"} included</>}
                         {paidCompanionsOf(attendees) > 0 && <> + {paidCompanionsOf(attendees)} extra companion{paidCompanionsOf(attendees) === 1 ? "" : "s"} × {php(companionPrice)}</>}
                       </div>
                     </div>
@@ -134,7 +134,7 @@ export function OrderReviewModal({
                             <ul className="mt-1.5 space-y-1 border-l-2 border-emerald-400/40 pl-2">
                               {a.companions!.map((c, k) => (
                                 <li key={k} className="flex items-center justify-between gap-2 text-xs">
-                                  <span className="truncate"><span className="text-emerald-300">Riding with this car:</span> {c.holder_name || (c.included ? <span className="text-zinc-400">Passenger {k + 1}, name later</span> : <span className="text-rose-300">No name</span>)} · {c.included ? "No shirt" : `Shirt ${c.shirt_size || "?"}`} · {companionLabel}, Green wristband</span>
+                                  <span className="truncate"><span className="text-emerald-300">Riding with this car:</span> {c.holder_name || (c.included ? <span className="text-zinc-400">Passenger {k + 1}, name later</span> : <span className="text-rose-300">No name</span>)} · {c.included ? "No shirt" : `Shirt ${c.shirt_size || "?"}`} · {c.included ? `${t.band_color} wristband` : `${companionLabel}, Green wristband`}</span>
                                   <span className="shrink-0 tabular-nums text-zinc-300">{c.included ? <span className="text-emerald-300">Included</span> : php(companionPrice)}</span>
                                 </li>
                               ))}

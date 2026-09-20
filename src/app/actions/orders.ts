@@ -111,7 +111,12 @@ export async function createOnlineOrder(formData: FormData): Promise<ActionResul
     for (const [i, a] of item.attendees.entries()) {
       a.vehicle_photo_path = undefined;
       if (a.companion_of) {
-        if (!tt.includes_shirt || tt.requires_vehicle) return { ok: false, error: "Companions must be VIP Pass tickets" };
+        // The free passenger wears a wristband from the car's own pool; paid companions buy a VIP Pass.
+        if (a.included) {
+          if (tt.id !== carType?.id) return { ok: false, error: "The included passenger belongs on the VIP Car Display line" };
+        } else if (!tt.includes_shirt || tt.requires_vehicle) {
+          return { ok: false, error: "Companions must be VIP Pass tickets" };
+        }
         if (!plates.has(plateKey(a.companion_of))) return { ok: false, error: `Companion ${a.holder_name || i + 1} must belong to a car in this order` };
         a.companion_of = a.companion_of.replace(/\s+/g, " ").trim().toUpperCase();
         companions += 1;
@@ -121,7 +126,7 @@ export async function createOnlineOrder(formData: FormData): Promise<ActionResul
         if (a.included) {
           const inc = (includedPerCar.get(plateKey(a.companion_of)) ?? 0) + 1;
           includedPerCar.set(plateKey(a.companion_of), inc);
-          if (inc > allowancePerCar) return { ok: false, error: `Only ${allowancePerCar} VIP Pass companions are included per car (${a.companion_of})` };
+          if (inc > allowancePerCar) return { ok: false, error: `Only ${allowancePerCar} passenger wristband(s) are included per car (${a.companion_of})` };
           includedTotal += 1;
         }
       } else if (a.included) {
@@ -129,7 +134,7 @@ export async function createOnlineOrder(formData: FormData): Promise<ActionResul
       }
       if (!a.holder_name) return { ok: false, error: `Enter the holder's full name for each ${tt.name} ticket` };
       if (tt.includes_shirt && !a.shirt_size && !a.included) return { ok: false, error: `Choose a shirt size for each ${tt.name} ticket` };
-      if (tt.requires_vehicle) {
+      if (tt.requires_vehicle && !a.companion_of) {
         if (!a.vehicle_plate || a.vehicle_plate.length < 3) return { ok: false, error: `Enter the plate number for each ${tt.name} ticket` };
         if (!a.vehicle_model || a.vehicle_model.length < 2) return { ok: false, error: `Enter the car make and model for each ${tt.name} ticket` };
         const file = formData.get(`photo:${tt.id}:${i}`);
