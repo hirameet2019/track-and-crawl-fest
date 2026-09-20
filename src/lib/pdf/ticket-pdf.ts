@@ -6,6 +6,7 @@ import path from "path";
 import QRCode from "qrcode";
 import { SITE_URL } from "@/config/event";
 import type { OrderBundle } from "@/lib/queries";
+import { itemLabel } from "@/lib/items";
 
 const A4: [number, number] = [595.28, 841.89];
 
@@ -173,8 +174,7 @@ function drawReceiptPage(doc: PDFDocument, f: Fonts, b: OrderBundle) {
 
   let rowIdx = 0;
   for (const it of items) {
-    const companionCount = (it.attendees ?? []).filter((a) => a.companion_of).length;
-    const descLines = wrap(f.regular, companionCount ? `${it.ticket_type.name} (incl. ${companionCount} companion${companionCount === 1 ? "" : "s"} of VIP Car Display)` : it.ticket_type.name, 10, colQty - MARGIN - 60);
+    const descLines = wrap(f.regular, itemLabel(it, false), 10, colQty - MARGIN - 60);
     const rowH = Math.max(24, 10 + descLines.length * 13);
     if (rowIdx % 2 === 1) page.drawRectangle({ x: MARGIN, y: y - rowH, width: contentW, height: rowH, color: PANEL });
     let ty = y - 16;
@@ -419,7 +419,7 @@ async function drawTicketPage(doc: PDFDocument, f: Fonts, b: OrderBundle, t: Ord
   const includes: string[] = [];
   if (tt.includes_shirt) includes.push("Event T-shirt");
   if (tt.includes_lanyard) includes.push("ID Lanyard");
-  if (tt.includes_sticker) includes.push("Sticker");
+  if (tt.includes_sticker) includes.push(tt.includes_car_pass ? "2 Event Decals" : "Event Decal");
   if (tt.includes_car_pass) includes.push("Car Pass");
 
   // gate steps, anchored to the bottom of the card

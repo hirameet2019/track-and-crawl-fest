@@ -4,6 +4,7 @@ import { PAYMENT_WINDOW_MINUTES, PAY_VIA, SITE_URL } from "@/config/event";
 import { php } from "@/lib/money";
 import { getEmailSettings, type EmailSettings } from "@/lib/settings";
 import type { OrderBundle } from "@/lib/queries";
+import { itemLabel } from "@/lib/items";
 
 export interface MailMessage {
   to: string;
@@ -140,7 +141,7 @@ export async function sendOrderReceivedEmail(b: OrderBundle) {
   const rows = b.items
     .map(
       (it) =>
-        `<tr><td style="padding:6px 10px;border-bottom:1px solid #eee">${it.ticket_type.name} &times; ${it.qty}</td>
+        `<tr><td style="padding:6px 10px;border-bottom:1px solid #eee">${itemLabel(it).replace(" x ", " &times; ")}</td>
          <td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:right">${php(it.qty * it.unit_price_centavos)}</td></tr>`,
     )
     .join("");

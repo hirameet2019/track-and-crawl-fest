@@ -192,7 +192,7 @@ function ResultCard({ r, onKit }: { r: AnyResult; onKit: (id: string, item: stri
   const kit: { key: string; label: string; show: boolean }[] = [
     { key: "shirt", label: `T-shirt ${t.shirt_size ?? ""}`, show: t.ticket_type.includes_shirt },
     { key: "lanyard", label: "ID lanyard", show: t.ticket_type.includes_lanyard },
-    { key: "sticker", label: "Sticker", show: t.ticket_type.includes_sticker },
+    { key: "sticker", label: t.ticket_type.includes_car_pass ? "Event decals (2)" : "Event decal", show: t.ticket_type.includes_sticker },
     { key: "car_pass", label: "Car pass", show: t.ticket_type.includes_car_pass },
   ];
   return (

@@ -7,6 +7,7 @@ import { OrderActions } from "@/components/OrderActions";
 import { php } from "@/lib/money";
 import { SignedImage } from "@/components/SignedImage";
 import { TicketActions } from "@/components/TicketActions";
+import { itemLabel } from "@/lib/items";
 
 const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleString("en-PH", { timeZone: "Asia/Manila" }) : "-");
 
@@ -46,7 +47,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ or
           <h2 className="mt-5 font-semibold">Items</h2>
           <ul className="mt-2 divide-y text-sm">
             {items.map((it) => (
-              <li key={it.id} className="flex justify-between py-2"><span>{it.ticket_type.name} x {it.qty}</span><span>{php(it.qty * it.unit_price_centavos)}</span></li>
+              <li key={it.id} className="flex justify-between py-2"><span>{itemLabel(it)}</span><span>{php(it.qty * it.unit_price_centavos)}</span></li>
             ))}
             <li className="flex justify-between py-2 font-bold"><span>Total</span><span>{php(order.total_centavos)}</span></li>
           </ul>

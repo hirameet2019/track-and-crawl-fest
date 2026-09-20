@@ -9,6 +9,7 @@ import { ticketUrl } from "@/lib/pdf/ticket-pdf";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SupportContact } from "@/components/SupportContact";
 import { EXPIRED_GRACE_HOURS } from "@/config/event";
+import { itemLabel } from "@/lib/items";
 
 export const dynamic = "force-dynamic";
 
@@ -87,7 +88,7 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ or
         <ul className="mt-2 divide-y text-sm">
           {items.map((it) => (
             <li key={it.id} className="flex justify-between py-2">
-              <span>{it.ticket_type.name} x {it.qty}</span>
+              <span>{itemLabel(it)}</span>
               <span>{php(it.qty * it.unit_price_centavos)}</span>
             </li>
           ))}

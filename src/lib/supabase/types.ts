@@ -70,6 +70,10 @@ export interface TicketTypeRow {
   walkin_price_centavos: number | null;
   /** Online sales stop at this instant; null = no cut-off. Set from Admin > Settings. */
   sales_close_at: string | null;
+  /** Max direct online tickets of this type (companions excluded); null = wristband pool only. */
+  online_cap: number | null;
+  /** Free VIP Pass companions bundled with one ticket of this type (VIP Car Display = 2). */
+  included_companions: number;
 }
 
 export interface TicketNumberRow {
@@ -125,6 +129,8 @@ export interface Attendee {
   vehicle_photo_path?: string;
   /** Plate of the VIP Car Display car this (VIP Pass) ticket rides with. */
   companion_of?: string;
+  /** Companion bundled free with the car package (counts toward the car's included_companions). */
+  included?: boolean;
 }
 
 export interface OrderItemRow {
@@ -180,8 +186,13 @@ export interface AvailabilityRow {
   /** online_sold + walkin_sold */
   sold: number;
   reserved: number;
-  /** pool_available - reserved - walkin_sold */
+  /** min(pool_sellable, online_cap - cap_used); what a buyer may still add directly */
   sellable: number;
+  online_cap: number | null;
+  /** Direct (non-companion) tickets in live orders, counted against online_cap */
+  cap_used: number;
+  /** pool_available - reserved - walkin_sold, ignoring the cap (companions draw from this) */
+  pool_sellable: number;
   online_revenue_centavos: number;
   walkin_revenue_centavos: number;
   revenue_centavos: number;

@@ -22,6 +22,8 @@ const attendeeSchema = z.object({
   vehicle_photo_path: z.string().optional(),
   // VIP Pass ticket bought from inside a VIP Car Display ticket: the car's plate.
   companion_of: z.string().trim().max(20).optional(),
+  // Free companion bundled with the car package; the server re-derives the price.
+  included: z.boolean().optional(),
 });
 
 /** Plates compare without spaces or case: "NBC 8821" == "nbc8821". */
@@ -53,6 +55,8 @@ const createOrderSchema = z.object({
         // Direct tickets are capped at MAX_QTY_PER_TYPE below; companions are only limited by the pool.
         qty: z.number().int().min(1).max(500),
         attendees: z.array(attendeeSchema),
+        // Ignored from the client; set server-side (0 for included companions).
+        unit_price_centavos: z.number().int().min(0).optional(),
       }),
     )
     .min(1, "Select at least one ticket"),
@@ -90,7 +94,13 @@ export async function createOnlineOrder(formData: FormData): Promise<ActionResul
       .filter(Boolean),
   );
   let companions = 0;
+  let includedTotal = 0;
   const companionsPerCar = new Map<string, number>();
+  const includedPerCar = new Map<string, number>();
+  // Free companions come with the car package: included_companions per VIP Car Display ticket.
+  const carType = types.find((t) => t.requires_vehicle);
+  const carQty = parsed.data.items.filter((i) => i.ticket_type_id === carType?.id).reduce((n, i) => n + i.qty, 0);
+  const allowancePerCar = carType?.included_companions ?? 0;
   for (const [ii, item] of parsed.data.items.entries()) {
     const tt = types.find((t) => t.id === item.ticket_type_id);
     if (!tt) return { ok: false, error: "Unknown ticket type" };
@@ -108,9 +118,17 @@ export async function createOnlineOrder(formData: FormData): Promise<ActionResul
         const perCar = (companionsPerCar.get(plateKey(a.companion_of)) ?? 0) + 1;
         companionsPerCar.set(plateKey(a.companion_of), perCar);
         if (perCar > MAX_COMPANIONS_PER_CAR) return { ok: false, error: `Up to ${MAX_COMPANIONS_PER_CAR} companions per car (${a.companion_of})` };
+        if (a.included) {
+          const inc = (includedPerCar.get(plateKey(a.companion_of)) ?? 0) + 1;
+          includedPerCar.set(plateKey(a.companion_of), inc);
+          if (inc > allowancePerCar) return { ok: false, error: `Only ${allowancePerCar} VIP Pass companions are included per car (${a.companion_of})` };
+          includedTotal += 1;
+        }
+      } else if (a.included) {
+        return { ok: false, error: "Included companions must ride with a car in this order" };
       }
       if (!a.holder_name) return { ok: false, error: `Enter the holder's full name for each ${tt.name} ticket` };
-      if (tt.includes_shirt && !a.shirt_size) return { ok: false, error: `Choose a shirt size for each ${tt.name} ticket` };
+      if (tt.includes_shirt && !a.shirt_size && !a.included) return { ok: false, error: `Choose a shirt size for each ${tt.name} ticket` };
       if (tt.requires_vehicle) {
         if (!a.vehicle_plate || a.vehicle_plate.length < 3) return { ok: false, error: `Enter the plate number for each ${tt.name} ticket` };
         if (!a.vehicle_model || a.vehicle_model.length < 2) return { ok: false, error: `Enter the car make and model for each ${tt.name} ticket` };
@@ -121,6 +139,14 @@ export async function createOnlineOrder(formData: FormData): Promise<ActionResul
         photos.push({ item: ii, index: i, file });
       }
     }
+  }
+
+  if (includedTotal > carQty * allowancePerCar) return { ok: false, error: "More included companions than the car package allows" };
+  // Price is decided here, never by the client: an item is free only when every attendee is an included companion.
+  for (const item of parsed.data.items) {
+    const allIncluded = item.attendees.length > 0 && item.attendees.every((a) => a.included && a.companion_of);
+    item.unit_price_centavos = allIncluded ? 0 : undefined;
+    if (!allIncluded) for (const a of item.attendees) a.included = undefined;
   }
 
   const admin = createAdminClient();
@@ -156,7 +182,7 @@ export async function createOnlineOrder(formData: FormData): Promise<ActionResul
     action: "order.created",
     entity: "order",
     entity_id: orderId,
-    data: { buyer: parsed.data.buyer_name, companions, items: parsed.data.items.reduce((n, i) => n + i.qty, 0), total_centavos: parsed.data.items.reduce((n, i) => n + i.qty * (types.find((t) => t.id === i.ticket_type_id)?.price_centavos ?? 0), 0) },
+    data: { buyer: parsed.data.buyer_name, companions, included: includedTotal, items: parsed.data.items.reduce((n, i) => n + i.qty, 0), total_centavos: parsed.data.items.reduce((n, i) => n + i.qty * (i.unit_price_centavos ?? types.find((t) => t.id === i.ticket_type_id)?.price_centavos ?? 0), 0) },
   });
 
   // A way back to the pay page if the buyer loses the tab while paying. Must never block the order.
