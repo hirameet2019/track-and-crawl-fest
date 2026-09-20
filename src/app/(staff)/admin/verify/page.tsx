@@ -2,6 +2,7 @@
 import { requireStaff } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { VerifyQueue, type QueueOrder } from "@/components/VerifyQueue";
+import { LiveOrders } from "@/components/LiveOrders";
 import type { Attendee } from "@/lib/supabase/types";
 
 export default async function VerifyPage() {
@@ -27,8 +28,11 @@ export default async function VerifyPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold">Payment verification</h1>
-      <p className="text-sm text-zinc-500">Compare each screenshot and reference number with the organizer&apos;s GoTyme transaction history, then approve or reject.</p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-bold">Payment verification</h1>
+        <LiveOrders watch="verification" />
+      </div>
+      <p className="text-sm text-zinc-500">Compare each screenshot and reference number with the organizer&apos;s GoTyme transaction history, then approve or reject. New proofs appear here on their own; no need to refresh.</p>
       <div className="mt-6">
         <VerifyQueue orders={orders} />
       </div>

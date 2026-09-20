@@ -1,5 +1,6 @@
 /* eslint-disable react-hooks/purity -- server component: rendered once per request, Date.now() is intentional */
 import Link from "next/link";
+import { LiveOrders } from "@/components/LiveOrders";
 import { requireStaff } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getActiveEvent, getAvailability } from "@/lib/queries";
@@ -74,7 +75,7 @@ export default async function DashboardPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h1 className="text-2xl font-bold">{event.name}</h1>
+          <div className="flex flex-wrap items-center gap-3"><h1 className="text-2xl font-bold">{event.name}</h1><LiveOrders /></div>
           <p className="text-sm text-zinc-500">Sales dashboard</p>
         </div>
         <div className="flex gap-2">
