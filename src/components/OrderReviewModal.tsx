@@ -12,7 +12,7 @@ export interface ReviewAttendee {
   vehicle_plate: string;
   vehicle_model: string;
   photo_preview: string | null;
-  /** Passengers added inside a VIP Car Display ticket (become VIP Standing tickets). */
+  /** Passengers added inside a VIP Car Display ticket (become VIP Pass tickets). */
   companions?: { holder_name: string; shirt_size: string }[];
 }
 export interface ReviewLine {
@@ -34,7 +34,7 @@ export function OrderReviewModal({
   onClose,
   onConfirm,
   companionPrice = 0,
-  companionLabel = "VIP Standing",
+  companionLabel = "VIP Pass",
 }: {
   lines: ReviewLine[];
   companionPrice?: number;

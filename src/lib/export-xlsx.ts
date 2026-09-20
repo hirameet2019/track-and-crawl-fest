@@ -5,7 +5,7 @@ import { bandHex } from "@/lib/bands";
 /**
  * Tickets workbook for the organizer: a Summary sheet, then one sheet per
  * wristband label (ticket type) in the organizer's own order. Each tab and its
- * header row take the wristband colour, so "green sheet = VIP Standing" at a
+ * header row take the wristband colour, so "green sheet = VIP Pass" at a
  * glance. Walk-in-only labels list their gate taps instead of tickets.
  */
 

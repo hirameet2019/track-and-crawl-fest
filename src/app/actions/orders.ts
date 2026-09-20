@@ -20,7 +20,7 @@ const attendeeSchema = z.object({
   vehicle_model: z.string().trim().max(60).optional(),
   // Set server-side after upload; anything the client sends here is discarded.
   vehicle_photo_path: z.string().optional(),
-  // VIP Standing ticket bought from inside a VIP Car Display ticket: the car's plate.
+  // VIP Pass ticket bought from inside a VIP Car Display ticket: the car's plate.
   companion_of: z.string().trim().max(20).optional(),
 });
 
@@ -101,7 +101,7 @@ export async function createOnlineOrder(formData: FormData): Promise<ActionResul
     for (const [i, a] of item.attendees.entries()) {
       a.vehicle_photo_path = undefined;
       if (a.companion_of) {
-        if (!tt.includes_shirt || tt.requires_vehicle) return { ok: false, error: "Companions must be VIP Standing tickets" };
+        if (!tt.includes_shirt || tt.requires_vehicle) return { ok: false, error: "Companions must be VIP Pass tickets" };
         if (!plates.has(plateKey(a.companion_of))) return { ok: false, error: `Companion ${a.holder_name || i + 1} must belong to a car in this order` };
         a.companion_of = a.companion_of.replace(/\s+/g, " ").trim().toUpperCase();
         companions += 1;

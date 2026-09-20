@@ -16,7 +16,7 @@ export const PAYMENT_WINDOW_MINUTES = 60;
 export const EXPIRED_GRACE_HOURS = 24;
 
 /**
- * Shirt sizes offered on ticket types that include a shirt (VIP Standing, VIP Car
+ * Shirt sizes offered on ticket types that include a shirt (VIP Pass, VIP Car
  * Display). The list mirrors the supplier's "Regular Shirt" size chart so every
  * size the buyer can see on the chart is also selectable.
  */

@@ -25,12 +25,12 @@ insert into ticket_types (event_id, code, name, description, price_centavos, wal
                           includes_shirt, includes_lanyard, includes_sticker, includes_car_pass, requires_vehicle, is_child, sort_order)
 select e.id, v.* from events e,
 (values
-  ('B', 'Child (12 yrs old & below)', 'General admission for children 12 years old and below. Blue stripes wristband - the same band is used for walk-in kids.', 7500,   null, 'Blue stripes',   true,  false, false, false, false, false, true,  1),
+  ('B', 'Early Bird Kids',            'General admission for children 12 years old and below. Blue stripes wristband - the same band is used for walk-in kids.', 7500,   null, 'Blue stripes',   true,  false, false, false, false, false, true,  1),
   ('Y', 'Adult Walk-in',              'Sold at the gate only. Yellow stripes wristband.',                                                                       0,      null, 'Yellow stripes', false, false, false, false, false, false, false, 2),
   ('O', 'Adult Walk-in',              'Sold at the gate only. Orange stripes wristband.',                                                                       0,      null, 'Orange stripes', false, false, false, false, false, false, false, 3),
   ('R', 'VIP Car Display',            'Display your car. Includes event t-shirt, VIP passes and car pass. A photo of the car, plate number and car model are required.', 150000, null, 'Red stripes', true, true, true, false, true, true, false, 4),
-  ('P', 'Early Bird Adult',           'General admission wristband.',                                                                                           15000,  null, 'Pink stripes',   true,  false, false, false, false, false, false, 5),
-  ('G', 'VIP Standing',               'VIP wristband with event t-shirt, ID lanyard and sticker.',                                                              95000,  null, 'Green',          true,  true,  true,  true,  false, false, false, 6)
+  ('P', 'Early Bird',                 'General admission wristband.',                                                                                           15000,  null, 'Pink stripes',   true,  false, false, false, false, false, false, 5),
+  ('G', 'VIP Pass',                   'VIP wristband with event t-shirt, ID lanyard and sticker.',                                                              95000,  null, 'Green',          true,  true,  true,  true,  false, false, false, 6)
 ) as v(code, name, description, price_centavos, walkin_price_centavos, band_color, sell_online, includes_shirt, includes_lanyard, includes_sticker, includes_car_pass, requires_vehicle, is_child, sort_order)
 where e.slug = 'drift-2026';
 

@@ -16,9 +16,9 @@ sales, a sales dashboard, and a mobile gate scanner with offline fallback.
 
 | Code | Name | Price | Includes |
 |------|------|-------|----------|
-| EBA  | Early Bird - Adult | PHP 150 | wristband |
-| EBC  | Early Bird - Child (below 12) | PHP 75 | wristband |
-| VIPS | VIP Standing | PHP 950 | wristband, t-shirt, ID lanyard, sticker |
+| EBA  | Early Bird | PHP 150 | wristband |
+| EBC  | Early Bird Kids (12 and below) | PHP 75 | wristband |
+| VIPS | VIP Pass | PHP 950 | wristband, t-shirt, ID lanyard, sticker |
 | VIPC | VIP Car Display | PHP 1,500 | wristband, t-shirt, VIP passes, car pass |
 
 ## Supabase project

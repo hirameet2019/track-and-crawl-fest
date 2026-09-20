@@ -13,7 +13,7 @@ import { ShirtSizeChartButton, ShirtSizeHint } from "@/components/ShirtSizeChart
 import { emailProblem, emailsMatch, mobileProblem, normalizeEmail, normalizeMobile, suggestEmail } from "@/lib/contact";
 import { OrderReviewModal, type ReviewLine } from "@/components/OrderReviewModal";
 
-/** A passenger riding with a VIP Car Display car: becomes a VIP Standing ticket linked to the plate. */
+/** A passenger riding with a VIP Car Display car: becomes a VIP Pass ticket linked to the plate. */
 type Companion = { holder_name: string; shirt_size: string };
 type Attendee = {
   holder_name: string;
@@ -95,14 +95,14 @@ export function OrderForm({ types, availability }: { types: TicketTypeRow[]; ava
 
   const sellable = (id: string) => Number(availability.find((a) => a.ticket_type_id === id)?.sellable ?? 0);
 
-  // Companions ride inside a VIP Car Display ticket but are VIP Standing tickets
+  // Companions ride inside a VIP Car Display ticket but are VIP Pass tickets
   // (shirt, lanyard, sticker, green band), priced from that ticket type.
   const carType = types.find((t) => t.requires_vehicle) ?? null;
-  // Companions are only offered while VIP Standing is still on sale.
+  // Companions are only offered while VIP Pass is still on sale.
   const companionType = types.find((t) => t.includes_shirt && !t.requires_vehicle && !isTypeClosed(t)) ?? null;
   const companionCount = carType ? (attendees[carType.id] ?? []).reduce((n, a) => n + a.companions.length, 0) : 0;
   const companionPrice = companionType?.price_centavos ?? 0;
-  /** VIP Standing wristbands still free after direct VIP Standing tickets and companions. */
+  /** VIP Pass wristbands still free after direct VIP Pass tickets and companions. */
   const companionsLeft = companionType ? sellable(companionType.id) - (qty[companionType.id] ?? 0) - companionCount : 0;
 
   const total = useMemo(
@@ -193,7 +193,7 @@ export function OrderForm({ types, availability }: { types: TicketTypeRow[]; ava
       }
     }
     if (companionType && companionsLeft < 0) {
-      setError(`Only ${Math.max(0, sellable(companionType.id))} VIP Standing wristbands are left for companions.`);
+      setError(`Only ${Math.max(0, sellable(companionType.id))} ${companionType.name} wristbands are left for companions.`);
       return;
     }
     setReview(true);
@@ -213,7 +213,7 @@ export function OrderForm({ types, availability }: { types: TicketTypeRow[]; ava
         vehicle_model: a.vehicle_model.trim() || undefined,
       })),
     }));
-    // Companions become VIP Standing attendees carrying the plate they ride with.
+    // Companions become VIP Pass attendees carrying the plate they ride with.
     if (carType && companionType && companionCount > 0) {
       const comps = (attendees[carType.id] ?? []).flatMap((a) =>
         a.companions.map((c) => ({
@@ -532,7 +532,7 @@ export function OrderForm({ types, availability }: { types: TicketTypeRow[]; ava
       <OrderReviewModal
         lines={reviewLines}
         companionPrice={companionPrice}
-        companionLabel={companionType?.name ?? "VIP Standing"}
+        companionLabel={companionType?.name ?? "VIP Pass"}
         buyer={{ ...buyer, buyer_mobile: normalizeMobile(buyer.buyer_mobile) || buyer.buyer_mobile }}
         total={total}
         pending={pending}

@@ -123,7 +123,7 @@ export interface Attendee {
   vehicle_model?: string;
   /** Object path in the private vehicle-photos bucket (VIP Car Display). */
   vehicle_photo_path?: string;
-  /** Plate of the VIP Car Display car this (VIP Standing) ticket rides with. */
+  /** Plate of the VIP Car Display car this (VIP Pass) ticket rides with. */
   companion_of?: string;
 }
 
