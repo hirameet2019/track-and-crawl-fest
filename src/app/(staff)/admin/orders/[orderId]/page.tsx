@@ -54,7 +54,12 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ or
         </div>
         <div className="card">
           <h2 className="font-semibold">Actions</h2>
-          <OrderActions orderId={order.id} status={order.status} proofPath={order.payment_proof_path} hasEmail={!!order.buyer_email} isAdmin={isAdmin} />
+          <OrderActions
+            orderId={order.id} status={order.status} proofPath={order.payment_proof_path} hasEmail={!!order.buyer_email} isAdmin={isAdmin}
+            buyerName={order.buyer_name} totalCentavos={order.total_centavos}
+            balanceCentavos={order.balance_centavos} balanceSettledAt={order.balance_settled_at}
+            hasRedeemed={tickets.some((t) => t.status === "redeemed")}
+          />
         </div>
       </div>
 
@@ -75,7 +80,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ or
                   <td><TicketStatusBadge status={t.status} /></td>
                   <td className="text-xs text-zinc-500">{fmt(t.redeemed_at)}</td>
                   <td><Link prefetch={false} href={`/t/${t.qr_token}`} className="text-xs underline" target="_blank">View QR</Link></td>
-                  {isAdmin && <td className="py-2"><TicketActions ticketId={t.id} number={t.number} status={t.status} voidReason={t.void_reason} /></td>}
+                  {isAdmin && <td className="py-2">{t.ticket_number_id === null ? <span className="text-xs text-zinc-500">converted</span> : <TicketActions ticketId={t.id} number={t.number} status={t.status} voidReason={t.void_reason} />}</td>}
                 </tr>
               ))}
             </tbody>

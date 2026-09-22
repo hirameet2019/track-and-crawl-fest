@@ -43,6 +43,8 @@ const ACTIONS: Record<string, { cat: AuditCategory; label: string }> = {
   "ticket.voided": { cat: "payments", label: "Ticket voided" },
   "ticket.unvoided": { cat: "payments", label: "Voided ticket restored" },
   "order.voided": { cat: "payments", label: "Paid order voided" },
+  "order.converted": { cat: "payments", label: "Order converted" },
+  "order.balance_settled": { cat: "payments", label: "Balance settled" },
   "ticket.kit": { cat: "tickets", label: "Kit item handed over" },
   "walkin.recorded": { cat: "walkin", label: "Walk-in tally" },
   "ticket_type.walkin_price": { cat: "walkin", label: "Gate price changed" },
@@ -86,6 +88,22 @@ export function describe(action: string, data: Record<string, unknown> | null | 
       return d.number ? String(d.number) : "";
     case "order.voided":
       return [d.order_no ? `Order #${d.order_no}` : "", d.tickets !== undefined ? `${d.tickets} ticket(s)` : "", d.reason ? `Reason: ${d.reason}` : ""].filter(Boolean).join(" · ");
+    case "order.converted": {
+      const was = Array.isArray(d.from) ? (d.from as { number?: string }[]).map((t) => t.number).filter(Boolean).join(", ") : "";
+      const bal = Number(d.balance_centavos ?? 0);
+      return [
+        d.order_no ? `Order #${d.order_no}` : "",
+        was ? `was ${was}` : "",
+        `now ${d.to_qty} x ${d.to_type}`,
+        `${peso(d.old_total_centavos)} to ${peso(d.new_total_centavos)}`,
+        bal > 0 ? `refund ${peso(bal)}` : bal < 0 ? `collect ${peso(-bal)}` : "no difference",
+        d.reason ? `Reason: ${d.reason}` : "",
+      ].filter(Boolean).join(" · ");
+    }
+    case "order.balance_settled": {
+      const bal = Number(d.balance_centavos ?? 0);
+      return [d.order_no ? `Order #${d.order_no}` : "", bal > 0 ? `refunded ${peso(bal)}` : `collected ${peso(-bal)}`, d.note ? String(d.note) : ""].filter(Boolean).join(" · ");
+    }
     case "order.reverted":
       return [d.order_no ? `Order #${d.order_no}` : "", Array.isArray(d.released_numbers) ? `released ${d.released_numbers.join(", ")}` : "", d.reason ? String(d.reason) : ""].filter(Boolean).join(" · ");
     case "walkin.recorded": {

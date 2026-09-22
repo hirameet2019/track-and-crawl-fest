@@ -567,6 +567,8 @@ export async function buildOrderPdf(bundle: OrderBundle): Promise<Uint8Array> {
   };
   doc.setTitle(`${bundle.event.name} - Order #${bundle.order.order_no}`);
   drawReceiptPage(doc, f, bundle);
-  for (const t of bundle.tickets) await drawTicketPage(doc, f, bundle, t);
+  // A ticket converted to another type gave its band back to the pool; it is not the
+  // buyer's any more, so it gets no page. Ordinary voids keep theirs, stamped VOID.
+  for (const t of bundle.tickets.filter((t) => t.ticket_number_id !== null)) await drawTicketPage(doc, f, bundle, t);
   return doc.save();
 }

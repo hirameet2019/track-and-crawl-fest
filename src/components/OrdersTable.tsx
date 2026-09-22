@@ -165,7 +165,12 @@ function OrderPanel({ d, isAdmin }: { d: OrderDetail; isAdmin: boolean }) {
       <div className="space-y-3">
         <div>
           <h4 className="font-semibold">Actions</h4>
-          <OrderActions orderId={d.id} status={d.status} proofPath={d.payment_proof_path} hasEmail={!!d.buyer_email} isAdmin={isAdmin} />
+          <OrderActions
+            orderId={d.id} status={d.status} proofPath={d.payment_proof_path} hasEmail={!!d.buyer_email} isAdmin={isAdmin}
+            buyerName={d.buyer_name} totalCentavos={d.total_centavos}
+            balanceCentavos={d.balance_centavos} balanceSettledAt={d.balance_settled_at}
+            hasRedeemed={d.tickets.some((t) => t.status === "redeemed")}
+          />
         </div>
         {d.payment_proof_path && (
           <div>
@@ -194,7 +199,7 @@ function OrderPanel({ d, isAdmin }: { d: OrderDetail; isAdmin: boolean }) {
                   <td><TicketStatusBadge status={t.status} /></td>
                   <td className="text-xs text-zinc-500">{fmt(t.redeemed_at)}</td>
                   <td><Link prefetch={false} href={`/t/${t.qr_token}`} className="text-xs underline" target="_blank">View QR</Link></td>
-                  {isAdmin && <td className="py-2"><TicketActions ticketId={t.id} number={t.number} status={t.status} voidReason={t.void_reason} /></td>}
+                  {isAdmin && <td className="py-2">{t.converted ? <span className="text-xs text-zinc-500">converted</span> : <TicketActions ticketId={t.id} number={t.number} status={t.status} voidReason={t.void_reason} />}</td>}
                 </tr>
               ))}
             </tbody>

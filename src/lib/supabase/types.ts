@@ -121,6 +121,11 @@ export interface OrderRow {
   receipt_no: number | null;
   email_sent_at: string | null;
   notes: string | null;
+  /** Left over after a conversion: positive = refund owed to the buyer, negative = the buyer owes. */
+  balance_centavos: number;
+  /** Set once staff have actually moved the money. */
+  balance_settled_at: string | null;
+  balance_note: string | null;
   created_at: string;
 }
 
@@ -150,7 +155,8 @@ export interface TicketRow {
   id: string;
   order_id: string;
   ticket_type_id: string;
-  ticket_number_id: string;
+  /** Null only on a ticket converted to another type: the band went back to the pool. */
+  ticket_number_id: string | null;
   number: string;
   qr_token: string;
   holder_name: string | null;

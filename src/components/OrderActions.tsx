@@ -2,13 +2,22 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { approveOrder, getProofUrl, rejectOrder, resendTickets, voidOrder } from "@/app/actions/admin";
+import { approveOrder, getProofUrl, rejectOrder, resendTickets, settleOrderBalance, voidOrder } from "@/app/actions/admin";
+import { ConvertOrderForm } from "@/components/ConvertOrderForm";
+import { php } from "@/lib/money";
 import type { OrderStatus } from "@/lib/supabase/types";
 
-export function OrderActions({ orderId, status, proofPath, hasEmail, isAdmin = false }: { orderId: string; status: OrderStatus; proofPath: string | null; hasEmail: boolean; isAdmin?: boolean }) {
+export function OrderActions({
+  orderId, status, proofPath, hasEmail, isAdmin = false,
+  buyerName = "", totalCentavos = 0, balanceCentavos = 0, balanceSettledAt = null, hasRedeemed = false,
+}: {
+  orderId: string; status: OrderStatus; proofPath: string | null; hasEmail: boolean; isAdmin?: boolean;
+  buyerName?: string; totalCentavos?: number; balanceCentavos?: number; balanceSettledAt?: string | null; hasRedeemed?: boolean;
+}) {
   const router = useRouter();
   const [msg, setMsg] = useState<string | null>(null);
   const [reason, setReason] = useState("");
+  const [settleNote, setSettleNote] = useState("");
   const [voidReason, setVoidReason] = useState("");
   const [confirmVoid, setConfirmVoid] = useState(false);
   const [pending, start] = useTransition();
@@ -43,6 +52,30 @@ export function OrderActions({ orderId, status, proofPath, hasEmail, isAdmin = f
         <button className="btn-primary w-full" disabled={pending || !hasEmail} onClick={() => run(() => resendTickets(orderId), "Email re-sent")}>
           {hasEmail ? "Re-send ticket email" : "No email on order"}
         </button>
+      )}
+      {balanceCentavos !== 0 && (
+        <div className={`space-y-2 rounded-lg border p-3 ${balanceSettledAt ? "border-emerald-500/30 bg-emerald-500/10" : "border-amber-500/40 bg-amber-500/10"}`}>
+          <div className="text-xs font-semibold uppercase tracking-wide">
+            {balanceCentavos > 0 ? "Refund due to the buyer" : "Still to collect from the buyer"}
+          </div>
+          <div className="text-xl font-black">{php(Math.abs(balanceCentavos))}</div>
+          {balanceSettledAt ? (
+            <p className="text-xs opacity-80">Marked settled on {new Date(balanceSettledAt).toLocaleString("en-PH", { timeZone: "Asia/Manila" })}.</p>
+          ) : isAdmin ? (
+            <>
+              <p className="text-xs opacity-80">Left over from a conversion. Move the money in GoTyme first, then record it here.</p>
+              <input className="input" placeholder="Reference or note, e.g. GoTyme ref 123456" value={settleNote} onChange={(e) => setSettleNote(e.target.value)} />
+              <button className="btn-secondary w-full" disabled={pending} onClick={() => run(() => settleOrderBalance(orderId, settleNote), "Balance marked settled")}>
+                Mark {balanceCentavos > 0 ? "refunded" : "collected"}
+              </button>
+            </>
+          ) : (
+            <p className="text-xs opacity-80">Left over from a conversion. An admin records it once the money has moved.</p>
+          )}
+        </div>
+      )}
+      {status === "paid" && isAdmin && (
+        <ConvertOrderForm orderId={orderId} buyerName={buyerName} currentTotalCentavos={totalCentavos} hasRedeemed={hasRedeemed} />
       )}
       {status === "paid" && isAdmin && (
         <div className="space-y-2 rounded-lg border border-red-200 bg-red-50 p-3">

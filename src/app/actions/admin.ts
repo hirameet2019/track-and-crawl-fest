@@ -6,10 +6,11 @@ import { assertStaff } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getOrderBundle } from "@/lib/queries";
 import { audit } from "@/lib/audit";
-import { issueOrder, deliverOrder } from "@/lib/issue";
+import { issueOrder, deliverOrder, deliverConversion } from "@/lib/issue";
 import { sendRejectionEmail, sendVoidEmail } from "@/lib/email";
 import { itemLabel } from "@/lib/items";
-import type { OrderStatus, TicketStatus } from "@/lib/supabase/types";
+import { newQrToken } from "@/lib/tokens";
+import type { OrderStatus, TicketStatus, TicketTypeRow } from "@/lib/supabase/types";
 import type { ActionResult } from "./orders";
 
 function fail(e: unknown): ActionResult {
@@ -181,6 +182,132 @@ export async function voidOrder(orderId: string, reason: string): Promise<Action
   }
 }
 
+/* ------------------------------------------------------- conversion */
+export interface ConvertTarget {
+  id: string;
+  code: string;
+  name: string;
+  band_color: string | null;
+  price_centavos: number;
+  includes_shirt: boolean;
+  /** How many of this label a buyer could still be given. */
+  sellable: number;
+}
+
+/**
+ * Ticket types a paid order can be swapped into. Three are excluded: VIP Car
+ * Display needs a plate number and a car photo this form cannot collect, the
+ * gate-only labels have no online price (they are tallied, not ordered), and the
+ * drifter label is handed out on its own tab.
+ */
+export async function getConvertTargets(orderId: string): Promise<ConvertTarget[]> {
+  await assertStaff("admin");
+  const admin = createAdminClient();
+  const { data: order } = await admin.from("orders").select("event_id").eq("id", orderId).maybeSingle();
+  if (!order) return [];
+  const { data: types } = await admin
+    .from("ticket_types")
+    .select("id, code, name, band_color, price_centavos, includes_shirt, requires_vehicle, drifter_family, sell_online")
+    .eq("event_id", order.event_id)
+    .eq("active", true)
+    .order("sort_order");
+  const { data: avail } = await admin
+    .from("v_ticket_type_availability")
+    .select("ticket_type_id, sellable")
+    .eq("event_id", order.event_id);
+  const left = new Map((avail ?? []).map((a) => [a.ticket_type_id as string, Number(a.sellable)]));
+  return ((types ?? []) as (Pick<TicketTypeRow, "id" | "code" | "name" | "band_color" | "price_centavos" | "includes_shirt" | "requires_vehicle" | "drifter_family" | "sell_online">)[])
+    .filter((t) => t.sell_online && !t.requires_vehicle && !t.drifter_family)
+    .map((t) => ({
+      id: t.id, code: t.code, name: t.name, band_color: t.band_color,
+      price_centavos: t.price_centavos, includes_shirt: t.includes_shirt,
+      sellable: left.get(t.id) ?? 0,
+    }));
+}
+
+const convertSchema = z.object({
+  orderId: z.string().uuid(),
+  ticketTypeId: z.string().uuid(),
+  qty: z.number().int().min(1).max(50),
+  reason: z.string().trim().min(3, "Give a short reason (the buyer will see it)").max(200),
+  attendees: z.array(z.object({
+    holder_name: z.string().trim().max(80).optional(),
+    shirt_size: z.string().trim().max(10).optional(),
+  })).max(50).optional(),
+});
+
+/**
+ * Swap a paid order to a different ticket type, keeping its order number, receipt
+ * and payment trail. The old bands go back to the pool, new ones are issued, and
+ * the price difference is left on the order as a balance to settle by hand.
+ */
+export async function convertOrder(input: z.input<typeof convertSchema>): Promise<ActionResult & { summary?: string }> {
+  try {
+    const { userId } = await assertStaff("admin");
+    const p = convertSchema.parse(input);
+
+    // Captured before the swap: the email has to name the numbers that stopped working.
+    const before = await getOrderBundle(p.orderId);
+    if (!before) return { ok: false, error: "Order not found" };
+    const from = before.tickets
+      .filter((t) => t.status === "issued")
+      .map((t) => ({ number: t.number, type: t.ticket_type.name }));
+
+    const admin = createAdminClient();
+    const { data, error } = await admin.rpc("convert_order", {
+      p_order_id: p.orderId,
+      p_target_type_id: p.ticketTypeId,
+      p_qty: p.qty,
+      p_attendees: p.attendees ?? [],
+      p_actor: userId,
+      p_reason: p.reason,
+      p_tokens: Array.from({ length: p.qty }, newQrToken),
+    });
+    if (error) return { ok: false, error: error.message };
+
+    const r = data as { type: string; qty: number; old_total_centavos: number; new_total_centavos: number; balance_centavos: number };
+    const money = r.balance_centavos > 0
+      ? `Refund ${(r.balance_centavos / 100).toFixed(2)} to the buyer.`
+      : r.balance_centavos < 0
+        ? `Collect ${(-r.balance_centavos / 100).toFixed(2)} more from the buyer.`
+        : "Nothing to settle.";
+
+    // A delivery problem must not look like a failed conversion: the swap is committed.
+    let warning: string | undefined;
+    try {
+      const sent = await deliverConversion(p.orderId, { from, reason: p.reason, balanceCentavos: r.balance_centavos });
+      if (!sent.emailed) warning = `Converted to ${r.qty} x ${r.type}. ${money} No email was sent (no address on the order).`;
+    } catch (e) {
+      console.error(`[convert] delivery failed for order ${p.orderId}:`, e);
+      warning = `Converted to ${r.qty} x ${r.type}. ${money} The new ticket email could not be sent - use "Re-send ticket email".`;
+    }
+
+    revalidatePath("/admin");
+    revalidatePath("/admin/orders");
+    revalidatePath(`/admin/orders/${p.orderId}`);
+    return warning ? { ok: true, warning } : { ok: true, summary: `Converted to ${r.qty} x ${r.type}. ${money}` };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/** Record that the refund (or the extra payment) has actually been moved. */
+export async function settleOrderBalance(orderId: string, note: string): Promise<ActionResult> {
+  try {
+    const { userId } = await assertStaff("admin");
+    const id = z.string().uuid().parse(orderId);
+    const admin = createAdminClient();
+    const { error } = await admin.rpc("settle_order_balance", { p_order_id: id, p_actor: userId, p_note: note.trim().slice(0, 200) });
+    if (error) return { ok: false, error: error.message };
+    revalidatePath("/admin");
+    revalidatePath("/admin/orders");
+    revalidatePath(`/admin/orders/${id}`);
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
 /* ------------------------------------------------------- order detail */
 /**
  * Everything the Orders page shows when a row is expanded. Fetched on demand, one
@@ -204,11 +331,17 @@ export interface OrderDetail {
   rejection_reason: string | null;
   created_at: string;
   total_centavos: number;
+  /** After a conversion: positive = refund owed to the buyer, negative = the buyer owes. */
+  balance_centavos: number;
+  balance_settled_at: string | null;
+  balance_note: string | null;
   items: { id: string; label: string; amount_centavos: number }[];
   tickets: {
     id: string; number: string; type: string; holder_name: string | null; shirt_size: string | null;
     vehicle: string | null; vehicle_photo_path: string | null; companion_of: string | null; included: boolean;
     status: TicketStatus; redeemed_at: string | null; void_reason: string | null; qr_token: string;
+    /** Voided by a conversion: the band went back to the pool, so it cannot be restored. */
+    converted: boolean;
   }[];
 }
 
@@ -235,6 +368,9 @@ export async function getOrderDetail(orderId: string): Promise<OrderDetail | nul
     rejection_reason: order.rejection_reason,
     created_at: order.created_at,
     total_centavos: order.total_centavos,
+    balance_centavos: order.balance_centavos,
+    balance_settled_at: order.balance_settled_at,
+    balance_note: order.balance_note,
     items: items.map((it) => ({ id: it.id, label: itemLabel(it), amount_centavos: it.qty * it.unit_price_centavos })),
     tickets: tickets.map((t) => ({
       id: t.id,
@@ -250,6 +386,7 @@ export async function getOrderDetail(orderId: string): Promise<OrderDetail | nul
       redeemed_at: t.redeemed_at,
       void_reason: t.void_reason,
       qr_token: t.qr_token,
+      converted: t.ticket_number_id === null,
     })),
   };
 }

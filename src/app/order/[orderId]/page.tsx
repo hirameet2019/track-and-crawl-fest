@@ -17,7 +17,10 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ or
   const { orderId } = await params;
   const b = await getOrderBundle(orderId);
   if (!b) notFound();
-  const { order, event, items, tickets } = b;
+  const { order, event, items } = b;
+  // A ticket converted to another type handed its wristband back; it is no longer the
+  // buyer's, so it is not listed here at all. Ordinary voids stay, marked VOID.
+  const tickets = b.tickets.filter((t) => t.ticket_number_id !== null);
   if (order.status === "pending_payment") redirect(`/pay/${orderId}`);
 
   const admin = createAdminClient();
@@ -67,6 +70,19 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ or
             Otherwise <Link href="/" className="underline">place a new order</Link>.
           </p>
           <p className="mt-1 text-xs text-zinc-600">Nakabayad na? I-upload pa rin ang proof sa link sa itaas. Kung hindi pa, mag-order ulit.</p>
+        </div>
+      )}
+
+      {order.balance_centavos !== 0 && (
+        <div className={`card mt-6 ${order.balance_centavos > 0 ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50"}`}>
+          <h2 className="font-semibold">{order.balance_centavos > 0 ? "A refund is on its way" : "There is still a balance to pay"}</h2>
+          <p className="mt-1 text-sm">
+            Your order was changed to a different ticket.{" "}
+            {order.balance_centavos > 0
+              ? <><b>{php(order.balance_centavos)}</b> will be returned to the account you paid from{order.balance_settled_at ? <> &mdash; sent on {new Date(order.balance_settled_at).toLocaleDateString("en-PH", { timeZone: "Asia/Manila", dateStyle: "medium" })}</> : null}.</>
+              : <><b>{php(-order.balance_centavos)}</b> is still to be paid{order.balance_settled_at ? <> &mdash; received on {new Date(order.balance_settled_at).toLocaleDateString("en-PH", { timeZone: "Asia/Manila", dateStyle: "medium" })}</> : null}. Your tickets below are already valid.</>}
+          </p>
+          {!order.balance_settled_at && <p className="mt-1 text-xs opacity-80">Kontakin ang organizer at banggitin ang order number kung may tanong.</p>}
         </div>
       )}
 

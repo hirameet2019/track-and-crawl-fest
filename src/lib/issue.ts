@@ -2,7 +2,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { newQrToken } from "@/lib/tokens";
 import { getOrderBundle } from "@/lib/queries";
 import { buildOrderPdf } from "@/lib/pdf/ticket-pdf";
-import { sendTicketsEmail } from "@/lib/email";
+import { sendConvertedEmail, sendTicketsEmail } from "@/lib/email";
 import type { PaymentMethod } from "@/lib/supabase/types";
 
 /**
@@ -56,6 +56,27 @@ export async function deliverOrder(orderId: string) {
 
   const pdf = await buildOrderPdf(bundle);
   const result = await sendTicketsEmail(bundle, pdf);
+  if (result.ok) {
+    await admin.from("orders").update({ email_sent_at: new Date().toISOString() }).eq("id", orderId);
+  }
+  return { bundle, emailed: result.ok };
+}
+
+/**
+ * Sends the replacement tickets after a conversion. Uses its own template so the
+ * buyer is told which wristband numbers stopped working and what is still owed,
+ * rather than a second "your payment has been verified" mail.
+ */
+export async function deliverConversion(
+  orderId: string,
+  opts: { from: { number: string; type: string }[]; reason: string; balanceCentavos: number },
+) {
+  const admin = createAdminClient();
+  const bundle = await getOrderBundle(orderId);
+  if (!bundle) throw new Error("Order not found after converting");
+
+  const pdf = await buildOrderPdf(bundle);
+  const result = await sendConvertedEmail(bundle, pdf, opts);
   if (result.ok) {
     await admin.from("orders").update({ email_sent_at: new Date().toISOString() }).eq("id", orderId);
   }

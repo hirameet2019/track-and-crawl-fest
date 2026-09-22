@@ -207,3 +207,59 @@ export async function sendRejectionEmail(b: OrderBundle, reason: string) {
   </div>`;
   return send({ to: b.order.buyer_email, subject: `Payment not verified - Order #${b.order.order_no}`, html });
 }
+
+/**
+ * Sent after staff swap a paid order to a different ticket type. The buyer keeps
+ * the same order number, so the mail leads with what changed and what is still
+ * owed either way, then attaches the replacement tickets.
+ */
+export async function sendConvertedEmail(
+  b: OrderBundle,
+  pdf: Uint8Array,
+  opts: { from: { number: string; type: string }[]; reason: string; balanceCentavos: number },
+) {
+  if (!b.order.buyer_email) return { ok: false, reason: "no email" as const };
+  const oldRows = opts.from.map((t) => `<li>${t.type} &middot; <b>${t.number}</b></li>`).join("");
+  const newRows = b.tickets
+    .filter((t) => t.status !== "void")
+    .map(
+      (t) =>
+        `<tr><td style="padding:6px 10px;border-bottom:1px solid #eee">${t.ticket_type.name}</td>
+         <td style="padding:6px 10px;border-bottom:1px solid #eee"><b>${t.number}</b></td>
+         <td style="padding:6px 10px;border-bottom:1px solid #eee">${t.holder_name ?? ""}</td></tr>`,
+    )
+    .join("");
+  const contact = b.event.support_contact_label
+    ? `${b.event.support_contact_url ? `<a href="${b.event.support_contact_url}">${b.event.support_contact_label}</a>` : b.event.support_contact_label}`
+    : "reply to this email";
+  const money =
+    opts.balanceCentavos > 0
+      ? `<p style="background:#eefaf0;border:1px solid #bfe6c8;padding:10px;border-radius:6px"><b>${php(opts.balanceCentavos)} will be returned to you.</b> The organizer will send it back to the account you paid from. If it has not arrived in a few days, ${contact} and mention order #${b.order.order_no}.</p>`
+      : opts.balanceCentavos < 0
+        ? `<p style="background:#fff7e0;border:1px solid #f1d58a;padding:10px;border-radius:6px"><b>${php(-opts.balanceCentavos)} is still to be paid.</b> ${contact === "reply to this email" ? "Reply to this email" : contact} to arrange it, and mention order #${b.order.order_no}. Your new tickets below are already valid.</p>`
+        : "";
+  const html = `
+  <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#111">
+    <h2 style="margin-bottom:4px">${b.event.name}</h2>
+    <p style="margin-top:0;color:#555">Your order <b>#${b.order.order_no}</b> has been changed to a different ticket. Your old wristband number${opts.from.length === 1 ? "" : "s"} below will <b>not</b> work at the gate any more.</p>
+    <p style="background:#f5f5f5;padding:10px;border-radius:6px"><b>Reason:</b> ${opts.reason}</p>
+    ${oldRows ? `<p style="margin-bottom:4px;color:#555">No longer valid:</p><ul style="margin-top:0;color:#555">${oldRows}</ul>` : ""}
+    <p style="margin-bottom:4px"><b>Your new ticket${b.tickets.filter((t) => t.status !== "void").length === 1 ? "" : "s"}</b> &middot; new total ${php(b.order.total_centavos)}</p>
+    <table style="border-collapse:collapse;width:100%">
+      <thead><tr style="text-align:left;background:#f5f5f5">
+        <th style="padding:6px 10px">Ticket</th><th style="padding:6px 10px">Wristband No.</th><th style="padding:6px 10px">Holder</th>
+      </tr></thead>
+      <tbody>${newRows}</tbody>
+    </table>
+    ${money}
+    <p style="margin-top:20px">Show the QR code in the attached PDF at the gate. Please delete or ignore the older PDF.</p>
+    <p><a href="${SITE_URL}/order/${b.order.id}" style="background:#111;color:#fff;padding:10px 16px;text-decoration:none;border-radius:6px;display:inline-block">View my tickets online</a></p>
+    <p style="color:#555;font-size:13px">Napalitan ang ticket sa order #${b.order.order_no}. Hindi na gagana ang lumang wristband number; nasa PDF na nakalakip ang bago.</p>
+  </div>`;
+  return send({
+    to: b.order.buyer_email,
+    subject: `Your ticket was changed - ${b.event.name} (Order #${b.order.order_no})`,
+    html,
+    attachments: [{ filename: `tickets-order-${b.order.order_no}.pdf`, content: Buffer.from(pdf) }],
+  });
+}
