@@ -1,6 +1,7 @@
 /* eslint-disable react-hooks/purity -- server component: rendered once per request, Date.now() is intentional */
 import Link from "next/link";
 import { LiveOrders } from "@/components/LiveOrders";
+import { humanMinutes } from "@/lib/elapsed";
 import { requireStaff } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getActiveEvent, getAvailability } from "@/lib/queries";
@@ -89,7 +90,7 @@ export default async function DashboardPage() {
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Stat label="Revenue (paid)" value={php(onlineRevenue + walkinRevenue)} sub={`${paid.length} online orders · ${walkinCount} walk-in bands${voidedCentavos ? ` · excludes ${php(voidedCentavos)} for ${voidedTickets} voided ticket${voidedTickets === 1 ? "" : "s"}` : ""}`} />
         <Stat label="Wristbands sold" value={String(sold)} sub={`${onlineSold} online · ${walkinCount} walk-in · ${redeemed} scanned at gate`} />
-        <Stat label="Awaiting verification" value={String(queueCount ?? 0)} sub={oldestAgeMin != null ? `oldest ${oldestAgeMin} min` : "queue empty"} />
+        <Stat label="Awaiting verification" value={String(queueCount ?? 0)} sub={oldestAgeMin != null ? `oldest ${humanMinutes(oldestAgeMin)}` : "queue empty"} />
         <Stat label="Walk-in vs online" value={`${php(walkinRevenue)} / ${php(onlineRevenue)}`} />
       </div>
 

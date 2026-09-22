@@ -5,6 +5,7 @@ import { approveOrder, getProofUrl, rejectOrder } from "@/app/actions/admin";
 import { php } from "@/lib/money";
 import type { Attendee } from "@/lib/supabase/types";
 import { SignedImage } from "@/components/SignedImage";
+import { humanMinutes } from "@/lib/elapsed";
 
 export interface QueueOrder {
   id: string;
@@ -71,7 +72,7 @@ function Card({ o, onDone }: { o: QueueOrder; onDone: (id: string, warning?: str
             <div className="text-sm">{o.buyer_name}</div>
             <div className="text-xs text-zinc-500">{o.buyer_email} &middot; {o.buyer_mobile}</div>
           </div>
-          {age != null && <span className={`rounded-full px-2 py-0.5 text-xs ${age > 120 ? "bg-red-100 text-red-700" : "bg-zinc-100 text-zinc-600"}`}>{age} min ago</span>}
+          {age != null && <span className={`rounded-full px-2 py-0.5 text-xs ${age > 120 ? "bg-red-100 text-red-700" : "bg-zinc-100 text-zinc-600"}`}>{humanMinutes(age)} ago</span>}
         </div>
         <ul className="text-sm text-zinc-700">
           {o.order_items.map((i, k) => <li key={k}>{i.name} x {i.qty}</li>)}
