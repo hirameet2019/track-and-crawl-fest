@@ -9,6 +9,7 @@ import { audit } from "@/lib/audit";
 import { issueOrder, deliverOrder, deliverConversion } from "@/lib/issue";
 import { sendRejectionEmail, sendVoidEmail } from "@/lib/email";
 import { itemLabel } from "@/lib/items";
+import { php } from "@/lib/money";
 import { newQrToken } from "@/lib/tokens";
 import type { OrderStatus, TicketStatus, TicketTypeRow } from "@/lib/supabase/types";
 import type { ActionResult } from "./orders";
@@ -267,9 +268,9 @@ export async function convertOrder(input: z.input<typeof convertSchema>): Promis
 
     const r = data as { type: string; qty: number; old_total_centavos: number; new_total_centavos: number; balance_centavos: number };
     const money = r.balance_centavos > 0
-      ? `Refund ${(r.balance_centavos / 100).toFixed(2)} to the buyer.`
+      ? `Refund ${php(r.balance_centavos)} to the buyer.`
       : r.balance_centavos < 0
-        ? `Collect ${(-r.balance_centavos / 100).toFixed(2)} more from the buyer.`
+        ? `Collect ${php(-r.balance_centavos)} more from the buyer.`
         : "Nothing to settle.";
 
     // A delivery problem must not look like a failed conversion: the swap is committed.
