@@ -74,6 +74,10 @@ export interface TicketTypeRow {
   online_cap: number | null;
   /** Free VIP Pass companions bundled with one ticket of this type (VIP Car Display = 2). */
   included_companions: number;
+  /** Handed out on the Drifters tab (competing drivers' families), not the Walk-in tab. */
+  drifter_family: boolean;
+  /** Bands per drifter at no charge before the gate price applies. */
+  free_allowance: number;
 }
 
 export interface TicketNumberRow {
@@ -195,6 +199,10 @@ export interface AvailabilityRow {
   cap_used: number;
   /** pool_available - reserved - walkin_sold, ignoring the cap (companions draw from this) */
   pool_sellable: number;
+  drifter_family: boolean;
+  free_allowance: number;
+  /** Bands given away inside a drifter's free allowance (never counted as revenue). */
+  free_bands: number;
   online_revenue_centavos: number;
   walkin_revenue_centavos: number;
   revenue_centavos: number;
@@ -300,4 +308,18 @@ export interface Database {
     };
     CompositeTypes: Record<string, never>;
   };
+}
+
+/** One drifter's running family-band total (view v_drifter_bands). */
+export interface DrifterBandRow {
+  ticket_type_id: string;
+  event_id: string;
+  drifter_key: string;
+  drifter_name: string;
+  bands: number;
+  free_bands: number;
+  paid_bands: number;
+  amount_centavos: number;
+  first_at: string;
+  last_at: string;
 }

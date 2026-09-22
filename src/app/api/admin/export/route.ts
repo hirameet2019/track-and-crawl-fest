@@ -21,21 +21,60 @@ function download(body: string, name: string) {
   });
 }
 
-/** Walk-in tally entries, one row per tap. */
-async function walkinCsv() {
+type TallyRow = {
+  created_at: string; qty: number; free_qty: number; drifter_name: string | null; unit_price_centavos: number; payment_method: string;
+  ticket_type: { code: string; name: string; band_color: string | null; drifter_family: boolean } | null;
+  staff: { full_name: string } | null;
+};
+
+async function tallyRows(): Promise<TallyRow[]> {
   const admin = createAdminClient();
   const { data } = await admin
     .from("walkin_sales")
-    .select("created_at, qty, unit_price_centavos, payment_method, ticket_type:ticket_types(code, name, band_color), staff:staff(full_name)")
+    .select("created_at, qty, free_qty, drifter_name, unit_price_centavos, payment_method, ticket_type:ticket_types(code, name, band_color, drifter_family), staff:staff(full_name)")
     .order("created_at")
     .limit(50000);
-  type Row = { created_at: string; qty: number; unit_price_centavos: number; payment_method: string; ticket_type: { code: string; name: string; band_color: string | null } | null; staff: { full_name: string } | null };
-  const rows = (data ?? []) as unknown as Row[];
+  return (data ?? []) as unknown as TallyRow[];
+}
+
+/** Bands given away inside a drifter's free allowance are never charged. */
+const tallyAmount = (r: TallyRow) => (r.qty - r.free_qty) * r.unit_price_centavos;
+const manilaTime = (iso: string) => new Date(iso).toLocaleString("en-PH", { timeZone: "Asia/Manila" });
+
+/** Walk-in tally entries, one row per tap. Drifter family bands have their own export. */
+async function walkinCsv() {
+  const rows = (await tallyRows()).filter((r) => !r.drifter_name);
   return csv([
     ["time_manila", "code", "label", "band_color", "qty", "unit_price_php", "amount_php", "payment_method", "staff"],
     ...rows.map((r) => [
-      new Date(r.created_at).toLocaleString("en-PH", { timeZone: "Asia/Manila" }), r.ticket_type?.code, r.ticket_type?.name, r.ticket_type?.band_color,
-      r.qty, (r.unit_price_centavos / 100).toFixed(2), ((r.qty * r.unit_price_centavos) / 100).toFixed(2), r.payment_method, r.staff?.full_name,
+      manilaTime(r.created_at), r.ticket_type?.code, r.ticket_type?.name, r.ticket_type?.band_color,
+      r.qty, (r.unit_price_centavos / 100).toFixed(2), (tallyAmount(r) / 100).toFixed(2), r.payment_method, r.staff?.full_name,
+    ]),
+  ]);
+}
+
+/** Drifter family bands: one row per hand-out, plus a per-drifter total block. */
+async function driftersCsv() {
+  const rows = (await tallyRows()).filter((r) => r.drifter_name);
+  const byDrifter = new Map<string, { name: string; bands: number; free: number; amount: number }>();
+  for (const r of rows) {
+    const key = (r.drifter_name ?? "").toLowerCase();
+    const d = byDrifter.get(key) ?? { name: r.drifter_name ?? "", bands: 0, free: 0, amount: 0 };
+    d.bands += r.qty;
+    d.free += r.free_qty;
+    d.amount += tallyAmount(r);
+    byDrifter.set(key, d);
+  }
+  return csv([
+    ["drifter", "bands", "free_bands", "charged_bands", "amount_php"],
+    ...[...byDrifter.values()]
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map((d) => [d.name, d.bands, d.free, d.bands - d.free, (d.amount / 100).toFixed(2)]),
+    [],
+    ["time_manila", "drifter", "qty", "free_qty", "charged_qty", "unit_price_php", "amount_php", "payment_method", "staff"],
+    ...rows.map((r) => [
+      manilaTime(r.created_at), r.drifter_name, r.qty, r.free_qty, r.qty - r.free_qty,
+      (r.unit_price_centavos / 100).toFixed(2), (tallyAmount(r) / 100).toFixed(2), r.payment_method, r.staff?.full_name,
     ]),
   ]);
 }
@@ -61,7 +100,8 @@ async function auditCsv() {
 }
 
 /**
- * Exports. `?type=walkin` (CSV) for the gate tally, `?type=audit` (CSV, admin) for the audit
+ * Exports. `?type=walkin` (CSV) for the gate tally, `?type=drifters` (CSV) for the
+ * drifter family bands, `?type=audit` (CSV, admin) for the audit
  * trail, `?type=csv` for the flat one-row-per-ticket CSV. Default is the Excel workbook with
  * a Summary sheet and one colour-coded sheet per wristband label. Staff only.
  */
@@ -70,6 +110,7 @@ export async function GET(req: NextRequest) {
   if (!session || session.staff.role === "scanner") return new NextResponse("Forbidden", { status: 403 });
   const type = req.nextUrl.searchParams.get("type");
   if (type === "walkin") return download(await walkinCsv(), "walkin-tally");
+  if (type === "drifters") return download(await driftersCsv(), "drifter-family-bands");
   if (type === "audit") {
     if (session.staff.role !== "admin") return new NextResponse("Forbidden", { status: 403 });
     return download(await auditCsv(), "audit-log");

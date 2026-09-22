@@ -9,13 +9,15 @@ import { bandHex } from "@/lib/bands";
  * glance. Walk-in-only labels list their gate taps instead of tickets.
  */
 
-type TypeRow = { id: string; code: string; name: string; band_color: string | null; price_centavos: number; walkin_price_centavos: number | null; sort_order: number; sell_online: boolean };
+type TypeRow = { id: string; code: string; name: string; band_color: string | null; price_centavos: number; walkin_price_centavos: number | null; sort_order: number; sell_online: boolean; drifter_family: boolean };
 type TicketRow = {
   number: string; status: string; holder_name: string | null; shirt_size: string | null; vehicle_plate: string | null; vehicle_model: string | null;
   vehicle_photo_path: string | null; companion_of: string | null; redeemed_at: string | null; void_reason: string | null; ticket_type_id: string; created_at: string;
   order: { order_no: number; receipt_no: number | null; status: string; channel: string; buyer_name: string; buyer_email: string | null; buyer_mobile: string | null; total_centavos: number; payment_method: string | null; payment_reference: string | null; paid_at: string | null } | null;
 };
-type WalkinRow = { created_at: string; qty: number; unit_price_centavos: number; payment_method: string; ticket_type_id: string; staff: { full_name: string } | null };
+type WalkinRow = { created_at: string; qty: number; free_qty: number; drifter_name: string | null; unit_price_centavos: number; payment_method: string; ticket_type_id: string; staff: { full_name: string } | null };
+/** Bands inside a drifter's free allowance are handed over, not sold. */
+const tapAmount = (w: WalkinRow) => (w.qty - w.free_qty) * w.unit_price_centavos;
 type AvailRow = { ticket_type_id: string; pool_total: number; pool_available: number; voided: number; online_sold: number; walkin_sold: number; reserved: number; sellable: number; online_revenue_centavos: number; walkin_revenue_centavos: number; redeemed: number };
 
 const manila = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleString("en-PH", { timeZone: "Asia/Manila" }) : "");
@@ -63,7 +65,7 @@ function bandBlock(ws: ExcelJS.Worksheet, t: TypeRow, hex: string) {
 export async function buildTicketsWorkbook(): Promise<Buffer> {
   const admin = createAdminClient();
   const [{ data: types }, { data: tickets }, { data: walkins }, { data: avail }, { data: event }] = await Promise.all([
-    admin.from("ticket_types").select("id, code, name, band_color, price_centavos, walkin_price_centavos, sort_order, sell_online").eq("active", true).order("sort_order"),
+    admin.from("ticket_types").select("id, code, name, band_color, price_centavos, walkin_price_centavos, sort_order, sell_online, drifter_family").eq("active", true).order("sort_order"),
     admin
       .from("tickets")
       .select(
@@ -71,7 +73,7 @@ export async function buildTicketsWorkbook(): Promise<Buffer> {
       )
       .order("number")
       .limit(50000),
-    admin.from("walkin_sales").select("created_at, qty, unit_price_centavos, payment_method, ticket_type_id, staff:staff(full_name)").order("created_at").limit(50000),
+    admin.from("walkin_sales").select("created_at, qty, free_qty, drifter_name, unit_price_centavos, payment_method, ticket_type_id, staff:staff(full_name)").order("created_at").limit(50000),
     admin.from("v_ticket_type_availability").select("ticket_type_id, pool_total, pool_available, voided, online_sold, walkin_sold, reserved, sellable, online_revenue_centavos, walkin_revenue_centavos, redeemed"),
     admin.from("events").select("name").limit(1).maybeSingle(),
   ]);
@@ -92,7 +94,7 @@ export async function buildTicketsWorkbook(): Promise<Buffer> {
   sum.getCell("A1").font = { bold: true, size: 13 };
   sum.getCell("A2").value = "One sheet per wristband label follows; the tab colour is the wristband colour. Amounts in PHP.";
   sum.getCell("A2").font = { italic: true, color: { argb: "FF666666" } };
-  const sumHeader = ["Code", "Ticket type", "Wristband", "Price", "Pool total", "Online tickets", "Walk-in bands", "Reserved (unpaid)", "Voided", "Left to sell", "Scanned at gate", "Revenue (PHP)"];
+  const sumHeader = ["Code", "Ticket type", "Wristband", "Price", "Pool total", "Online tickets", "Gate / family bands", "Reserved (unpaid)", "Voided", "Left to sell", "Scanned at gate", "Revenue (PHP)"];
   sum.addRow(sumHeader);
   styleHeader(sum, 3, "#111111", sumHeader.length);
   for (const t of T) {
@@ -119,6 +121,7 @@ export async function buildTicketsWorkbook(): Promise<Buffer> {
   // ------------------------------------------------------ per label sheets
   const ticketHeader = ["Wristband no.", "Status", "Holder", "Shirt", "Plate", "Vehicle", "Car photo", "Companion of car", "Scanned at gate", "Void reason", "Order #", "Receipt #", "Order status", "Channel", "Buyer", "Email", "Mobile", "Order total (PHP)", "Payment", "Reference", "Paid at", "Issued at"];
   const walkinHeader = ["Time (Manila)", "Bands", "Price each (PHP)", "Amount (PHP)", "Payment", "Staff"];
+  const drifterHeader = ["Time (Manila)", "Drifter", "Bands", "Free", "Charged", "Price each (PHP)", "Amount (PHP)", "Payment", "Staff"];
 
   for (const t of T) {
     const hex = bandHex(t.band_color);
@@ -130,11 +133,13 @@ export async function buildTicketsWorkbook(): Promise<Buffer> {
     const taps = allWalkins.filter((w) => w.ticket_type_id === t.id);
     const a = availBy.get(t.id);
     const voidCount = mine.filter((x) => x.status === "void").length;
-    ws.getCell("A2").value = `${mine.length - voidCount} valid online ticket(s)${voidCount ? ` (+${voidCount} void)` : ""}  |  ${Number(a?.walkin_sold ?? 0)} walk-in band(s)  |  ${Number(a?.sellable ?? 0)} left to sell  |  ${Number(a?.redeemed ?? 0)} scanned at gate`;
+    ws.getCell("A2").value = t.drifter_family
+      ? `${Number(a?.walkin_sold ?? 0)} family band(s) handed out  |  ${taps.reduce((n, w) => n + w.free_qty, 0)} free  |  ${Number(a?.sellable ?? 0)} left  |  ${Number(a?.redeemed ?? 0)} scanned at gate`
+      : `${mine.length - voidCount} valid online ticket(s)${voidCount ? ` (+${voidCount} void)` : ""}  |  ${Number(a?.walkin_sold ?? 0)} walk-in band(s)  |  ${Number(a?.sellable ?? 0)} left to sell  |  ${Number(a?.redeemed ?? 0)} scanned at gate`;
     ws.getCell("A2").font = { italic: true, color: { argb: "FF555555" } };
 
     let row = 4;
-    if (mine.length > 0 || t.sell_online) {
+    if (!t.drifter_family && (mine.length > 0 || t.sell_online)) {
       ws.getCell(`A${row - 1}`).value = "Online tickets (one row per wristband)";
       ws.getCell(`A${row - 1}`).font = { bold: true };
       ws.getRow(row).values = ticketHeader;
@@ -158,7 +163,21 @@ export async function buildTicketsWorkbook(): Promise<Buffer> {
       row += 3;
     }
 
-    if (taps.length > 0 || !t.sell_online) {
+    if (t.drifter_family) {
+      // Family bands are booked against a drifter's name, with the free allowance split out.
+      ws.getCell(`A${row - 1}`).value = "Drifter family bands (first bands per drifter are free)";
+      ws.getCell(`A${row - 1}`).font = { bold: true };
+      ws.getRow(row).values = drifterHeader;
+      styleHeader(ws, row, hex, drifterHeader.length);
+      for (const w of taps) {
+        row += 1;
+        const r = ws.getRow(row);
+        r.values = [manila(w.created_at), w.drifter_name ?? "", w.qty, w.free_qty, w.qty - w.free_qty, php(w.unit_price_centavos), php(tapAmount(w)), w.payment_method, w.staff?.full_name ?? ""];
+        r.getCell(6).numFmt = "#,##0.00";
+        r.getCell(7).numFmt = "#,##0.00";
+      }
+      if (taps.length === 0) { row += 1; ws.getCell(`A${row}`).value = "No family bands handed out yet."; ws.getCell(`A${row}`).font = { italic: true, color: { argb: "FF888888" } }; }
+    } else if (taps.length > 0 || !t.sell_online) {
       ws.getCell(`A${row - 1}`).value = "Walk-in tally at the gate (no names are collected)";
       ws.getCell(`A${row - 1}`).font = { bold: true };
       ws.getRow(row).values = walkinHeader;
@@ -166,14 +185,16 @@ export async function buildTicketsWorkbook(): Promise<Buffer> {
       for (const w of taps) {
         row += 1;
         const r = ws.getRow(row);
-        r.values = [manila(w.created_at), w.qty, php(w.unit_price_centavos), php(w.qty * w.unit_price_centavos), w.payment_method, w.staff?.full_name ?? ""];
+        r.values = [manila(w.created_at), w.qty, php(w.unit_price_centavos), php(tapAmount(w)), w.payment_method, w.staff?.full_name ?? ""];
         r.getCell(3).numFmt = "#,##0.00";
         r.getCell(4).numFmt = "#,##0.00";
       }
       if (taps.length === 0) { row += 1; ws.getCell(`A${row}`).value = "No walk-in bands recorded yet."; ws.getCell(`A${row}`).font = { italic: true, color: { argb: "FF888888" } }; }
     }
 
-    const widths = [14, 10, 22, 6, 11, 22, 9, 16, 19, 28, 8, 9, 13, 8, 22, 28, 13, 16, 9, 20, 19, 19];
+    const widths = t.drifter_family
+      ? [19, 26, 8, 8, 10, 16, 14, 10, 20]
+      : [14, 10, 22, 6, 11, 22, 9, 16, 19, 28, 8, 9, 13, 8, 22, 28, 13, 16, 9, 20, 19, 19];
     ws.columns.forEach((c, i) => { c.width = widths[i] ?? 12; });
   }
 

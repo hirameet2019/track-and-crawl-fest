@@ -46,6 +46,8 @@ const ACTIONS: Record<string, { cat: AuditCategory; label: string }> = {
   "ticket.kit": { cat: "tickets", label: "Kit item handed over" },
   "walkin.recorded": { cat: "walkin", label: "Walk-in tally" },
   "ticket_type.walkin_price": { cat: "walkin", label: "Gate price changed" },
+  "drifter.bands": { cat: "walkin", label: "Drifter family bands" },
+  "ticket_type.free_allowance": { cat: "walkin", label: "Free bands per drifter changed" },
   "numbers.imported": { cat: "numbers", label: "Wristband range imported" },
   "numbers.imported_list": { cat: "numbers", label: "Wristband list imported" },
   "number.voided": { cat: "numbers", label: "Wristband voided" },
@@ -92,6 +94,17 @@ export function describe(action: string, data: Record<string, unknown> | null | 
     }
     case "ticket_type.walkin_price":
       return `New gate price ${peso(d.walkin_price_centavos)}`;
+    case "drifter.bands": {
+      const qty = Number(d.qty ?? 0);
+      const paid = Number(d.paid ?? 0);
+      return [
+        `${d.drifter ?? "?"}: ${qty > 0 ? "+" : ""}${qty} band(s)`,
+        Number(d.free ?? 0) ? `${d.free} free` : "",
+        paid ? `${paid} paid at ${peso(d.unit_price_centavos)} (${String(d.method ?? "cash").toUpperCase()})` : "",
+      ].filter(Boolean).join(" · ");
+    }
+    case "ticket_type.free_allowance":
+      return `${d.free_allowance} free band(s) per drifter`;
     case "numbers.imported":
       return `${d.prefix ?? ""}${d.start ?? ""} to ${d.prefix ?? ""}${d.end ?? ""}`;
     case "numbers.imported_list":

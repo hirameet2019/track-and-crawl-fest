@@ -30,7 +30,7 @@ export default async function DashboardPage() {
   const [availability, { data: paidOrders }, { data: walkins }, { count: queueCount }, { data: oldest }, { data: recent }, { data: voidRows }] = await Promise.all([
     getAvailability(event.id),
     admin.from("orders").select("id, total_centavos, payment_method, channel, paid_at, created_at").eq("status", "paid").eq("event_id", event.id),
-    admin.from("walkin_sales").select("qty, unit_price_centavos, payment_method, created_at").eq("event_id", event.id),
+    admin.from("walkin_sales").select("qty, free_qty, drifter_name, unit_price_centavos, payment_method, created_at").eq("event_id", event.id),
     admin.from("orders").select("id", { count: "exact", head: true }).eq("status", "awaiting_verification"),
     admin.from("orders").select("proof_submitted_at").eq("status", "awaiting_verification").order("proof_submitted_at").limit(1).maybeSingle(),
     admin.from("orders").select("id, order_no, buyer_name, total_centavos, status, channel, created_at").order("created_at", { ascending: false }).limit(10),
@@ -45,12 +45,21 @@ export default async function DashboardPage() {
   const voidedCentavos = (paidOrders ?? []).reduce((s, o) => s + (voidByOrder.get(o.id) ?? 0), 0);
   const voidedTickets = (voidRows ?? []).filter((v) => (paidOrders ?? []).some((o) => o.id === v.order_id)).reduce((s, v) => s + Number(v.void_tickets), 0);
   const tally = walkins ?? [];
+  // Bands inside a drifter's free allowance are handed over, not sold: they count as
+  // wristbands out but never as money. Gate taps and drifter hand-outs are also kept
+  // apart so the organizer can see what the grid consumed.
+  const amount = (w: { qty: number; free_qty: number; unit_price_centavos: number }) => (w.qty - w.free_qty) * w.unit_price_centavos;
+  const gate = tally.filter((w) => !w.drifter_name);
+  const drifterTally = tally.filter((w) => w.drifter_name);
   const onlineRevenue = paid.reduce((s, o) => s + o.total_centavos, 0);
-  const walkinRevenue = tally.reduce((s, w) => s + w.qty * w.unit_price_centavos, 0);
-  const walkinCount = tally.reduce((s, w) => s + w.qty, 0);
+  const walkinRevenue = gate.reduce((s, w) => s + amount(w), 0);
+  const walkinCount = gate.reduce((s, w) => s + w.qty, 0);
+  const drifterRevenue = drifterTally.reduce((s, w) => s + amount(w), 0);
+  const drifterBands = drifterTally.reduce((s, w) => s + w.qty, 0);
+  const drifterFree = drifterTally.reduce((s, w) => s + w.free_qty, 0);
   const byMethod = { gotyme: 0, gcash: 0, maya: 0, cash: 0 } as Record<string, number>;
   for (const o of paid) if (o.payment_method) byMethod[o.payment_method] = (byMethod[o.payment_method] ?? 0) + o.total_centavos;
-  for (const w of tally) byMethod[w.payment_method] = (byMethod[w.payment_method] ?? 0) + w.qty * w.unit_price_centavos;
+  for (const w of tally) byMethod[w.payment_method] = (byMethod[w.payment_method] ?? 0) + amount(w);
   // GoTyme and cash are the live channels; GCash / Maya tiles only appear if they ever took money.
   const methodTiles = (["gotyme", "cash", "gcash", "maya"] as const).filter((m) => m === "gotyme" || m === "cash" || byMethod[m] > 0);
   const sold = availability.reduce((s, a) => s + Number(a.sold), 0);
@@ -68,7 +77,7 @@ export default async function DashboardPage() {
   }
   for (const w of tally) {
     const d = days.get(manilaDay(w.created_at));
-    if (d) d.walkin += w.qty * w.unit_price_centavos;
+    if (d) d.walkin += amount(w);
   }
   const dayTotals = [...days.values()].map((d) => d.online + d.walkin);
   const maxDay = Math.max(1, ...dayTotals);
@@ -85,6 +94,7 @@ export default async function DashboardPage() {
         </div>
         <div className="flex gap-2">
           <Link prefetch={false} href="/admin/walkin" className="btn-secondary">Walk-in tally</Link>
+          <Link prefetch={false} href="/admin/drifters" className="btn-secondary">Drifters</Link>
           <Link prefetch={false} href="/admin/verify" className={`btn-primary ${queueCount ? "" : "opacity-60"}`}>
             Verify queue {queueCount ? <span className="rounded-full bg-amber-400 px-2 text-xs text-black">{queueCount}</span> : null}
           </Link>
@@ -92,8 +102,8 @@ export default async function DashboardPage() {
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat label="Revenue (paid)" value={php(onlineRevenue + walkinRevenue)} sub={`${paid.length} online orders · ${walkinCount} walk-in bands${voidedCentavos ? ` · excludes ${php(voidedCentavos)} for ${voidedTickets} voided ticket${voidedTickets === 1 ? "" : "s"}` : ""}`} />
-        <Stat label="Wristbands sold" value={String(sold)} sub={`${onlineSold} online · ${walkinCount} walk-in · ${redeemed} scanned at gate`} />
+        <Stat label="Revenue (paid)" value={php(onlineRevenue + walkinRevenue + drifterRevenue)} sub={`${paid.length} online orders · ${walkinCount} walk-in bands${drifterRevenue ? ` · ${php(drifterRevenue)} drifter extras` : ""}${voidedCentavos ? ` · excludes ${php(voidedCentavos)} for ${voidedTickets} voided ticket${voidedTickets === 1 ? "" : "s"}` : ""}`} />
+        <Stat label="Wristbands sold" value={String(sold)} sub={`${onlineSold} online · ${walkinCount} walk-in${drifterBands ? ` · ${drifterBands} drifter family (${drifterFree} free)` : ""} · ${redeemed} scanned at gate`} />
         <Stat label="Awaiting verification" value={String(queueCount ?? 0)} sub={oldestAgeMin != null ? `oldest ${humanMinutes(oldestAgeMin)}` : "queue empty"} />
         <Stat label="Walk-in vs online" value={`${php(walkinRevenue)} / ${php(onlineRevenue)}`} />
       </div>
@@ -122,7 +132,7 @@ export default async function DashboardPage() {
               return (
                 <tr key={a.ticket_type_id} className="border-t">
                   <td className="py-2"><span className="rounded bg-white/10 px-1.5 py-0.5 font-black">{a.code}</span></td>
-                  <td className="font-medium">{a.name}{!a.sell_online && <span className="ml-1 text-[10px] uppercase text-zinc-500">gate only</span>}</td>
+                  <td className="font-medium">{a.name}{a.drifter_family ? <span className="ml-1 text-[10px] uppercase text-zinc-500">drifters</span> : !a.sell_online && <span className="ml-1 text-[10px] uppercase text-zinc-500">gate only</span>}</td>
                   <td className="text-zinc-500"><BandSwatch color={a.band_color} size={12} label={false} /> {a.band_color}</td>
                   <td className="text-right">{a.online_sold}</td>
                   <td className="text-right">{a.walkin_sold}</td>
@@ -145,7 +155,7 @@ export default async function DashboardPage() {
             <h2 className="font-semibold">Sales, last 14 days</h2>
             <div className="flex gap-3 text-[10px] uppercase tracking-wide text-zinc-500">
               <span><span className="mr-1 inline-block h-2 w-2 rounded-sm bg-cyan-300" />online</span>
-              <span><span className="mr-1 inline-block h-2 w-2 rounded-sm bg-fuchsia-400" />walk-in</span>
+              <span><span className="mr-1 inline-block h-2 w-2 rounded-sm bg-fuchsia-400" />on-site</span>
             </div>
           </div>
           <p className="mt-0.5 text-xs text-zinc-500">
@@ -157,7 +167,7 @@ export default async function DashboardPage() {
             {[...days.entries()].map(([d, v]) => {
               const total = v.online + v.walkin;
               return (
-                <div key={d} className="flex min-w-0 flex-1 flex-col" title={`${dayLabel(d)}: online ${php(v.online)} · walk-in ${php(v.walkin)} · total ${php(total)}`}>
+                <div key={d} className="flex min-w-0 flex-1 flex-col" title={`${dayLabel(d)}: online ${php(v.online)} · on-site ${php(v.walkin)} · total ${php(total)}`}>
                   <div className="flex flex-1 flex-col justify-end">
                     {v.walkin > 0 && <div className="w-full rounded-t bg-fuchsia-400" style={{ height: `${(v.walkin / maxDay) * 100}%` }} />}
                     {v.online > 0 && <div className={`w-full bg-cyan-300 ${v.walkin > 0 ? "" : "rounded-t"}`} style={{ height: `${(v.online / maxDay) * 100}%` }} />}

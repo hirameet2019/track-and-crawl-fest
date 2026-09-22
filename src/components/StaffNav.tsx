@@ -11,6 +11,7 @@ const LINKS: { href: string; label: string; min: StaffRole }[] = [
   { href: "/admin/verify", label: "Verify", min: "staff" },
   { href: "/admin/orders", label: "Orders", min: "staff" },
   { href: "/admin/walkin", label: "Walk-in", min: "staff" },
+  { href: "/admin/drifters", label: "Drifters", min: "staff" },
   { href: "/admin/numbers", label: "Numbers", min: "admin" },
   { href: "/admin/audit", label: "Audit", min: "admin" },
   { href: "/admin/settings", label: "Settings", min: "admin" },

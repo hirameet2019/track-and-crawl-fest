@@ -68,8 +68,11 @@ export default async function WalkinPage() {
           Gate sales are a plain count: collect the payment, hand over the wristband, tap <b>+1</b> on that label. No name or contact is taken and no ticket is emailed.
           Tap <b>−</b> to undo a mistake. Every tap deducts from the wristbands left for that label.
         </p>
+        <p className="mt-1 text-sm text-zinc-500">
+          Bands for a competing drifter&apos;s family go on the <b>Drifters</b> tab instead, recorded under the driver&apos;s name.
+        </p>
       </div>
-      <WalkinTally types={types} availability={availability} today={today} recent={recent} isAdmin={session.staff.role === "admin"} />
+      <WalkinTally types={types.filter((t) => !t.drifter_family)} availability={availability} today={today} recent={recent} isAdmin={session.staff.role === "admin"} />
     </div>
   );
 }
