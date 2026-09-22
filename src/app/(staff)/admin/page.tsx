@@ -29,7 +29,7 @@ export default async function DashboardPage() {
   const admin = createAdminClient();
   const [availability, { data: paidOrders }, { data: walkins }, { count: queueCount }, { data: oldest }, { data: recent }, { data: voidRows }] = await Promise.all([
     getAvailability(event.id),
-    admin.from("orders").select("id, total_centavos, payment_method, channel, paid_at").eq("status", "paid").eq("event_id", event.id),
+    admin.from("orders").select("id, total_centavos, payment_method, channel, paid_at, created_at").eq("status", "paid").eq("event_id", event.id),
     admin.from("walkin_sales").select("qty, unit_price_centavos, payment_method, created_at").eq("event_id", event.id),
     admin.from("orders").select("id", { count: "exact", head: true }).eq("status", "awaiting_verification"),
     admin.from("orders").select("proof_submitted_at").eq("status", "awaiting_verification").order("proof_submitted_at").limit(1).maybeSingle(),
@@ -57,19 +57,23 @@ export default async function DashboardPage() {
   const onlineSold = availability.reduce((s, a) => s + Number(a.online_sold), 0);
   const redeemed = availability.reduce((s, a) => s + Number(a.redeemed), 0);
 
-  // Daily sales for the last 14 days (online paid + walk-in)
+  // Daily sales for the last 14 days (online paid + walk-in). Online sales are placed on
+  // the day the buyer ordered, not the day staff approved: approvals are done in batches,
+  // so paid_at would pile a whole week of sales onto one bar.
   const days = new Map<string, { online: number; walkin: number }>();
   for (let i = 13; i >= 0; i--) days.set(manilaDay(new Date(Date.now() - i * 86400000).toISOString()), { online: 0, walkin: 0 });
   for (const o of paid) {
-    if (!o.paid_at) continue;
-    const d = days.get(manilaDay(o.paid_at));
+    const d = days.get(manilaDay(o.created_at));
     if (d) d.online += o.total_centavos;
   }
   for (const w of tally) {
     const d = days.get(manilaDay(w.created_at));
     if (d) d.walkin += w.qty * w.unit_price_centavos;
   }
-  const maxDay = Math.max(1, ...[...days.values()].map((d) => d.online + d.walkin));
+  const dayTotals = [...days.values()].map((d) => d.online + d.walkin);
+  const maxDay = Math.max(1, ...dayTotals);
+  const windowTotal = dayTotals.reduce((a, b) => a + b, 0);
+  const dayLabel = (iso: string) => new Date(`${iso}T12:00:00+08:00`).toLocaleDateString("en-PH", { timeZone: "Asia/Manila", month: "short", day: "numeric" });
   const oldestAgeMin = oldest?.proof_submitted_at ? Math.round((Date.now() - new Date(oldest.proof_submitted_at).getTime()) / 60000) : null;
 
   return (
@@ -137,24 +141,34 @@ export default async function DashboardPage() {
 
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="card">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h2 className="font-semibold">Sales, last 14 days</h2>
             <div className="flex gap-3 text-[10px] uppercase tracking-wide text-zinc-500">
               <span><span className="mr-1 inline-block h-2 w-2 rounded-sm bg-cyan-300" />online</span>
               <span><span className="mr-1 inline-block h-2 w-2 rounded-sm bg-fuchsia-400" />walk-in</span>
             </div>
           </div>
-          <div className="mt-4 flex h-32 items-end gap-1">
-            {[...days.entries()].map(([d, v]) => (
-              <div key={d} className="flex flex-1 flex-col items-center gap-1" title={`${d}: online ${php(v.online)} · walk-in ${php(v.walkin)}`}>
-                <div className="flex w-full flex-col justify-end" style={{ height: "100%" }}>
-                  <div className="w-full rounded-t bg-fuchsia-400" style={{ height: `${(v.walkin / maxDay) * 100}%` }} />
-                  <div className="w-full bg-cyan-300" style={{ height: `${Math.max(v.online + v.walkin > 0 ? 0 : 2, (v.online / maxDay) * 100)}%` }} />
+          <p className="mt-0.5 text-xs text-zinc-500">
+            {php(windowTotal)} in paid orders &middot; tallest bar {php(maxDay)} &middot; counted on the day the order was placed
+          </p>
+          {/* The bar area needs a definite height of its own: percentage heights inside an
+              auto-height column resolve to zero and the chart renders blank. */}
+          <div className="mt-3 flex h-36 gap-1">
+            {[...days.entries()].map(([d, v]) => {
+              const total = v.online + v.walkin;
+              return (
+                <div key={d} className="flex min-w-0 flex-1 flex-col" title={`${dayLabel(d)}: online ${php(v.online)} · walk-in ${php(v.walkin)} · total ${php(total)}`}>
+                  <div className="flex flex-1 flex-col justify-end">
+                    {v.walkin > 0 && <div className="w-full rounded-t bg-fuchsia-400" style={{ height: `${(v.walkin / maxDay) * 100}%` }} />}
+                    {v.online > 0 && <div className={`w-full bg-cyan-300 ${v.walkin > 0 ? "" : "rounded-t"}`} style={{ height: `${(v.online / maxDay) * 100}%` }} />}
+                    {total === 0 && <div className="h-px w-full bg-white/15" />}
+                  </div>
+                  <div className={`mt-1 text-center text-[9px] ${total > 0 ? "font-semibold text-zinc-300" : "text-zinc-500"}`}>{d.slice(8)}</div>
                 </div>
-                <div className="text-[9px] text-zinc-400">{d.slice(8)}</div>
-              </div>
-            ))}
+              );
+            })}
           </div>
+          <p className="mt-1 text-center text-[10px] text-zinc-500">{dayLabel([...days.keys()][0])} to {dayLabel([...days.keys()][days.size - 1])} &middot; hover a bar for the amount</p>
         </div>
         <div className="card overflow-x-auto">
           <div className="flex items-center justify-between">
