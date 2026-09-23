@@ -114,6 +114,12 @@ export function ConvertOrderForm({
                 {fits > 0 && <> &middot; {php(currentTotalCentavos)} covers <b>{fits}</b> of these</>}
               </p>
             )}
+            {target?.drifter_family && (
+              <p className="mt-1 rounded-lg border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-amber-200">
+                Paid for through this order, so it does <b>not</b> use up that drifter&apos;s four free bands. Hand-outs
+                recorded on the Drifters tab are the only ones counted there.
+              </p>
+            )}
           </div>
 
           <div>

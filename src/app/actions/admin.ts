@@ -193,13 +193,17 @@ export interface ConvertTarget {
   includes_shirt: boolean;
   /** How many of this label a buyer could still be given. */
   sellable: number;
+  /** The Drifters label: allowed here, but it sits outside that tab's free allowance. */
+  drifter_family: boolean;
 }
 
 /**
- * Ticket types a paid order can be swapped into. Three are excluded: VIP Car
- * Display needs a plate number and a car photo this form cannot collect, the
- * gate-only labels have no online price (they are tallied, not ordered), and the
- * drifter label is handed out on its own tab.
+ * Ticket types a paid order can be swapped into. Two are excluded: VIP Car
+ * Display needs a plate number and a car photo this form cannot collect, and a
+ * label with no ticket price (the gate labels Y and O are priced per tally) would
+ * collapse the order total to zero. Drifter Family is priced, so it belongs here -
+ * the organizer asked for it so a drifter's relative who bought an ordinary ticket
+ * can be moved onto the plain red band.
  */
 export async function getConvertTargets(orderId: string): Promise<ConvertTarget[]> {
   await assertStaff("admin");
@@ -208,7 +212,7 @@ export async function getConvertTargets(orderId: string): Promise<ConvertTarget[
   if (!order) return [];
   const { data: types } = await admin
     .from("ticket_types")
-    .select("id, code, name, band_color, price_centavos, includes_shirt, requires_vehicle, drifter_family, sell_online")
+    .select("id, code, name, band_color, price_centavos, includes_shirt, requires_vehicle, drifter_family")
     .eq("event_id", order.event_id)
     .eq("active", true)
     .order("sort_order");
@@ -217,12 +221,12 @@ export async function getConvertTargets(orderId: string): Promise<ConvertTarget[
     .select("ticket_type_id, sellable")
     .eq("event_id", order.event_id);
   const left = new Map((avail ?? []).map((a) => [a.ticket_type_id as string, Number(a.sellable)]));
-  return ((types ?? []) as (Pick<TicketTypeRow, "id" | "code" | "name" | "band_color" | "price_centavos" | "includes_shirt" | "requires_vehicle" | "drifter_family" | "sell_online">)[])
-    .filter((t) => t.sell_online && !t.requires_vehicle && !t.drifter_family)
+  return ((types ?? []) as (Pick<TicketTypeRow, "id" | "code" | "name" | "band_color" | "price_centavos" | "includes_shirt" | "requires_vehicle" | "drifter_family">)[])
+    .filter((t) => !t.requires_vehicle && t.price_centavos > 0)
     .map((t) => ({
       id: t.id, code: t.code, name: t.name, band_color: t.band_color,
       price_centavos: t.price_centavos, includes_shirt: t.includes_shirt,
-      sellable: left.get(t.id) ?? 0,
+      sellable: left.get(t.id) ?? 0, drifter_family: t.drifter_family,
     }));
 }
 
