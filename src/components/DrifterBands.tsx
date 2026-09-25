@@ -20,6 +20,16 @@ export interface DrifterEntry {
   staff: string | null;
 }
 
+/** Drifter Family bands that reached a family through a converted order, one row per order. */
+export interface OrderBandRow {
+  order_id: string;
+  order_no: number;
+  buyer_name: string;
+  holder_name: string | null;
+  numbers: string[];
+  amount_centavos: number;
+}
+
 const METHODS: { key: PaymentMethod; label: string }[] = [
   { key: "cash", label: "Cash" },
   { key: "gotyme", label: "GoTyme" },
@@ -86,12 +96,14 @@ export function DrifterBands({
   avail,
   drifters,
   recent,
+  orderBands,
   isAdmin,
 }: {
   type: TicketTypeRow;
   avail: AvailabilityRow | undefined;
   drifters: DrifterBandRow[];
   recent: DrifterEntry[];
+  orderBands: OrderBandRow[];
   isAdmin: boolean;
 }) {
   const router = useRouter();
@@ -107,13 +119,22 @@ export function DrifterBands({
   const poolTotal = Number(avail?.pool_total ?? 0);
   const left = Number(avail?.sellable ?? 0);
 
-  const totals = useMemo(() => ({
-    families: drifters.length,
-    bands: drifters.reduce((s, d) => s + d.bands, 0),
-    free: drifters.reduce((s, d) => s + d.free_bands, 0),
-    paid: drifters.reduce((s, d) => s + d.paid_bands, 0),
-    amount: drifters.reduce((s, d) => s + Number(d.amount_centavos), 0),
-  }), [drifters]);
+  // Every band out of this pool, whichever door it came through: the tally below,
+  // and orders converted into this label. Without the second the tiles read zero
+  // while "bands left" has already dropped, which is what staff noticed.
+  const totals = useMemo(() => {
+    const gate = drifters.reduce((s, d) => s + d.bands, 0);
+    const viaOrders = orderBands.reduce((s, o) => s + o.numbers.length, 0);
+    return {
+      families: drifters.length,
+      gate,
+      viaOrders,
+      bands: gate + viaOrders,
+      free: drifters.reduce((s, d) => s + d.free_bands, 0),
+      paid: drifters.reduce((s, d) => s + d.paid_bands, 0),
+      amount: drifters.reduce((s, d) => s + Number(d.amount_centavos), 0) + orderBands.reduce((s, o) => s + o.amount_centavos, 0),
+    };
+  }, [drifters, orderBands]);
 
   /** The typed name matched against an existing drifter, so the preview knows their total. */
   const match = useMemo(() => {
@@ -299,20 +320,58 @@ export function DrifterBands({
       {/* running totals */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <div className="card p-4"><div className="text-[10px] uppercase tracking-wide text-zinc-500">Drifters</div><div className="text-2xl font-black tabular-nums">{totals.families}</div></div>
-        <div className="card p-4"><div className="text-[10px] uppercase tracking-wide text-zinc-500">Bands handed out</div><div className="text-2xl font-black tabular-nums">{totals.bands}</div><div className="text-xs text-zinc-500">{totals.free} free &middot; {totals.paid} paid</div></div>
-        <div className="card p-4"><div className="text-[10px] uppercase tracking-wide text-zinc-500">Collected</div><div className="text-2xl font-black">{php(totals.amount)}</div></div>
+        <div className="card p-4">
+          <div className="text-[10px] uppercase tracking-wide text-zinc-500">Bands handed out</div>
+          <div className="text-2xl font-black tabular-nums">{totals.bands}</div>
+          <div className="text-xs text-zinc-500">
+            {totals.gate} here ({totals.free} free &middot; {totals.paid} paid)
+            {totals.viaOrders > 0 && <> &middot; {totals.viaOrders} via orders</>}
+          </div>
+        </div>
+        <div className="card p-4"><div className="text-[10px] uppercase tracking-wide text-zinc-500">Collected</div><div className="text-2xl font-black">{php(totals.amount)}</div><div className="text-xs text-zinc-500">gate charges and converted orders</div></div>
         <div className="card p-4"><div className="text-[10px] uppercase tracking-wide text-zinc-500">Bands left</div><div className={`text-2xl font-black tabular-nums ${left <= 20 ? "text-rose-400" : ""}`}>{left}</div><div className="text-xs text-zinc-500">of {poolTotal} imported</div></div>
       </div>
+
+      {/* Bands that arrived through a converted order: paid for there, so they carry no
+          free allowance and cannot be adjusted from this tab. */}
+      {orderBands.length > 0 && (
+        <div className="card overflow-x-auto">
+          <h2 className="font-semibold">Issued through a converted order</h2>
+          <p className="text-xs text-zinc-500">
+            Already paid for in the order, so these do not use up anyone&apos;s free {allowance}. Adjust them on the order itself.
+          </p>
+          <table className="mt-2 w-full text-sm">
+            <thead className="text-left text-xs uppercase text-zinc-500">
+              <tr><th className="py-1">Order</th><th>Buyer</th><th className="text-right">Bands</th><th>Wristband numbers</th><th className="text-right">Amount</th></tr>
+            </thead>
+            <tbody>
+              {orderBands.map((o) => (
+                <tr key={o.order_id} className="border-t border-white/10">
+                  <td className="py-2 font-semibold">
+                    <Link prefetch={false} href={`/admin/orders/${o.order_id}`} className="text-cyan-300 hover:underline">#{o.order_no}</Link>
+                  </td>
+                  <td>{o.buyer_name}</td>
+                  <td className="text-right font-bold tabular-nums">{o.numbers.length}</td>
+                  <td className="font-mono text-xs text-zinc-400">{o.numbers.length > 4 ? `${o.numbers[0]} - ${o.numbers[o.numbers.length - 1]}` : o.numbers.join(", ")}</td>
+                  <td className="text-right tabular-nums">{php(o.amount_centavos)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-[1.3fr_1fr]">
         {/* one row per drifter family */}
         <div className="card overflow-x-auto">
           <div className="flex items-center justify-between">
-            <h2 className="font-semibold">Drifters</h2>
+            <h2 className="font-semibold">Handed out here</h2>
             <a href="/api/admin/export?type=drifters" className="text-xs text-cyan-300 hover:underline">Export CSV</a>
           </div>
           {drifters.length === 0 ? (
-            <p className="mt-2 text-sm text-zinc-500">No family bands handed out yet.</p>
+            <p className="mt-2 text-sm text-zinc-500">
+              Nothing handed out at the gate yet.{orderBands.length > 0 && <> The {totals.viaOrders} band{totals.viaOrders === 1 ? "" : "s"} already out came through a converted order, listed above.</>}
+            </p>
           ) : (
             <table className="mt-2 w-full text-sm">
               <thead className="text-left text-xs uppercase text-zinc-500">

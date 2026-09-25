@@ -53,8 +53,13 @@ async function walkinCsv() {
   ]);
 }
 
-/** Drifter family bands: one row per hand-out, plus a per-drifter total block. */
+/**
+ * Drifter family bands. Two blocks, because a band reaches a family two ways:
+ * handed out at the gate (tallied per drifter) or issued by converting a paid
+ * order. Only both together account for the bands missing from the pool.
+ */
 async function driftersCsv() {
+  const admin = createAdminClient();
   const rows = (await tallyRows()).filter((r) => r.drifter_name);
   const byDrifter = new Map<string, { name: string; bands: number; free: number; amount: number }>();
   for (const r of rows) {
@@ -76,6 +81,32 @@ async function driftersCsv() {
       manilaTime(r.created_at), r.drifter_name, r.qty, r.free_qty, r.qty - r.free_qty,
       (r.unit_price_centavos / 100).toFixed(2), (tallyAmount(r) / 100).toFixed(2), r.payment_method, r.staff?.full_name,
     ]),
+    [],
+    ["issued through a converted order"],
+    ["order_no", "buyer", "holder", "wristband_no", "status", "unit_price_php"],
+    ...(await orderBandRows(admin)),
+  ]);
+}
+
+/** One row per wristband issued out of a drifter label by an order conversion. */
+async function orderBandRows(admin: ReturnType<typeof createAdminClient>) {
+  const { data: types } = await admin.from("ticket_types").select("id").eq("drifter_family", true);
+  const ids = (types ?? []).map((t) => t.id as string);
+  if (ids.length === 0) return [];
+  const [{ data: tickets }, { data: lines }] = await Promise.all([
+    admin
+      .from("tickets")
+      .select("number, holder_name, status, order_id, order:orders(order_no, buyer_name)")
+      .in("ticket_type_id", ids)
+      .in("status", ["issued", "redeemed"])
+      .order("number"),
+    admin.from("order_items").select("order_id, unit_price_centavos").in("ticket_type_id", ids),
+  ]);
+  type Row = { number: string; holder_name: string | null; status: string; order_id: string; order: { order_no: number; buyer_name: string } | null };
+  const price = new Map((lines ?? []).map((l) => [l.order_id as string, Number(l.unit_price_centavos)]));
+  return ((tickets ?? []) as unknown as Row[]).map((t) => [
+    t.order?.order_no, t.order?.buyer_name, t.holder_name, t.number, t.status,
+    ((price.get(t.order_id) ?? 0) / 100).toFixed(2),
   ]);
 }
 
