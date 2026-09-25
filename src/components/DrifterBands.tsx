@@ -39,6 +39,14 @@ const METHODS: { key: PaymentMethod; label: string }[] = [
 
 const norm = (s: string) => s.trim().replace(/\s+/g, " ").toLowerCase();
 
+/**
+ * Cells need side padding or a right-aligned number butts straight into the next
+ * column ("12D-0001"). The first and last columns stay flush so the table still
+ * lines up with the card's own padding.
+ */
+const TABLE =
+  "mt-2 w-full text-sm [&_th]:px-3 [&_td]:px-3 [&_th:first-child]:pl-0 [&_td:first-child]:pl-0 [&_th:last-child]:pr-0 [&_td:last-child]:pr-0";
+
 /** Small inline number editor used for both the gate price and the free allowance. */
 function InlineNumber({
   value,
@@ -340,9 +348,12 @@ export function DrifterBands({
           <p className="text-xs text-zinc-500">
             Already paid for in the order, so these do not use up anyone&apos;s free {allowance}. Adjust them on the order itself.
           </p>
-          <table className="mt-2 w-full text-sm">
+          <table className={TABLE}>
             <thead className="text-left text-xs uppercase text-zinc-500">
-              <tr><th className="py-1">Order</th><th>Buyer</th><th className="text-right">Bands</th><th>Wristband numbers</th><th className="text-right">Amount</th></tr>
+              <tr>
+                <th className="py-1">Order</th><th>Buyer</th><th>Wristband numbers</th>
+                <th className="text-right">Bands</th><th className="text-right">Amount</th>
+              </tr>
             </thead>
             <tbody>
               {orderBands.map((o) => (
@@ -351,8 +362,8 @@ export function DrifterBands({
                     <Link prefetch={false} href={`/admin/orders/${o.order_id}`} className="text-cyan-300 hover:underline">#{o.order_no}</Link>
                   </td>
                   <td>{o.buyer_name}</td>
+                  <td className="whitespace-nowrap font-mono text-xs text-zinc-400">{o.numbers.length > 4 ? `${o.numbers[0]} – ${o.numbers[o.numbers.length - 1]}` : o.numbers.join(", ")}</td>
                   <td className="text-right font-bold tabular-nums">{o.numbers.length}</td>
-                  <td className="font-mono text-xs text-zinc-400">{o.numbers.length > 4 ? `${o.numbers[0]} - ${o.numbers[o.numbers.length - 1]}` : o.numbers.join(", ")}</td>
                   <td className="text-right tabular-nums">{php(o.amount_centavos)}</td>
                 </tr>
               ))}
@@ -373,7 +384,7 @@ export function DrifterBands({
               Nothing handed out at the gate yet.{orderBands.length > 0 && <> The {totals.viaOrders} band{totals.viaOrders === 1 ? "" : "s"} already out came through a converted order, listed above.</>}
             </p>
           ) : (
-            <table className="mt-2 w-full text-sm">
+            <table className={TABLE}>
               <thead className="text-left text-xs uppercase text-zinc-500">
                 <tr><th className="py-1">Drifter</th><th className="text-right">Bands</th><th className="text-right">Free</th><th className="text-right">Paid</th><th className="text-right">Amount</th><th></th></tr>
               </thead>
@@ -404,7 +415,7 @@ export function DrifterBands({
           {recent.length === 0 ? (
             <p className="mt-2 text-sm text-zinc-500">Nothing recorded yet.</p>
           ) : (
-            <table className="mt-2 w-full text-sm">
+            <table className={TABLE}>
               <tbody>
                 {recent.map((e) => {
                   const paid = e.qty - e.free_qty;
