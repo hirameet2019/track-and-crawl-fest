@@ -14,6 +14,9 @@ const METHODS: { key: PaymentMethod; label: string }[] = [
   { key: "maya", label: "Maya" },
 ];
 
+/** Status pill; never wraps inside itself ("CHECK COMPETITOR / PASS"). */
+const PILL = "whitespace-nowrap rounded-full border px-2 py-0.5 font-semibold uppercase tracking-wide";
+
 const when = (iso: string) => new Date(iso).toLocaleString("en-PH", { timeZone: "Asia/Manila", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 
 /**
@@ -112,8 +115,8 @@ export function DrifterQueue({
 
   return (
     <div className="card overflow-x-auto p-4">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <div>
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <div className="min-w-0">
           <h2 className="font-semibold">Pre-registered lists</h2>
           <p className="text-xs text-zinc-500">
             {waiting.length} drifter{waiting.length === 1 ? "" : "s"} &middot; {peopleWaiting} {peopleWaiting === 1 ? "person" : "people"} still to collect &middot;
@@ -122,8 +125,8 @@ export function DrifterQueue({
         </div>
         <input
           id="queue-search"
-          className="input w-full sm:w-64"
-          placeholder="Find a drifter, companion, team, car # or MD3- code"
+          className="input w-full sm:w-72"
+          placeholder="Name, companion, team, car # or code"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           aria-label="Search pre-registered drifters"
@@ -142,41 +145,42 @@ export function DrifterQueue({
           const payOk = !needsPay || (received && (method === "cash" || payRef.trim().length >= 4));
           return (
             <li key={e.id} className="py-3">
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                <div className="min-w-0 flex-1">
-                  <div className="font-semibold">{e.drifter_name}</div>
-                  <div className="text-xs text-zinc-500">
+              {/* name | count | actions on a wide screen; on a phone the actions drop to their own line */}
+              <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 sm:grid-cols-[minmax(0,1fr)_10rem_auto]">
+                <div className="min-w-0">
+                  <div className="break-words font-semibold sm:truncate" title={e.drifter_name}>{e.drifter_name}</div>
+                  <div className="break-words text-xs text-zinc-500 sm:truncate">
                     {[e.team_name ?? "no team", e.car_no ? `Car #${e.car_no}` : null, drifterReference(e.token)].filter(Boolean).join(" · ")}
                   </div>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px]">
+                    <span className={`${PILL} border-emerald-500/35 bg-emerald-500/10 text-emerald-300`}>Rules confirmed</span>
+                    {e.self_registered && (
+                      <span className={`${PILL} border-amber-500/40 bg-amber-500/10 text-amber-300`} title="Signed up through the shared link, not from an entry list">
+                        Check competitor pass
+                      </span>
+                    )}
+                    {e.rules_ack_at && <span className="whitespace-nowrap text-xs text-zinc-500">{when(e.rules_ack_at)}</span>}
+                  </div>
                 </div>
-                <div className="w-36 text-sm">
-                  <div className="font-bold tabular-nums">
+                <div className="text-right text-sm sm:text-left">
+                  <div className="whitespace-nowrap font-bold tabular-nums">
                     {remaining} to collect
                     {e.bands_given > 0 && <span className="font-normal text-zinc-500"> of {e.band_count}</span>}
                   </div>
-                  <div className="text-xs text-zinc-500">
+                  <div className="whitespace-nowrap text-xs text-zinc-500">
                     {e.bands_given > 0 ? `${e.bands_given} already collected` : s.paid === 0 ? "all free" : `${s.free} free · ${s.paid} × ${php(priceCentavos)}`}
                   </div>
                 </div>
-                <div className="w-40 space-y-1 text-xs">
-                  <span className="inline-block rounded-full border border-emerald-500/35 bg-emerald-500/10 px-2 py-0.5 font-semibold uppercase tracking-wide text-emerald-300">Rules confirmed</span>
-                  {e.self_registered && (
-                    <span className="block w-fit rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 font-semibold uppercase tracking-wide text-amber-300" title="Signed up through the shared link, not from an entry list">
-                      Check competitor pass
-                    </span>
-                  )}
-                  {e.rules_ack_at && <div className="text-zinc-500">{when(e.rules_ack_at)}</div>}
-                </div>
-                <div className="flex shrink-0 items-center gap-2">
+                <div className="col-span-2 flex items-center justify-end gap-3 sm:col-span-1">
                   {!isActive && (
-                    <button type="button" className="text-xs text-cyan-300 hover:underline" onClick={() => setOpen(isOpen ? null : e.id)} aria-expanded={isOpen}>
+                    <button type="button" className="w-20 text-right text-xs text-cyan-300 hover:underline" onClick={() => setOpen(isOpen ? null : e.id)} aria-expanded={isOpen}>
                       {isOpen ? "Hide names" : "Names"}
                     </button>
                   )}
                   {isActive ? (
-                    <button type="button" className="btn-secondary px-3 py-1.5 text-sm" disabled={pending} onClick={() => begin(null)}>Cancel</button>
+                    <button type="button" className="btn-secondary w-28 px-3 py-1.5 text-sm" disabled={pending} onClick={() => begin(null)}>Cancel</button>
                   ) : (
-                    <button type="button" className="btn-primary px-3 py-1.5 text-sm" disabled={pending} onClick={() => begin(e)}>Hand over</button>
+                    <button type="button" className="btn-primary w-28 px-3 py-1.5 text-sm" disabled={pending} onClick={() => begin(e)}>Hand over</button>
                   )}
                 </div>
               </div>
@@ -233,7 +237,7 @@ export function DrifterQueue({
                     {picked.length === 0
                       ? "Tick at least one person."
                       : `${picked.length} band${picked.length === 1 ? "" : "s"} now${remaining - picked.length > 0 ? ` · ${remaining - picked.length} stay on the list to collect later` : ""}${s.paid === 0 ? " · free" : ` · ${s.free} free, ${s.paid} to pay`}`}
-                    {e.self_registered && " Check the competitor pass first."}
+                    {e.self_registered && <span className="block text-amber-300">Signed up through the shared link: check the competitor pass first.</span>}
                   </p>
 
                   {needsPay && (

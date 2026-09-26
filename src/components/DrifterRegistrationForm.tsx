@@ -6,24 +6,11 @@ import { DRIFTER_CONFIRMATION, drifterRules } from "@/lib/drifter-rules";
 import { drifterLink, drifterReference } from "@/lib/drifter";
 import { DRIFTER_ROLES, type DrifterRole } from "@/lib/supabase/types";
 import { rememberDrifterLink } from "@/components/DrifterLinkMemory";
+import { RuleLines, RulesHeading } from "@/components/RuleLines";
 
 type Person = { name: string; role: DrifterRole };
 
 const MAX = 20;
-
-/** One language per line behind a fixed-width tag, as on the desk. */
-function Lines({ lines, strong }: { lines: [string, string][]; strong?: string }) {
-  return (
-    <>
-      {lines.map(([lang, text]) => (
-        <span key={lang} className="grid grid-cols-[3.25rem_1fr] gap-2 py-0.5">
-          <span className="pt-px text-[10px] font-semibold uppercase tracking-wide text-zinc-500">{lang}</span>
-          <span className={lang === "EN" ? strong ?? "text-zinc-100" : "text-zinc-400"}>{text}</span>
-        </span>
-      ))}
-    </>
-  );
-}
 
 /**
  * What a drifter fills in: who is coming with them and a confirmation of the
@@ -148,7 +135,7 @@ export function DrifterRegistrationForm({
           Show this screen at the registration desk on event day. Your wristbands will be waiting.
           <span className="mt-1 block text-zinc-500">Ipakita ito sa registration desk sa araw ng event.</span>
         </p>
-        <div className="mx-auto mt-5 max-w-xs rounded-xl border border-dashed border-white/20 bg-black/30 p-3">
+        <div className="mx-auto mt-5 max-w-sm rounded-xl border border-dashed border-white/20 bg-black/30 p-3">
           <div className="text-[10px] uppercase tracking-widest text-zinc-500">Reference</div>
           <div className="mt-1 font-mono text-2xl font-bold text-cyan-300">{drifterReference(token)}</div>
         </div>
@@ -165,7 +152,7 @@ export function DrifterRegistrationForm({
             <div className="mt-2 flex items-center gap-2">
               <input
                 readOnly
-                className="input py-1 font-mono text-xs"
+                className="input min-w-0 flex-1 py-1 font-mono text-xs"
                 value={drifterLink(siteUrl, token)}
                 onFocus={(e) => e.currentTarget.select()}
                 aria-label="Your personal link"
@@ -218,7 +205,7 @@ export function DrifterRegistrationForm({
             <input id="self-name" className="input mt-1" autoComplete="name" placeholder="e.g. Juan Dela Cruz"
               value={who.name} onChange={(e) => { setWho((w) => ({ ...w, name: e.target.value })); setError(null); }} />
           </div>
-          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_7rem]">
+          <div className="grid grid-cols-[minmax(0,1fr)_5.5rem] gap-3 sm:grid-cols-[minmax(0,1fr)_7rem]">
             <div>
               <label className="label" htmlFor="self-team">Team</label>
               <input id="self-team" className="input mt-1" placeholder="Leave blank if none"
@@ -274,7 +261,7 @@ export function DrifterRegistrationForm({
           <span className="label">Who is coming with you</span>
           <div className="mt-2 space-y-2">
             {people.map((p, i) => (
-              <div key={i} className="grid grid-cols-[1.5rem_minmax(0,1fr)_7.5rem] items-center gap-2">
+              <div key={i} className="grid grid-cols-[1.25rem_minmax(0,1fr)_7rem] items-center gap-2 sm:grid-cols-[1.5rem_minmax(0,1fr)_8rem]">
                 <span className="text-right text-xs text-zinc-500 tabular-nums">{i + 1}</span>
                 <input
                   id={`person-${i}`}
@@ -287,7 +274,7 @@ export function DrifterRegistrationForm({
                 />
                 <select
                   id={`role-${i}`}
-                  className="input"
+                  className="input px-2"
                   value={p.role}
                   onChange={(e) => patch(i, { role: e.target.value as DrifterRole })}
                   aria-label={`Role of person ${i + 1}`}
@@ -301,13 +288,11 @@ export function DrifterRegistrationForm({
       </div>
 
       <div className="card">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-300">
-          Wristband rules &middot; Patakaran sa wristband &middot; 手环规则
-        </h2>
+        <RulesHeading />
         <ol className="mt-3 space-y-3 text-sm">
           {drifterRules(allowance, priceLabel, "drifter").map((rule, i) => (
             <li key={i} className="border-l-2 border-white/15 pl-3">
-              <Lines lines={rule} />
+              <RuleLines lines={rule} />
             </li>
           ))}
         </ol>
@@ -325,8 +310,8 @@ export function DrifterRegistrationForm({
               {ack ? "Confirmed" : "Your confirmation"}
             </span>
           </span>
-          <span className="mt-2 block pl-6 text-sm">
-            <Lines lines={DRIFTER_CONFIRMATION} strong={ack ? "text-emerald-100" : "text-amber-100"} />
+          <span className="mt-2 block text-sm sm:pl-6">
+            <RuleLines lines={DRIFTER_CONFIRMATION} strong={ack ? "text-emerald-100" : "text-amber-100"} />
           </span>
         </label>
       </div>

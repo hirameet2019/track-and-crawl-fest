@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { EventBanner } from "@/components/EventHero";
 import { DrifterRegistrationForm } from "@/components/DrifterRegistrationForm";
-import { RememberThisLink } from "@/components/DrifterLinkMemory";
+import { ForgetThisLink, RememberThisLink } from "@/components/DrifterLinkMemory";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getActiveEvent } from "@/lib/queries";
 import { drifterReference } from "@/lib/drifter";
@@ -47,6 +47,7 @@ export default async function DrifterLinkPage({ params }: { params: Promise<{ to
   if (!entry || !entry.active || !type) {
     return shell(
       <div className="card text-center">
+        <ForgetThisLink token={token} />
         <h1 className="text-xl font-bold">This link is not active</h1>
         <p className="mt-2 text-sm text-zinc-400">
           Check that you opened the whole link from the organizer&rsquo;s message. If it still does not work, ask the organizer for a new one.
@@ -57,7 +58,7 @@ export default async function DrifterLinkPage({ params }: { params: Promise<{ to
   }
 
   const paidBox = entry.paid_centavos > 0 && (
-    <div className="mx-auto mt-4 max-w-xs rounded-xl border border-emerald-400/30 bg-emerald-400/5 p-3 text-sm">
+    <div className="mx-auto mt-4 max-w-sm rounded-xl border border-emerald-400/30 bg-emerald-400/5 p-3 text-sm">
       <div className="font-semibold text-emerald-200">Payment received: {php(entry.paid_centavos)}</div>
       <div className="mt-0.5 text-xs text-zinc-400">
         For the bands past the free {type.free_allowance}

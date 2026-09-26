@@ -36,15 +36,17 @@ export default async function DrifterSignupPage({ params }: { params: Promise<{ 
       {event && <EventBanner event={event} backLabel="Meet & Drift 3" />}
       <div className="dark-zone mx-auto w-full max-w-xl flex-1 px-4 py-8">
         {!type ? (
-          <div className="card text-center">
-            <h1 className="text-xl font-bold">This sign-up link is closed</h1>
-            <p className="mt-2 text-sm text-zinc-400">
-              The organizer may have replaced it with a new one. Ask them for the current drifter sign-up link.
-            </p>
-            <p className="mt-2 text-xs text-zinc-500">Sarado na ang link na ito. Humingi ng bago sa organizer.</p>
+          <>
             <RememberedDrifterLinks />
+            <div className="card text-center">
+              <h1 className="text-xl font-bold">This sign-up link is closed</h1>
+              <p className="mt-2 text-sm text-zinc-400">
+                The organizer may have replaced it with a new one. Ask them for the current drifter sign-up link.
+              </p>
+              <p className="mt-2 text-xs text-zinc-500">Sarado na ang link na ito. Humingi ng bago sa organizer.</p>
+            </div>
             <LostDrifterLink />
-          </div>
+          </>
         ) : (
           <>
             <RememberedDrifterLinks />

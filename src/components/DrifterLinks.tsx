@@ -24,6 +24,9 @@ function parseList(text: string) {
     .filter((r) => r.name.length > 0);
 }
 
+/** Status pill; never wraps inside itself. */
+const PILL = "inline-block whitespace-nowrap rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide";
+
 async function copy(text: string) {
   try {
     await navigator.clipboard.writeText(text);
@@ -102,18 +105,16 @@ export function DrifterLinks({ entries, siteUrl, signupSlug }: { entries: Drifte
     <div className="card space-y-4 p-4">
       {/* One link for every drifter, for when there is no final entry list. */}
       <div className={`rounded-lg border p-3 ${signupUrl ? "border-cyan-400/30 bg-cyan-400/5" : "border-white/10 bg-black/20"}`}>
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <div>
-            <h2 className="font-semibold">Shared sign-up link</h2>
-            <p className="text-xs text-zinc-500">
-              One link for all drifters, for when there is no final list. Each drifter types their own name, team and car number and
-              gets a personal link back. Entries made this way are marked <b>Self</b>: check the competitor pass before handing over.
-            </p>
-          </div>
-          <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${signupUrl ? "border-emerald-500/35 bg-emerald-500/10 text-emerald-300" : "border-white/15 text-zinc-400"}`}>
+        <div className="flex items-center gap-2">
+          <h2 className="font-semibold">Shared sign-up link</h2>
+          <span className={`${PILL} ${signupUrl ? "border-emerald-500/35 bg-emerald-500/10 text-emerald-300" : "border-white/15 text-zinc-400"}`}>
             {signupUrl ? "Open" : "Closed"}
           </span>
         </div>
+        <p className="mt-0.5 text-xs text-zinc-500">
+          One link for all drifters, for when there is no final list. Each drifter types their own name, team and car number and
+          gets a personal link back. Entries made this way are marked <b>Self</b>: check the competitor pass before handing over.
+        </p>
         {signupUrl ? (
           <>
             <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -145,8 +146,8 @@ export function DrifterLinks({ entries, siteUrl, signupSlug }: { entries: Drifte
         )}
       </div>
 
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <div>
+      <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
+        <div className="min-w-0 max-w-3xl">
           <h2 className="font-semibold">Drifter links</h2>
           <p className="text-xs text-zinc-500">
             Everyone signed up or added by hand. Each drifter has a private link to send in or change who is coming with them.
@@ -154,7 +155,7 @@ export function DrifterLinks({ entries, siteUrl, signupSlug }: { entries: Drifte
           </p>
         </div>
         {live.length > 0 && (
-          <div className="flex gap-3 text-xs">
+          <div className="flex gap-3 whitespace-nowrap text-xs">
             <button type="button" className="text-cyan-300 hover:underline" onClick={copyAll}>Copy all links</button>
             <a href="/api/admin/export?type=drifter-links" className="text-cyan-300 hover:underline">Export CSV</a>
           </div>
@@ -218,37 +219,37 @@ export function DrifterLinks({ entries, siteUrl, signupSlug }: { entries: Drifte
         <p className="text-sm text-zinc-500">No drifters yet. Open the shared sign-up link above, or add drifters by hand.</p>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px] text-sm [&_td]:px-3 [&_th]:px-3 [&_td:first-child]:pl-0 [&_th:first-child]:pl-0 [&_td:last-child]:pr-0 [&_th:last-child]:pr-0">
+          <table className="w-full min-w-[680px] text-sm [&_td]:px-3 [&_th]:px-3 [&_td:first-child]:pl-0 [&_th:first-child]:pl-0 [&_td:last-child]:pr-0 [&_th:last-child]:pr-0">
             <thead className="text-left text-xs uppercase text-zinc-500">
-              <tr><th className="py-1">Drifter &amp; team</th><th>Status</th><th>Private link</th><th></th></tr>
+              <tr><th className="py-1">Drifter &amp; team</th><th>Status</th><th className="w-[40%]">Private link</th><th></th></tr>
             </thead>
             <tbody>
               {live.map((e) => (
-                <tr key={e.id} className="border-t border-white/10 align-top">
-                  <td className="py-2">
-                    <div className="font-semibold">
-                      {e.drifter_name}
-                      {e.self_registered && <span className="ml-2 rounded border border-amber-500/40 px-1 text-[10px] font-semibold uppercase text-amber-300" title="Signed up through the shared link">Self</span>}
+                <tr key={e.id} className="border-t border-white/10 align-middle">
+                  <td className="py-2.5">
+                    <div className="flex items-center gap-2 font-semibold">
+                      <span className="min-w-0">{e.drifter_name}</span>
+                      {e.self_registered && <span className="shrink-0 rounded border border-amber-500/40 px-1 text-[10px] font-semibold uppercase text-amber-300" title="Signed up through the shared link">Self</span>}
                     </div>
                     <div className="text-xs text-zinc-500">{[e.team_name ?? "no team", e.car_no ? `Car #${e.car_no}` : null].filter(Boolean).join(" · ")}</div>
                     {e.contact_email && <div className="text-xs text-zinc-500">{e.contact_email}</div>}
                   </td>
-                  <td className="py-2">
+                  <td className="py-2.5 text-[10px]">
                     {!e.handed_over_at && e.bands_given > 0 ? (
-                      <span className="inline-block rounded-full border border-cyan-400/35 bg-cyan-400/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-cyan-300">{e.bands_given}/{e.band_count} collected</span>
+                      <span className={`${PILL} border-cyan-400/35 bg-cyan-400/10 text-cyan-300`}>{e.bands_given}/{e.band_count} collected</span>
                     ) : e.handed_over_at ? (
-                      <span className="inline-block rounded-full border border-emerald-500/35 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-300">Handed over</span>
+                      <span className={`${PILL} border-emerald-500/35 bg-emerald-500/10 text-emerald-300`}>Handed over</span>
                     ) : e.submitted_at ? (
-                      <span className="inline-block rounded-full border border-cyan-400/35 bg-cyan-400/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-cyan-300">List in &middot; {e.band_count}</span>
+                      <span className={`${PILL} border-cyan-400/35 bg-cyan-400/10 text-cyan-300`}>List in &middot; {e.band_count}</span>
                     ) : (
-                      <span className="inline-block rounded-full border border-amber-500/35 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-300">Waiting</span>
+                      <span className={`${PILL} border-amber-500/35 bg-amber-500/10 text-amber-300`}>Waiting</span>
                     )}
                   </td>
-                  <td className="py-2">
+                  <td className="py-2.5">
                     <div className="flex items-center gap-2">
                       <input
                         readOnly
-                        className="input w-56 py-1 font-mono text-xs"
+                        className="input min-w-0 flex-1 py-1 font-mono text-xs"
                         value={drifterLink(siteUrl, e.token)}
                         onFocus={(ev) => ev.currentTarget.select()}
                         aria-label={`Private link for ${e.drifter_name}`}
@@ -259,7 +260,7 @@ export function DrifterLinks({ entries, siteUrl, signupSlug }: { entries: Drifte
                     </div>
                     <div className="mt-0.5 font-mono text-[10px] text-zinc-500">{drifterReference(e.token)}</div>
                   </td>
-                  <td className="py-2 text-right">
+                  <td className="whitespace-nowrap py-2.5 text-right">
                     {removing === e.id ? (
                       <span className="inline-flex gap-1">
                         <button

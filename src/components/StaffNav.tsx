@@ -37,7 +37,7 @@ export function StaffNav({ name, role }: { name: string; role: StaffRole }) {
         <Link prefetch={false} href={RANK[role] >= RANK.staff ? "/admin" : "/scan"} className="mr-3 flex items-center gap-2" aria-label="Meet & Drift 3 staff home">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo.png" alt="Meet & Drift 3" className="h-9 w-auto sm:h-11" />
-          <span className="hidden rounded border border-white/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-zinc-300 md:inline">Staff</span>
+          <span className="hidden rounded border border-white/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-zinc-300 xl:inline">Staff</span>
         </Link>
         {LINKS.filter((l) => RANK[role] >= RANK[l.min]).map((l) => {
           const active = l.href === "/admin" ? path === "/admin" : path.startsWith(l.href);
@@ -45,7 +45,7 @@ export function StaffNav({ name, role }: { name: string; role: StaffRole }) {
             <Link prefetch={false}
               key={l.href}
               href={l.href}
-              className={`rounded-md px-3 py-1.5 font-medium transition ${
+              className={`whitespace-nowrap rounded-md px-2.5 py-1.5 font-medium transition xl:px-3 ${
                 active ? "bg-gradient-to-r from-cyan-300 to-green-300 text-zinc-950 shadow-[0_0_18px_rgba(47,216,255,0.35)]" : "text-zinc-300 hover:bg-white/10 hover:text-white"
               }`}
             >
@@ -63,8 +63,9 @@ export function StaffNav({ name, role }: { name: string; role: StaffRole }) {
           >
             Tickets <span aria-hidden className="text-[10px] text-cyan-300/70">&#8599;</span>
           </a>
-          <span className="hidden whitespace-nowrap text-xs text-zinc-400 lg:inline">{name} &middot; {role}</span>
-          <button onClick={signOut} className="whitespace-nowrap rounded-md px-3 py-1.5 text-zinc-300 hover:bg-white/10 hover:text-white">Sign out</button>
+          {/* The name only fits beside nine tabs on a wide screen; otherwise it is on the button's tooltip. */}
+          <span className="hidden whitespace-nowrap text-xs text-zinc-400 2xl:inline">{name} &middot; {role}</span>
+          <button onClick={signOut} title={`Signed in as ${name} (${role})`} className="whitespace-nowrap rounded-md px-3 py-1.5 text-zinc-300 hover:bg-white/10 hover:text-white">Sign out</button>
         </div>
       </div>
       <div className="h-[3px] w-full bg-gradient-to-r from-fuchsia-500 via-violet-500 via-50% to-cyan-400" aria-hidden />

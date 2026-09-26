@@ -10,6 +10,7 @@ import { BandSwatch } from "@/components/BandSwatch";
 import { DRIFTER_CONFIRMATION, drifterRules } from "@/lib/drifter-rules";
 import { DrifterQueue } from "@/components/DrifterQueue";
 import { DrifterLinks } from "@/components/DrifterLinks";
+import { RuleLines, RulesHeading } from "@/components/RuleLines";
 import type { AvailabilityRow, DrifterBandRow, DrifterEntryRow, PaymentMethod, TicketTypeRow } from "@/lib/supabase/types";
 
 export interface DrifterEntry {
@@ -51,7 +52,15 @@ const norm = (s: string) => s.trim().replace(/\s+/g, " ").toLowerCase();
  * lines up with the card's own padding.
  */
 const TABLE =
-  "mt-2 w-full text-sm [&_th]:px-3 [&_td]:px-3 [&_th:first-child]:pl-0 [&_td:first-child]:pl-0 [&_th:last-child]:pr-0 [&_td:last-child]:pr-0";
+  "mt-2 w-full text-sm [&_th]:px-2 [&_td]:px-2 sm:[&_th]:px-3 sm:[&_td]:px-3 [&_th:first-child]:pl-0 [&_td:first-child]:pl-0 [&_th:last-child]:pr-0 [&_td:last-child]:pr-0";
+
+/**
+ * "Handed out here" columns, shared by the header and every row so they line up.
+ * The button column is a fixed width (a 2rem "−", a gap and a 4rem "+ Add"): an
+ * auto column would size itself separately in the header and in each row.
+ */
+const HANDED_COLS =
+  "grid grid-cols-[minmax(0,1fr)_6.375rem] items-center gap-x-3 sm:grid-cols-[minmax(0,1fr)_3rem_3rem_3rem_5.5rem_6.375rem]";
 
 /** Small inline number editor used for both the gate price and the free allowance. */
 function InlineNumber({
@@ -218,17 +227,33 @@ export function DrifterBands({
     });
   }
 
-  function tapFor(drifter: DrifterBandRow, delta: number) {
+  /** Row "−": take one band back. Returning a band needs no confirmation or payment. */
+  function takeBack(drifter: DrifterBandRow) {
     setError(null);
     setBusy(true);
     start(async () => {
-      // The row buttons only take bands back or top up a team that already confirmed.
-      const r = await recordDrifterBands({ ticketTypeId: type.id, drifterName: drifter.drifter_name, team: drifter.team_name ?? undefined, delta, method, rulesAck: delta > 0 });
+      const r = await recordDrifterBands({ ticketTypeId: type.id, drifterName: drifter.drifter_name, team: drifter.team_name ?? undefined, delta: -1, method, rulesAck: false });
       if (!r.ok) setError(r.error);
-      else if (r.result) setFlash(`${r.result.drifter_name}: ${delta > 0 ? "+" : ""}${delta} · ${r.result.total} total${r.result.paid > 0 ? ` · charge ${php(r.result.charge_centavos)}` : ""}`);
+      else if (r.result) setFlash(`${r.result.drifter_name}: -1 · ${r.result.total} total`);
       setBusy(false);
       router.refresh();
     });
+  }
+
+  /**
+   * Row "+ Add": open the desk form filled in for this drifter. Adding always goes
+   * through the form, so the rules are read to whoever is at the desk and any band
+   * past the free ones is paid for first.
+   */
+  function openDeskFor(drifter: DrifterBandRow) {
+    setName(drifter.drifter_name);
+    setTeam(drifter.team_name ?? "");
+    setRulesAck(false);
+    setPayReceived(false);
+    setPayRef("");
+    setError(null);
+    setDeskOpen(true);
+    formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   return (
@@ -310,7 +335,7 @@ export function DrifterBands({
           <span aria-hidden className={`shrink-0 text-zinc-400 transition-transform ${deskOpen ? "rotate-180" : ""}`}>&#9662;</span>
         </button>
         <div id="desk-handout" hidden={!deskOpen} className="space-y-4">
-        <div className="space-y-3">
+        <div className="grid gap-3 sm:grid-cols-2">
           <div>
             <label className="label" htmlFor="drifter-name">Drifter (competing driver)</label>
             <input
@@ -336,6 +361,11 @@ export function DrifterBands({
             <datalist id="drifter-names">
               {drifters.map((d) => <option key={d.drifter_key} value={d.drifter_name} />)}
             </datalist>
+            <p id="drifter-hint" className="mt-1 text-xs text-zinc-500">
+              {match
+                ? <>{match.drifter_name}{match.team_name ? ` (${match.team_name})` : ""} already has <b>{already}</b> band{already === 1 ? "" : "s"} &middot; {freeLeft > 0 ? <>{freeLeft} free left</> : <span className="text-amber-300">free allowance used up, next bands cost {php(price)} each</span>}</>
+                : <>Everyone with the team is booked under the drifter&apos;s name. The first {allowance} bands are free; extra bands are {php(price)} each.</>}
+            </p>
           </div>
           <div>
             <label className="label" htmlFor="drifter-team">Team</label>
@@ -356,18 +386,13 @@ export function DrifterBands({
           </div>
         </div>
         {waitingList && (
-          <p className="-mt-1 rounded-lg border border-cyan-400/40 bg-cyan-400/10 p-2 text-xs text-cyan-200">
+          <p className="rounded-lg border border-cyan-400/40 bg-cyan-400/10 p-2 text-xs text-cyan-200">
             {waitingList.drifter_name} already sent in a list of {waitingList.band_count} through their link. Use <b>Hand over</b> in
             Pre-registered lists above instead of typing it again.
           </p>
         )}
-        <p id="drifter-hint" className="-mt-2 text-xs text-zinc-500">
-          {match
-            ? <>{match.drifter_name}{match.team_name ? ` (${match.team_name})` : ""} already has <b>{already}</b> band{already === 1 ? "" : "s"} &middot; {freeLeft > 0 ? <>{freeLeft} free left</> : <span className="text-amber-300">free allowance used up, next bands cost {php(price)} each</span>}</>
-            : <>Everyone with the team is booked under the drifter&apos;s name. The first {allowance} bands are free; extra bands are {php(price)} each.</>}
-        </p>
 
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Extra bands paid by</span>
           <div className="inline-flex rounded-lg border border-white/15 bg-black/30 p-0.5">
             {METHODS.map((m) => (
@@ -415,23 +440,14 @@ export function DrifterBands({
           </div>
         )}
 
-        {/* Read to the drifter before anything is handed over. Three languages, each
-            on its own line behind a fixed-width tag, so a staff member can find the
-            one they need without reading the other two. */}
+        {/* Read to the drifter before anything is handed over. */}
         <div className="rounded-lg border border-white/15 bg-black/30 p-3">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-300">
-            Wristband rules &middot; Patakaran sa wristband &middot; 手环规则
-          </h3>
+          <RulesHeading as="h3" />
 
           <ol className="mt-3 space-y-3 text-sm">
             {drifterRules(allowance, php(price), "desk").map((rule, i) => (
               <li key={i} className="border-l-2 border-white/15 pl-3">
-                {rule.map(([lang, text]) => (
-                  <p key={lang} className="grid grid-cols-[2.75rem_1fr] gap-2 py-0.5">
-                    <span className="pt-px text-[10px] font-semibold uppercase tracking-wide text-zinc-500">{lang}</span>
-                    <span className={lang === "EN" ? "text-zinc-200" : "text-zinc-400"}>{text}</span>
-                  </p>
-                ))}
+                <RuleLines lines={rule} strong="text-zinc-200" />
               </li>
             ))}
           </ol>
@@ -448,13 +464,8 @@ export function DrifterBands({
                 Confirmation by the drifter
               </span>
             </span>
-            <span className="mt-2 block space-y-0.5 pl-6 text-sm">
-              {DRIFTER_CONFIRMATION.map(([lang, text]) => (
-                <span key={lang} className="grid grid-cols-[2.75rem_1fr] gap-2 py-0.5">
-                  <span className="pt-px text-[10px] font-semibold uppercase tracking-wide text-zinc-500">{lang}</span>
-                  <span className={lang === "EN" ? (rulesAck ? "text-emerald-100" : "text-amber-100") : "text-zinc-400"}>{text}</span>
-                </span>
-              ))}
+            <span className="mt-2 block text-sm sm:pl-6">
+              <RuleLines lines={DRIFTER_CONFIRMATION} strong={rulesAck ? "text-emerald-100" : "text-amber-100"} />
             </span>
           </label>
           {!rulesAck && <p className="mt-1 text-xs text-zinc-500">The drifter confirms this in front of you. Nothing can be handed over until it is ticked.</p>}
@@ -498,7 +509,7 @@ export function DrifterBands({
       </div>
 
       {/* running totals */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <div className="card p-4"><div className="text-[10px] uppercase tracking-wide text-zinc-500">Drifters</div><div className="text-2xl font-black tabular-nums">{totals.families}</div></div>
         <div className="card p-4">
           <div className="text-[10px] uppercase tracking-wide text-zinc-500">Bands handed out</div>
@@ -523,22 +534,29 @@ export function DrifterBands({
           <table className={TABLE}>
             <thead className="text-left text-xs uppercase text-zinc-500">
               <tr>
-                <th className="py-1">Order</th><th>Buyer</th><th>Wristband numbers</th>
+                <th className="py-1">Order</th><th>Buyer</th><th className="hidden sm:table-cell">Wristband numbers</th>
                 <th className="text-right">Bands</th><th className="text-right">Amount</th>
               </tr>
             </thead>
             <tbody>
-              {orderBands.map((o) => (
-                <tr key={o.order_id} className="border-t border-white/10">
-                  <td className="py-2 font-semibold">
-                    <Link prefetch={false} href={`/admin/orders/${o.order_id}`} className="text-cyan-300 hover:underline">#{o.order_no}</Link>
-                  </td>
-                  <td>{o.buyer_name}</td>
-                  <td className="whitespace-nowrap font-mono text-xs text-zinc-400">{o.numbers.length > 4 ? `${o.numbers[0]} – ${o.numbers[o.numbers.length - 1]}` : o.numbers.join(", ")}</td>
-                  <td className="text-right font-bold tabular-nums">{o.numbers.length}</td>
-                  <td className="text-right tabular-nums">{php(o.amount_centavos)}</td>
-                </tr>
-              ))}
+              {orderBands.map((o) => {
+                const range = o.numbers.length > 4 ? `${o.numbers[0]} – ${o.numbers[o.numbers.length - 1]}` : o.numbers.join(", ");
+                return (
+                  <tr key={o.order_id} className="border-t border-white/10">
+                    <td className="py-2 font-semibold">
+                      <Link prefetch={false} href={`/admin/orders/${o.order_id}`} className="text-cyan-300 hover:underline">#{o.order_no}</Link>
+                    </td>
+                    <td>
+                      {o.buyer_name}
+                      {/* on a phone the numbers ride under the buyer instead of taking a column */}
+                      <div className="whitespace-nowrap font-mono text-xs text-zinc-400 sm:hidden">{range}</div>
+                    </td>
+                    <td className="hidden whitespace-nowrap font-mono text-xs text-zinc-400 sm:table-cell">{range}</td>
+                    <td className="text-right font-bold tabular-nums">{o.numbers.length}</td>
+                    <td className="whitespace-nowrap text-right tabular-nums">{php(o.amount_centavos)}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -556,52 +574,57 @@ export function DrifterBands({
               Nothing handed out at the gate yet.{orderBands.length > 0 && <> The {totals.viaOrders} band{totals.viaOrders === 1 ? "" : "s"} already out came through a converted order, listed above.</>}
             </p>
           ) : (
-            <table className={TABLE}>
-              <thead className="text-left text-xs uppercase text-zinc-500">
-                <tr><th className="py-1">Drifter &amp; team</th><th className="text-right">Bands</th><th className="text-right">Free</th><th className="text-right">Paid</th><th className="text-right">Amount</th><th></th></tr>
-              </thead>
-              <tbody>
+            // Rows on a shared grid rather than a table: on a phone the numbers fold into
+            // one line under the name, so the name and the buttons both stay in view.
+            <div className="mt-2 text-sm">
+              <div className={`${HANDED_COLS} hidden pb-1 text-xs font-semibold uppercase text-zinc-500 sm:grid`}>
+                <span>Drifter &amp; team</span>
+                <span className="text-right">Bands</span>
+                <span className="text-right">Free</span>
+                <span className="text-right">Paid</span>
+                <span className="text-right">Amount</span>
+                <span aria-hidden />
+              </div>
+              <ul>
                 {drifters.map((d) => (
-                  <tr key={d.drifter_key} className="border-t border-white/10">
-                    <td className="py-2">
-                      <div className="font-semibold">{d.drifter_name}</div>
-                      <div className="text-xs text-zinc-500">{d.team_name ?? "no team"}</div>
-                    </td>
-                    <td className="text-right font-bold tabular-nums">{d.bands}</td>
-                    <td className="text-right tabular-nums text-emerald-300">{d.free_bands}</td>
-                    <td className="text-right tabular-nums">{d.paid_bands}</td>
-                    <td className="text-right tabular-nums">{php(Number(d.amount_centavos))}</td>
-                    <td className="py-1 text-right">
-                      <span className="inline-flex gap-1">
-                        <button type="button" className="btn-secondary px-2 py-1 text-sm font-black" disabled={busy || d.bands <= 0} onClick={() => tapFor(d, -1)} aria-label={`Take back one band from ${d.drifter_name}`}>&minus;</button>
-                        {d.bands >= allowance ? (
-                          <button
-                            type="button"
-                            className="btn-secondary px-2 py-1 text-xs font-semibold"
-                            disabled={busy || left <= 0}
-                            title="Past the free bands: fill in the form to take the payment"
-                            onClick={() => {
-                              setName(d.drifter_name);
-                              setTeam(d.team_name ?? "");
-                              setRulesAck(false);
-                              setPayReceived(false);
-                              setPayRef("");
-                              setDeskOpen(true);
-                              formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-                            }}
-                            aria-label={`Add paid bands for ${d.drifter_name}`}
-                          >
-                            + paid
-                          </button>
-                        ) : (
-                          <button type="button" className="btn-secondary px-2 py-1 text-sm font-black" disabled={busy || !rulesAck || left <= 0} title={!rulesAck ? "Tick the confirmation above first" : undefined} onClick={() => tapFor(d, 1)} aria-label={`Add one free band for ${d.drifter_name}`}>+</button>
-                        )}
-                      </span>
-                    </td>
-                  </tr>
+                  <li key={d.drifter_key} className={`${HANDED_COLS} border-t border-white/10 py-2`}>
+                    <div className="min-w-0">
+                      <div className="truncate font-semibold" title={d.drifter_name}>{d.drifter_name}</div>
+                      <div className="truncate text-xs text-zinc-500">{d.team_name ?? "no team"}</div>
+                      <div className="text-xs text-zinc-400 sm:hidden">
+                        <b className="text-zinc-100">{d.bands}</b> band{d.bands === 1 ? "" : "s"} &middot; <span className="text-emerald-300">{d.free_bands} free</span> &middot; {d.paid_bands} paid &middot; {php(Number(d.amount_centavos))}
+                      </div>
+                    </div>
+                    <span className="hidden text-right font-bold tabular-nums sm:block">{d.bands}</span>
+                    <span className="hidden text-right tabular-nums text-emerald-300 sm:block">{d.free_bands}</span>
+                    <span className="hidden text-right tabular-nums sm:block">{d.paid_bands}</span>
+                    <span className="hidden text-right tabular-nums sm:block">{php(Number(d.amount_centavos))}</span>
+                    <span className="flex items-center justify-end gap-1.5">
+                      <button
+                        type="button"
+                        className="btn-secondary h-8 w-8 px-0 py-0 text-base font-black"
+                        disabled={busy || d.bands <= 0}
+                        onClick={() => takeBack(d)}
+                        title={`Take back one band from ${d.drifter_name}`}
+                        aria-label={`Take back one band from ${d.drifter_name}`}
+                      >
+                        &minus;
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-secondary h-8 w-16 whitespace-nowrap px-0 py-0 text-xs font-semibold"
+                        disabled={busy || left <= 0}
+                        onClick={() => openDeskFor(d)}
+                        title={d.bands >= allowance ? `Past the free ${allowance}: the form takes the payment` : `Open the desk form for ${d.drifter_name}`}
+                        aria-label={`Add bands for ${d.drifter_name}`}
+                      >
+                        + Add
+                      </button>
+                    </span>
+                  </li>
                 ))}
-              </tbody>
-            </table>
+              </ul>
+            </div>
           )}
         </div>
 
@@ -611,33 +634,37 @@ export function DrifterBands({
           {recent.length === 0 ? (
             <p className="mt-2 text-sm text-zinc-500">Nothing recorded yet.</p>
           ) : (
-            <table className={TABLE}>
-              <tbody>
-                {recent.map((e) => {
-                  const paid = e.qty - e.free_qty;
-                  return (
-                    <tr key={e.id} className="border-t border-white/10">
-                      <td className="py-1.5 text-xs text-zinc-500">{new Date(e.created_at).toLocaleTimeString("en-PH", { timeZone: "Asia/Manila", hour: "2-digit", minute: "2-digit" })}</td>
-                      <td className={`font-bold tabular-nums ${e.qty < 0 ? "text-rose-400" : "text-emerald-300"}`}>{e.qty > 0 ? `+${e.qty}` : e.qty}</td>
-                      <td>
-                        <div>{e.drifter_name}</div>
-                        {e.team_name && <div className="text-xs text-zinc-500">{e.team_name}</div>}
-                      </td>
-                      <td className="text-right text-xs text-zinc-500">
+            // A list, not a table: this column is narrow, and six table cells made every
+            // name wrap a word per line.
+            <ul className="mt-2 text-sm">
+              {recent.map((e) => {
+                const paid = e.qty - e.free_qty;
+                const time = new Date(e.created_at).toLocaleTimeString("en-PH", { timeZone: "Asia/Manila", hour: "numeric", minute: "2-digit" });
+                const method = METHODS.find((m) => m.key === e.payment_method)?.label ?? e.payment_method;
+                return (
+                  <li key={e.id} className="grid grid-cols-[2.5rem_minmax(0,1fr)_auto] items-start gap-x-3 border-t border-white/10 py-2">
+                    <span className={`pt-px text-right font-bold tabular-nums ${e.qty < 0 ? "text-rose-400" : "text-emerald-300"}`}>{e.qty > 0 ? `+${e.qty}` : e.qty}</span>
+                    <div className="min-w-0">
+                      <div className="truncate font-medium" title={e.drifter_name}>{e.drifter_name}</div>
+                      <div className="truncate text-xs text-zinc-500">
+                        {[e.team_name, time, e.staff].filter(Boolean).join(" \u00b7 ")}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="tabular-nums">{php(paid * e.unit_price_centavos)}</div>
+                      <div className="whitespace-nowrap text-xs text-zinc-500">
                         {paid === 0 ? "free" : paid < 0 ? `${paid} paid` : (
-                          <>
-                            <span className={e.payment_confirmed ? "text-emerald-300" : "text-amber-300"}>{paid} paid{e.payment_confirmed ? " \u2713" : ""}</span>
-                            <span className="block uppercase">{e.payment_method}{e.payment_ref ? ` ${e.payment_ref}` : ""}</span>
-                          </>
+                          <span className={e.payment_confirmed ? "text-emerald-300" : "text-amber-300"}>
+                            {paid} paid{e.payment_confirmed ? " \u2713" : ""} &middot; {method}
+                          </span>
                         )}
-                      </td>
-                      <td className="text-right tabular-nums">{php(paid * e.unit_price_centavos)}</td>
-                      <td className="text-right text-xs text-zinc-500">{e.staff ?? ""}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                      </div>
+                      {paid > 0 && e.payment_ref && <div className="whitespace-nowrap font-mono text-[10px] text-zinc-500">ref {e.payment_ref}</div>}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
           )}
         </div>
       </div>

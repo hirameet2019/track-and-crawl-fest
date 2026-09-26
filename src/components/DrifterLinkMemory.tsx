@@ -51,18 +51,40 @@ export function RememberedDrifterLinks() {
   }, []);
   if (saved.length === 0) return null;
   return (
-    <div className="card mb-5 border-cyan-400/40">
+    <div className="card mb-5 border-cyan-400/40 text-left">
       <div className="text-sm font-semibold text-cyan-100">Already signed up on this phone?</div>
-      <div className="mt-2 flex flex-wrap gap-2">
+      <p className="text-xs text-zinc-500">Nakapag-sign up ka na? Buksan ang listahan mo dito.</p>
+      {/* full-width rows, so names of any length line up instead of ragged buttons */}
+      <div className="mt-3 grid gap-2">
         {saved.map((s) => (
-          <a key={s.token} href={`/d/${s.token}`} className="btn-primary px-3 py-1.5 text-sm">
-            Open {s.name}&rsquo;s list
+          <a
+            key={s.token}
+            href={`/d/${s.token}`}
+            className="flex items-center justify-between gap-3 rounded-lg border border-cyan-400/30 bg-cyan-400/10 px-3 py-2.5 text-sm transition hover:bg-cyan-400/20"
+          >
+            <span className="min-w-0 truncate font-semibold text-cyan-50">{s.name}</span>
+            <span className="shrink-0 text-xs font-semibold text-cyan-300">Open list &rarr;</span>
           </a>
         ))}
       </div>
-      <p className="mt-2 text-xs text-zinc-500">Nakapag-sign up ka na? Buksan ang listahan mo dito.</p>
     </div>
   );
+}
+
+/**
+ * On a link that no longer works (removed by the organizer, or replaced): drop it
+ * from this phone, so the sign-up page stops offering a dead link. Renders nothing.
+ */
+export function ForgetThisLink({ token }: { token: string }) {
+  useEffect(() => {
+    try {
+      const list = read();
+      if (list.some((s) => s.token === token)) window.localStorage.setItem(KEY, JSON.stringify(list.filter((s) => s.token !== token)));
+    } catch {
+      // blocked storage: nothing was remembered either
+    }
+  }, [token]);
+  return null;
 }
 
 /** "Lost your link?": resend to the email given at sign-up, never shown on screen. */
