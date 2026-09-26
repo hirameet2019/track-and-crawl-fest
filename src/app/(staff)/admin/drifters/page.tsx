@@ -32,7 +32,7 @@ export default async function DriftersPage() {
     admin.from("v_drifter_bands").select("*").eq("ticket_type_id", type.id).order("drifter_name"),
     admin
       .from("walkin_sales")
-      .select("id, created_at, drifter_name, qty, free_qty, unit_price_centavos, payment_method, staff:staff(full_name)")
+      .select("id, created_at, drifter_name, team_name, qty, free_qty, unit_price_centavos, payment_method, staff:staff(full_name)")
       .eq("ticket_type_id", type.id)
       .not("drifter_name", "is", null)
       .order("created_at", { ascending: false })
@@ -52,13 +52,14 @@ export default async function DriftersPage() {
   ]);
 
   type RecentRow = {
-    id: string; created_at: string; drifter_name: string; qty: number; free_qty: number;
+    id: string; created_at: string; drifter_name: string; team_name: string | null; qty: number; free_qty: number;
     unit_price_centavos: number; payment_method: PaymentMethod; staff: { full_name: string } | null;
   };
   const recent: DrifterEntry[] = ((recentRows ?? []) as unknown as RecentRow[]).map((r) => ({
     id: r.id,
     created_at: r.created_at,
     drifter_name: r.drifter_name,
+    team_name: r.team_name,
     qty: r.qty,
     free_qty: r.free_qty,
     unit_price_centavos: r.unit_price_centavos,

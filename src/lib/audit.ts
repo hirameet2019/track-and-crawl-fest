@@ -116,7 +116,7 @@ export function describe(action: string, data: Record<string, unknown> | null | 
       const qty = Number(d.qty ?? 0);
       const paid = Number(d.paid ?? 0);
       return [
-        `${d.drifter ?? "?"}: ${qty > 0 ? "+" : ""}${qty} band(s)`,
+        `${d.drifter ?? "?"}${d.team ? ` (${d.team})` : ""}: ${qty > 0 ? "+" : ""}${qty} band(s)`,
         Number(d.free ?? 0) ? `${d.free} free` : "",
         paid ? `${paid} paid at ${peso(d.unit_price_centavos)} (${String(d.method ?? "cash").toUpperCase()})` : "",
         qty > 0 ? (d.rules_ack ? "rules confirmed" : "RULES NOT CONFIRMED") : "",

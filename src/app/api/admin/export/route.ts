@@ -22,7 +22,7 @@ function download(body: string, name: string) {
 }
 
 type TallyRow = {
-  created_at: string; qty: number; free_qty: number; drifter_name: string | null; rules_ack: boolean; unit_price_centavos: number; payment_method: string;
+  created_at: string; qty: number; free_qty: number; drifter_name: string | null; team_name: string | null; rules_ack: boolean; unit_price_centavos: number; payment_method: string;
   ticket_type: { code: string; name: string; band_color: string | null; drifter_family: boolean } | null;
   staff: { full_name: string } | null;
 };
@@ -31,7 +31,7 @@ async function tallyRows(): Promise<TallyRow[]> {
   const admin = createAdminClient();
   const { data } = await admin
     .from("walkin_sales")
-    .select("created_at, qty, free_qty, drifter_name, rules_ack, unit_price_centavos, payment_method, ticket_type:ticket_types(code, name, band_color, drifter_family), staff:staff(full_name)")
+    .select("created_at, qty, free_qty, drifter_name, team_name, rules_ack, unit_price_centavos, payment_method, ticket_type:ticket_types(code, name, band_color, drifter_family), staff:staff(full_name)")
     .order("created_at")
     .limit(50000);
   return (data ?? []) as unknown as TallyRow[];
@@ -61,24 +61,25 @@ async function walkinCsv() {
 async function driftersCsv() {
   const admin = createAdminClient();
   const rows = (await tallyRows()).filter((r) => r.drifter_name);
-  const byDrifter = new Map<string, { name: string; bands: number; free: number; amount: number }>();
+  const byDrifter = new Map<string, { name: string; team: string; bands: number; free: number; amount: number }>();
   for (const r of rows) {
     const key = (r.drifter_name ?? "").toLowerCase();
-    const d = byDrifter.get(key) ?? { name: r.drifter_name ?? "", bands: 0, free: 0, amount: 0 };
+    const d = byDrifter.get(key) ?? { name: r.drifter_name ?? "", team: "", bands: 0, free: 0, amount: 0 };
+    if (r.team_name) d.team = r.team_name;
     d.bands += r.qty;
     d.free += r.free_qty;
     d.amount += tallyAmount(r);
     byDrifter.set(key, d);
   }
   return csv([
-    ["drifter", "bands", "free_bands", "charged_bands", "amount_php"],
+    ["drifter", "team", "bands", "free_bands", "charged_bands", "amount_php"],
     ...[...byDrifter.values()]
       .sort((a, b) => a.name.localeCompare(b.name))
-      .map((d) => [d.name, d.bands, d.free, d.bands - d.free, (d.amount / 100).toFixed(2)]),
+      .map((d) => [d.name, d.team, d.bands, d.free, d.bands - d.free, (d.amount / 100).toFixed(2)]),
     [],
-    ["time_manila", "drifter", "qty", "free_qty", "charged_qty", "unit_price_php", "amount_php", "payment_method", "rules_confirmed", "staff"],
+    ["time_manila", "drifter", "team", "qty", "free_qty", "charged_qty", "unit_price_php", "amount_php", "payment_method", "rules_confirmed", "staff"],
     ...rows.map((r) => [
-      manilaTime(r.created_at), r.drifter_name, r.qty, r.free_qty, r.qty - r.free_qty,
+      manilaTime(r.created_at), r.drifter_name, r.team_name, r.qty, r.free_qty, r.qty - r.free_qty,
       (r.unit_price_centavos / 100).toFixed(2), (tallyAmount(r) / 100).toFixed(2), r.payment_method,
       r.qty > 0 ? (r.rules_ack ? "yes" : "no") : "", r.staff?.full_name,
     ]),

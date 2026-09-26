@@ -15,6 +15,7 @@ const methodSchema = z.enum(["cash", "gotyme", "gcash", "maya"]);
 
 export interface DrifterResult {
   drifter_name: string;
+  team_name: string | null;
   /** The drifter's running band total after this entry. */
   total: number;
   /** Bands in this entry that fell inside the free allowance. */
@@ -33,6 +34,7 @@ export interface DrifterResult {
 export async function recordDrifterBands(input: {
   ticketTypeId: string;
   drifterName: string;
+  team?: string;
   delta: number;
   method: PaymentMethod;
   rulesAck: boolean;
@@ -44,6 +46,7 @@ export async function recordDrifterBands(input: {
     const delta = z.number().int().min(-20).max(20).parse(input.delta);
     if (delta === 0) return { ok: false, error: "Nothing to record" };
     const method = methodSchema.parse(input.method);
+    const team = z.string().trim().max(80).optional().parse(input.team);
     const rulesAck = z.boolean().parse(input.rulesAck);
     if (delta > 0 && !rulesAck) return { ok: false, error: "Tick the confirmation first: the drifter must understand the wristband rules." };
 
@@ -55,6 +58,7 @@ export async function recordDrifterBands(input: {
       p_actor: userId,
       p_method: method,
       p_rules_ack: rulesAck,
+      p_team: team || null,
     });
     if (error) return { ok: false, error: error.message };
     revalidatePath("/admin");

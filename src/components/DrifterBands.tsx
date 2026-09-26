@@ -13,6 +13,7 @@ export interface DrifterEntry {
   id: string;
   created_at: string;
   drifter_name: string;
+  team_name: string | null;
   qty: number;
   free_qty: number;
   unit_price_centavos: number;
@@ -35,6 +36,36 @@ const METHODS: { key: PaymentMethod; label: string }[] = [
   { key: "gotyme", label: "GoTyme" },
   { key: "gcash", label: "GCash" },
   { key: "maya", label: "Maya" },
+];
+
+/**
+ * The organizer's wristband rules, in the three languages spoken at the gate.
+ * EN first because it is the working language of the desk; the other two are for
+ * the person being handed the bands.
+ */
+const RULES = (allowance: number, price: string): [string, string][][] => [
+  [
+    ["EN", "Everyone inside the drifter area must wear a wristband at all times. Anyone without one will be asked to leave."],
+    ["TAGALOG", "Dapat laging naka-suot ng wristband ang lahat ng nasa loob ng drifter area. Sinumang walang suot ay palalabasin."],
+    ["中文", "进入漂移区域的所有人员必须全程佩戴手环。未佩戴手环者将被请离现场。"],
+  ],
+  [
+    ["EN", `Red wristbands are for the drifter and the people with them: family, friends, pit crew, spotter, manager and other team staff.`],
+    ["TAGALOG", "Ang pulang wristband ay para sa drifter at sa mga kasama niya: pamilya, kaibigan, pit crew, spotter, manager at iba pang team staff."],
+    ["中文", "红色手环仅限车手及其随行人员：家人、朋友、维修人员、观察员、领队及其他团队工作人员。"],
+  ],
+  [
+    ["EN", `${allowance} bands are free per drifter. Any beyond that cost ${price} each.`],
+    ["TAGALOG", `${allowance} ang libre kada drifter. Ang lampas dito ay ${price} bawat isa.`],
+    ["中文", `每位车手可免费领取 ${allowance} 条，超出部分每条 ${price}。`],
+  ],
+];
+
+/** What the drifter is agreeing to, in the same three languages. */
+const CONFIRMATION: [string, string][] = [
+  ["EN", "I hereby confirm that I have read and understood the rules above, and I accept responsibility for every person wearing these wristbands."],
+  ["TAGALOG", "Kinukumpirma ko na nabasa at naintindihan ko ang mga patakaran sa itaas, at mananagot ako sa bawat taong may suot ng mga wristband na ito."],
+  ["中文", "本人确认已阅读并理解以上规则，并对佩戴这些手环的所有人员负责。"],
 ];
 
 const norm = (s: string) => s.trim().replace(/\s+/g, " ").toLowerCase();
@@ -117,6 +148,7 @@ export function DrifterBands({
 }) {
   const router = useRouter();
   const [name, setName] = useState("");
+  const [team, setTeam] = useState("");
   const [method, setMethod] = useState<PaymentMethod>("cash");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -169,10 +201,11 @@ export function DrifterBands({
     setError(null);
     setBusy(true);
     start(async () => {
-      const r = await recordDrifterBands({ ticketTypeId: type.id, drifterName: trimmed, delta, method, rulesAck });
+      const r = await recordDrifterBands({ ticketTypeId: type.id, drifterName: trimmed, team, delta, method, rulesAck });
       if (!r.ok) setError(r.error);
       else if (r.result) {
         setRulesAck(false);
+        setTeam("");
         const { drifter_name, total, free, paid, charge_centavos } = r.result;
         setFlash(
           delta > 0
@@ -191,7 +224,7 @@ export function DrifterBands({
     setBusy(true);
     start(async () => {
       // The row buttons only take bands back or top up a team that already confirmed.
-      const r = await recordDrifterBands({ ticketTypeId: type.id, drifterName: drifter.drifter_name, delta, method, rulesAck: delta > 0 });
+      const r = await recordDrifterBands({ ticketTypeId: type.id, drifterName: drifter.drifter_name, team: drifter.team_name ?? undefined, delta, method, rulesAck: delta > 0 });
       if (!r.ok) setError(r.error);
       else if (r.result) setFlash(`${r.result.drifter_name}: ${delta > 0 ? "+" : ""}${delta} · ${r.result.total} total${r.result.paid > 0 ? ` · charge ${php(r.result.charge_centavos)}` : ""}`);
       setBusy(false);
@@ -257,27 +290,56 @@ export function DrifterBands({
 
       {/* hand bands to a drifter */}
       <div className="card space-y-4 p-4">
-        <div>
-          <label className="label" htmlFor="drifter-name">Drifter (competing driver)</label>
-          <input
-            id="drifter-name"
-            className="input mt-1"
-            list="drifter-names"
-            placeholder="e.g. Juan Dela Cruz"
-            autoComplete="off"
-            value={name}
-            onChange={(e) => { setName(e.target.value); setError(null); setRulesAck(false); }}
-            aria-describedby="drifter-hint"
-          />
-          <datalist id="drifter-names">
-            {drifters.map((d) => <option key={d.drifter_key} value={d.drifter_name} />)}
-          </datalist>
-          <p id="drifter-hint" className="mt-1 text-xs text-zinc-500">
-            {match
-              ? <>{match.drifter_name} already has <b>{already}</b> band{already === 1 ? "" : "s"} &middot; {freeLeft > 0 ? <>{freeLeft} free left</> : <span className="text-amber-300">free allowance used up, next bands cost {php(price)} each</span>}</>
-              : <>Everyone with the team is booked under the drifter&apos;s name. The first {allowance} bands are free; extra bands are {php(price)} each.</>}
-          </p>
+        <div className="space-y-3">
+          <div>
+            <label className="label" htmlFor="drifter-name">Drifter (competing driver)</label>
+            <input
+              id="drifter-name"
+              className="input mt-1"
+              list="drifter-names"
+              placeholder="e.g. Juan Dela Cruz"
+              autoComplete="off"
+              value={name}
+              onChange={(e) => {
+                const v = e.target.value;
+                setName(v);
+                setError(null);
+                setRulesAck(false);
+                // A drifter already on the list brings their team with them, so staff
+                // confirm it rather than retype it.
+                const key = norm(v);
+                const known = key ? drifters.find((d) => norm(d.drifter_name) === key) : null;
+                if (known?.team_name) setTeam(known.team_name);
+              }}
+              aria-describedby="drifter-hint"
+            />
+            <datalist id="drifter-names">
+              {drifters.map((d) => <option key={d.drifter_key} value={d.drifter_name} />)}
+            </datalist>
+          </div>
+          <div>
+            <label className="label" htmlFor="drifter-team">Team</label>
+            <input
+              id="drifter-team"
+              className="input mt-1"
+              list="drifter-teams"
+              placeholder="e.g. Team Burnout"
+              autoComplete="off"
+              value={team}
+              onChange={(e) => { setTeam(e.target.value); setError(null); }}
+              aria-describedby="drifter-team-hint"
+            />
+            <datalist id="drifter-teams">
+              {[...new Set(drifters.map((d) => d.team_name).filter(Boolean))].map((t) => <option key={t as string} value={t as string} />)}
+            </datalist>
+            <p id="drifter-team-hint" className="mt-1 text-xs text-zinc-500">Leave blank for a privateer.</p>
+          </div>
         </div>
+        <p id="drifter-hint" className="-mt-2 text-xs text-zinc-500">
+          {match
+            ? <>{match.drifter_name}{match.team_name ? ` (${match.team_name})` : ""} already has <b>{already}</b> band{already === 1 ? "" : "s"} &middot; {freeLeft > 0 ? <>{freeLeft} free left</> : <span className="text-amber-300">free allowance used up, next bands cost {php(price)} each</span>}</>
+            : <>Everyone with the team is booked under the drifter&apos;s name. The first {allowance} bands are free; extra bands are {php(price)} each.</>}
+        </p>
 
         <div className="flex flex-wrap items-center gap-3">
           <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Extra bands paid by</span>
@@ -296,35 +358,46 @@ export function DrifterBands({
           <span className="text-xs text-zinc-500">Ignored while the bands are still free.</span>
         </div>
 
-        {/* Read to the drifter before anything is handed over. English and Chinese
-            because part of the grid is Chinese-speaking. */}
+        {/* Read to the drifter before anything is handed over. Three languages, each
+            on its own line behind a fixed-width tag, so a staff member can find the
+            one they need without reading the other two. */}
         <div className="rounded-lg border border-white/15 bg-black/30 p-3">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-300">Wristband rules &middot; 手环规则</h3>
-          <dl className="mt-2 space-y-2 text-sm">
-            <div>
-              <dt className="text-zinc-300">Everyone inside the drifter area must wear a wristband at all times. Anyone without one will be asked to leave.</dt>
-              <dd className="text-zinc-400">进入漂移区域的所有人员必须全程佩戴手环。未佩戴手环者将被请离现场。</dd>
-            </div>
-            <div>
-              <dt className="text-zinc-300">
-                Red wristbands are for the drifter and the people with them: family, friends, pit crew, spotter, manager and other team staff.
-                {allowance} are free per drifter; any beyond that cost {php(price)} each.
-              </dt>
-              <dd className="text-zinc-400">
-                红色手环仅限车手及其随行人员：家人、朋友、维修人员、观察员、领队及其他团队工作人员。每位车手可免费领取 {allowance} 条，超出部分每条 {php(price)}。
-              </dd>
-            </div>
-          </dl>
-          <label className={`mt-3 flex cursor-pointer items-start gap-2 rounded-md border p-2 text-sm transition ${rulesAck ? "border-emerald-500/40 bg-emerald-500/10" : "border-amber-500/40 bg-amber-500/10"}`}>
-            <input
-              type="checkbox"
-              className="mt-0.5 h-4 w-4 shrink-0 accent-emerald-400"
-              checked={rulesAck}
-              onChange={(e) => { setRulesAck(e.target.checked); setError(null); }}
-            />
-            <span className={rulesAck ? "text-emerald-200" : "text-amber-200"}>
-              I hereby confirm that I have read and understood the rules above, and I accept responsibility for every person wearing
-              these wristbands. <span className="text-zinc-400">本人确认已阅读并理解以上规则，并对佩戴这些手环的所有人员负责。</span>
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-300">
+            Wristband rules &middot; Patakaran sa wristband &middot; 手环规则
+          </h3>
+
+          <ol className="mt-3 space-y-3 text-sm">
+            {RULES(allowance, php(price)).map((rule, i) => (
+              <li key={i} className="border-l-2 border-white/15 pl-3">
+                {rule.map(([lang, text]) => (
+                  <p key={lang} className="grid grid-cols-[2.75rem_1fr] gap-2 py-0.5">
+                    <span className="pt-px text-[10px] font-semibold uppercase tracking-wide text-zinc-500">{lang}</span>
+                    <span className={lang === "EN" ? "text-zinc-200" : "text-zinc-400"}>{text}</span>
+                  </p>
+                ))}
+              </li>
+            ))}
+          </ol>
+
+          <label className={`mt-3 block cursor-pointer rounded-md border p-3 transition ${rulesAck ? "border-emerald-500/40 bg-emerald-500/10" : "border-amber-500/40 bg-amber-500/10"}`}>
+            <span className="flex items-start gap-2">
+              <input
+                type="checkbox"
+                className="mt-0.5 h-4 w-4 shrink-0 accent-emerald-400"
+                checked={rulesAck}
+                onChange={(e) => { setRulesAck(e.target.checked); setError(null); }}
+              />
+              <span className={`text-xs font-semibold uppercase tracking-wide ${rulesAck ? "text-emerald-200" : "text-amber-200"}`}>
+                Confirmation by the drifter
+              </span>
+            </span>
+            <span className="mt-2 block space-y-0.5 pl-6 text-sm">
+              {CONFIRMATION.map(([lang, text]) => (
+                <span key={lang} className="grid grid-cols-[2.75rem_1fr] gap-2 py-0.5">
+                  <span className="pt-px text-[10px] font-semibold uppercase tracking-wide text-zinc-500">{lang}</span>
+                  <span className={lang === "EN" ? (rulesAck ? "text-emerald-100" : "text-amber-100") : "text-zinc-400"}>{text}</span>
+                </span>
+              ))}
             </span>
           </label>
           {!rulesAck && <p className="mt-1 text-xs text-zinc-500">The drifter confirms this in front of you. Nothing can be handed over until it is ticked.</p>}
@@ -427,12 +500,15 @@ export function DrifterBands({
           ) : (
             <table className={TABLE}>
               <thead className="text-left text-xs uppercase text-zinc-500">
-                <tr><th className="py-1">Drifter</th><th className="text-right">Bands</th><th className="text-right">Free</th><th className="text-right">Paid</th><th className="text-right">Amount</th><th></th></tr>
+                <tr><th className="py-1">Drifter &amp; team</th><th className="text-right">Bands</th><th className="text-right">Free</th><th className="text-right">Paid</th><th className="text-right">Amount</th><th></th></tr>
               </thead>
               <tbody>
                 {drifters.map((d) => (
                   <tr key={d.drifter_key} className="border-t border-white/10">
-                    <td className="py-2 font-semibold">{d.drifter_name}</td>
+                    <td className="py-2">
+                      <div className="font-semibold">{d.drifter_name}</div>
+                      <div className="text-xs text-zinc-500">{d.team_name ?? "no team"}</div>
+                    </td>
                     <td className="text-right font-bold tabular-nums">{d.bands}</td>
                     <td className="text-right tabular-nums text-emerald-300">{d.free_bands}</td>
                     <td className="text-right tabular-nums">{d.paid_bands}</td>
@@ -464,7 +540,10 @@ export function DrifterBands({
                     <tr key={e.id} className="border-t border-white/10">
                       <td className="py-1.5 text-xs text-zinc-500">{new Date(e.created_at).toLocaleTimeString("en-PH", { timeZone: "Asia/Manila", hour: "2-digit", minute: "2-digit" })}</td>
                       <td className={`font-bold tabular-nums ${e.qty < 0 ? "text-rose-400" : "text-emerald-300"}`}>{e.qty > 0 ? `+${e.qty}` : e.qty}</td>
-                      <td>{e.drifter_name}</td>
+                      <td>
+                        <div>{e.drifter_name}</div>
+                        {e.team_name && <div className="text-xs text-zinc-500">{e.team_name}</div>}
+                      </td>
                       <td className="text-right text-xs text-zinc-500">{paid === 0 ? "free" : `${paid} paid`}</td>
                       <td className="text-right tabular-nums">{php(paid * e.unit_price_centavos)}</td>
                       <td className="text-right text-xs text-zinc-500">{e.staff ?? ""}</td>

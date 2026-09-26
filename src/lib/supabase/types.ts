@@ -322,6 +322,8 @@ export interface DrifterBandRow {
   event_id: string;
   drifter_key: string;
   drifter_name: string;
+  /** The team the drifter runs with; null for a privateer or when never recorded. */
+  team_name: string | null;
   bands: number;
   free_bands: number;
   paid_bands: number;
