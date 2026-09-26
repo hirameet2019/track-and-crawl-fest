@@ -122,18 +122,19 @@ async function drifterLinksCsv() {
   const admin = createAdminClient();
   const { data } = await admin
     .from("drifter_entries")
-    .select("drifter_name, team_name, car_no, token, band_count, submitted_at, rules_ack_at, handed_over_at, people")
+    .select("drifter_name, team_name, car_no, token, self_registered, band_count, submitted_at, rules_ack_at, handed_over_at, people")
     .eq("active", true)
     .order("drifter_name");
   type Row = {
-    drifter_name: string; team_name: string | null; car_no: string | null; token: string; band_count: number | null;
+    drifter_name: string; team_name: string | null; car_no: string | null; token: string; self_registered: boolean; band_count: number | null;
     submitted_at: string | null; rules_ack_at: string | null; handed_over_at: string | null; people: { name: string; role: string }[];
   };
   const rows = (data ?? []) as Row[];
   return csv([
-    ["drifter", "team", "car_no", "link", "reference", "status", "bands", "rules_confirmed_manila", "handed_over_manila", "people"],
+    ["drifter", "team", "car_no", "added_by", "link", "reference", "status", "bands", "rules_confirmed_manila", "handed_over_manila", "people"],
     ...rows.map((r) => [
-      r.drifter_name, r.team_name, r.car_no, drifterLink(SITE_URL, r.token), drifterReference(r.token),
+      r.drifter_name, r.team_name, r.car_no, r.self_registered ? "self sign-up" : "organizer",
+      drifterLink(SITE_URL, r.token), drifterReference(r.token),
       r.handed_over_at ? "handed over" : r.submitted_at ? "list sent" : "waiting",
       r.band_count ?? "", r.rules_ack_at ? manilaTime(r.rules_ack_at) : "", r.handed_over_at ? manilaTime(r.handed_over_at) : "",
       (r.people ?? []).map((p) => `${p.name} (${p.role})`).join("; "),

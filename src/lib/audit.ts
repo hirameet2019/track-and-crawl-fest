@@ -53,6 +53,8 @@ const ACTIONS: Record<string, { cat: AuditCategory; label: string }> = {
   "drifter.entry_added": { cat: "walkin", label: "Drifters added to the entry list" },
   "drifter.entry_removed": { cat: "walkin", label: "Drifter removed from the entry list" },
   "drifter.registered": { cat: "walkin", label: "Drifter sent in their list" },
+  "drifter.self_registered": { cat: "walkin", label: "Drifter signed up through the shared link" },
+  "drifter.signup_link": { cat: "walkin", label: "Drifter sign-up link changed" },
   "drifter.handed_over": { cat: "walkin", label: "Pre-registered bands handed over" },
   "numbers.imported": { cat: "numbers", label: "Wristband range imported" },
   "numbers.imported_list": { cat: "numbers", label: "Wristband list imported" },
@@ -132,6 +134,10 @@ export function describe(action: string, data: Record<string, unknown> | null | 
       return `${d.drifter ?? "?"} - link closed`;
     case "drifter.registered":
       return `${d.drifter ?? "?"}${d.team ? ` (${d.team})` : ""} listed ${d.bands} band(s)${d.resubmitted ? " (updated)" : ""} and confirmed the rules`;
+    case "drifter.self_registered":
+      return `${d.drifter ?? "?"}${d.team ? ` (${d.team})` : ""}${d.car ? ` · car #${d.car}` : ""} signed up with ${d.bands} band(s)`;
+    case "drifter.signup_link":
+      return d.action === "close" ? "Sign-up link closed" : d.action === "replace" ? "Sign-up link replaced; the old one stopped working" : "Sign-up link opened";
     case "drifter.handed_over": {
       const charge = Number(d.charge_centavos ?? 0);
       return `${d.drifter ?? "?"}${d.team ? ` (${d.team})` : ""}: ${d.bands} band(s) handed over${charge ? ` - collected ${peso(charge)}` : " - all free"}`;

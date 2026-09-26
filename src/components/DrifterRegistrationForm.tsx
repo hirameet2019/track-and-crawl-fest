@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { submitDrifterRegistration } from "@/app/actions/drifter-entries";
+import { selfRegisterDrifter, submitDrifterRegistration } from "@/app/actions/drifter-entries";
 import { DRIFTER_CONFIRMATION, drifterRules } from "@/lib/drifter-rules";
-import { drifterReference } from "@/lib/drifter";
+import { drifterLink, drifterReference } from "@/lib/drifter";
 import { DRIFTER_ROLES, type DrifterRole } from "@/lib/supabase/types";
 
 type Person = { name: string; role: DrifterRole };
@@ -25,30 +25,45 @@ function Lines({ lines, strong }: { lines: [string, string][]; strong?: string }
 }
 
 /**
- * What a drifter fills in on their private link: who is coming with them and a
- * confirmation of the rules. Their own name and team come from the entry list and
- * are shown, not asked for. Resubmitting replaces the list until the desk hands
- * the bands over.
+ * What a drifter fills in: who is coming with them and a confirmation of the
+ * rules. Two ways in:
+ *   - "entry": their personal link. Name and team come from the entry list and
+ *     are shown, not asked for. Resubmitting replaces the list until hand-over.
+ *   - "signup": the organizer's shared link. The drifter types their own name,
+ *     team and car number; submitting creates their entry and hands back a
+ *     personal link for later changes.
  */
 export function DrifterRegistrationForm({
-  token,
-  drifterName,
-  teamName,
-  carNo,
+  mode = "entry",
+  slug,
+  siteUrl,
+  token: initialToken = "",
+  drifterName = "",
+  teamName = null,
+  carNo = null,
   allowance,
   priceLabel,
-  initialPeople,
-  submittedAt,
+  initialPeople = [],
+  submittedAt = null,
 }: {
-  token: string;
-  drifterName: string;
-  teamName: string | null;
-  carNo: string | null;
+  mode?: "entry" | "signup";
+  /** Shared sign-up slug; signup mode only. */
+  slug?: string;
+  /** Used to show the personal link after a sign-up. */
+  siteUrl?: string;
+  token?: string;
+  drifterName?: string;
+  teamName?: string | null;
+  carNo?: string | null;
   allowance: number;
   priceLabel: string;
-  initialPeople: Person[];
-  submittedAt: string | null;
+  initialPeople?: Person[];
+  submittedAt?: string | null;
 }) {
+  const signup = mode === "signup";
+  const [token, setToken] = useState(initialToken);
+  const [who, setWho] = useState({ name: drifterName, team: teamName ?? "", car: carNo ?? "" });
+  const [copied, setCopied] = useState(false);
   const [people, setPeople] = useState<Person[]>(
     initialPeople.length > 0 ? initialPeople : [{ name: "", role: "Family" }],
   );
@@ -62,7 +77,9 @@ export function DrifterRegistrationForm({
   const count = people.length;
   const extra = Math.max(0, count - allowance);
   const blanks = people.filter((p) => p.name.trim().length < 2).length;
-  const ready = ack && blanks === 0 && !pending;
+  const nameMissing = signup && who.name.trim().length < 2;
+  const ready = ack && blanks === 0 && !nameMissing && !pending;
+  const shownName = signup ? who.name.trim() : drifterName;
 
   const setCount = (n: number) => {
     const next = Math.max(1, Math.min(MAX, n));
@@ -80,15 +97,36 @@ export function DrifterRegistrationForm({
 
   function submit() {
     setError(null);
+    const list = people.map((p) => ({ name: p.name.trim(), role: p.role }));
     start(async () => {
-      const r = await submitDrifterRegistration({
-        token,
-        people: people.map((p) => ({ name: p.name.trim(), role: p.role })),
-        rulesAck: ack,
-      });
-      if (!r.ok) setError(r.error);
-      else { setDone(true); window.scrollTo({ top: 0, behavior: "smooth" }); }
+      if (signup && !token) {
+        const r = await selfRegisterDrifter({
+          slug: slug ?? "",
+          name: who.name.trim(),
+          team: who.team.trim() || undefined,
+          car: who.car.trim() || undefined,
+          people: list,
+          rulesAck: ack,
+        });
+        if (!r.ok) { setError(r.error); return; }
+        if (r.token) setToken(r.token);
+      } else {
+        const r = await submitDrifterRegistration({ token, people: list, rulesAck: ack });
+        if (!r.ok) { setError(r.error); return; }
+      }
+      setDone(true);
+      window.scrollTo({ top: 0, behavior: "smooth" });
     });
+  }
+
+  async function copyLink(url: string) {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch {
+      setCopied(false);
+    }
   }
 
   if (done) {
@@ -106,9 +144,30 @@ export function DrifterRegistrationForm({
           <div className="text-[10px] uppercase tracking-widest text-zinc-500">Reference</div>
           <div className="mt-1 font-mono text-2xl font-bold text-cyan-300">{drifterReference(token)}</div>
         </div>
+        {signup && siteUrl && token && (
+          <div className="mx-auto mt-4 max-w-sm rounded-xl border border-cyan-400/30 bg-cyan-400/5 p-3 text-left">
+            <div className="text-xs font-semibold text-cyan-200">Save your personal link</div>
+            <p className="mt-1 text-xs text-zinc-400">
+              Open it any time to change your list before event day. Keep it to yourself.
+              <span className="block text-zinc-500">I-save ang link na ito para mabago ang listahan mo.</span>
+            </p>
+            <div className="mt-2 flex items-center gap-2">
+              <input
+                readOnly
+                className="input py-1 font-mono text-xs"
+                value={drifterLink(siteUrl, token)}
+                onFocus={(e) => e.currentTarget.select()}
+                aria-label="Your personal link"
+              />
+              <button type="button" className="btn-secondary shrink-0 px-3 py-1 text-xs" onClick={() => copyLink(drifterLink(siteUrl, token))}>
+                {copied ? "Copied" : "Copy"}
+              </button>
+            </div>
+          </div>
+        )}
         <div className="mx-auto mt-5 max-w-sm text-left">
           <div className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500">
-            {count} wristband{count === 1 ? "" : "s"} for {drifterName}
+            {count} wristband{count === 1 ? "" : "s"} for {shownName}
             {extra > 0 ? ` · ${extra} to pay at the desk` : " · all free"}
           </div>
           <ol className="mt-2 divide-y divide-white/10 rounded-lg border border-white/10 text-sm">
@@ -120,9 +179,13 @@ export function DrifterRegistrationForm({
             ))}
           </ol>
         </div>
-        <button type="button" className="btn-secondary mt-5" onClick={() => { setDone(false); setAck(false); }}>
-          Edit my list
-        </button>
+        {signup && siteUrl && token ? (
+          <a href={drifterLink(siteUrl, token)} className="btn-secondary mt-5 inline-flex">Edit my list</a>
+        ) : (
+          <button type="button" className="btn-secondary mt-5" onClick={() => { setDone(false); setAck(false); }}>
+            Edit my list
+          </button>
+        )}
         <p className="mt-2 text-xs text-zinc-500">You can change it any time until the desk hands your wristbands over.</p>
       </div>
     );
@@ -130,19 +193,48 @@ export function DrifterRegistrationForm({
 
   return (
     <div className="space-y-5">
-      {/* who this link belongs to; read-only by design */}
-      <div className="card">
-        <div className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-cyan-300">
-          <span aria-hidden>&#128274;</span> From the official entry list
+      {signup ? (
+        /* the drifter says who they are; the desk checks the competitor pass on the day */
+        <div className="card space-y-3">
+          <div>
+            <h2 className="font-semibold">You, the drifter</h2>
+            <p className="text-xs text-zinc-500">
+              Use the name on your competitor registration. Bring your competitor pass: the desk checks it before handing anything over.
+            </p>
+          </div>
+          <div>
+            <label className="label" htmlFor="self-name">Your full name *</label>
+            <input id="self-name" className="input mt-1" autoComplete="name" placeholder="e.g. Juan Dela Cruz"
+              value={who.name} onChange={(e) => { setWho((w) => ({ ...w, name: e.target.value })); setError(null); }} />
+          </div>
+          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_7rem]">
+            <div>
+              <label className="label" htmlFor="self-team">Team</label>
+              <input id="self-team" className="input mt-1" placeholder="Leave blank if none"
+                value={who.team} onChange={(e) => setWho((w) => ({ ...w, team: e.target.value }))} />
+            </div>
+            <div>
+              <label className="label" htmlFor="self-car">Car #</label>
+              <input id="self-car" className="input mt-1" inputMode="numeric" placeholder="e.g. 17"
+                value={who.car} onChange={(e) => setWho((w) => ({ ...w, car: e.target.value }))} />
+            </div>
+          </div>
         </div>
-        <div className="mt-1.5 text-2xl font-bold">{drifterName}</div>
-        <div className="text-sm text-zinc-400">
-          {[teamName, carNo ? `Car #${carNo}` : null].filter(Boolean).join(" · ") || "Privateer"}
+      ) : (
+        /* who this link belongs to; read-only by design */
+        <div className="card">
+          <div className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-cyan-300">
+            <span aria-hidden>&#128274;</span> Your registration
+          </div>
+          <div className="mt-1.5 text-2xl font-bold">{drifterName}</div>
+          <div className="text-sm text-zinc-400">
+            {[teamName, carNo ? `Car #${carNo}` : null].filter(Boolean).join(" · ") || "Privateer"}
+          </div>
+          <p className="mt-2 text-xs text-zinc-500">
+            This link is yours alone. If any of this is wrong, contact the organizer instead of submitting.
+          </p>
         </div>
-        <p className="mt-2 text-xs text-zinc-500">
-          This link is yours alone. If any of this is wrong, contact the organizer instead of submitting.
-        </p>
-      </div>
+      )}
 
       <div className="card space-y-4">
         <div>
@@ -227,7 +319,9 @@ export function DrifterRegistrationForm({
           {pending ? "Sending…" : submittedAt ? "Update my list" : "Submit my list"}
         </button>
         <p className="mt-2 text-center text-xs text-zinc-500">
-          {!ack
+          {nameMissing
+            ? "Enter your own name as the drifter first."
+            : !ack
             ? "Tick the confirmation to continue."
             : blanks > 0
               ? `${blanks} name${blanks === 1 ? " is" : "s are"} still blank.`

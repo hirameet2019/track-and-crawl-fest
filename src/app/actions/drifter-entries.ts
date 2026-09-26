@@ -171,3 +171,77 @@ export async function submitDrifterRegistration(input: {
     return fail(e);
   }
 }
+
+/**
+ * Public: a drifter signs up through the organizer's shared link, typing their
+ * own name, team and car number. Creates their entry and submits their list in
+ * one step, then hands back their personal link for later changes.
+ */
+export async function selfRegisterDrifter(input: {
+  slug: string;
+  name: string;
+  team?: string;
+  car?: string;
+  people: { name: string; role: string }[];
+  rulesAck: boolean;
+}): Promise<ActionResult & { token?: string; bandCount?: number }> {
+  try {
+    const slug = z.string().trim().min(10).max(40).parse(input.slug);
+    const name = z.string().trim().min(2, "Enter your full name as the drifter").max(80).parse(input.name);
+    const team = z.string().trim().max(80).optional().parse(input.team);
+    const car = z.string().trim().max(20).optional().parse(input.car);
+    const people = z.array(personSchema).min(1, "List at least one person").max(20).parse(input.people);
+    if (!input.rulesAck) return { ok: false, error: "Please confirm that you understand the wristband rules." };
+
+    const token = newDrifterToken();
+    const admin = createAdminClient();
+    const { data, error } = await admin.rpc("self_register_drifter", {
+      p_slug: slug,
+      p_token: token,
+      p_name: name,
+      p_team: team || null,
+      p_car: car || null,
+      p_people: people,
+      p_rules_ack: true,
+    });
+    if (error) return { ok: false, error: error.message };
+    revalidatePath("/admin/drifters");
+    return { ok: true, token, bandCount: Number((data as { band_count: number } | null)?.band_count ?? people.length) };
+  } catch (e) {
+    if (e instanceof z.ZodError) return { ok: false, error: e.issues[0]?.message ?? "Check the form and try again." };
+    return fail(e);
+  }
+}
+
+/**
+ * Admin: open, replace or close the shared sign-up link. Replacing gives a new
+ * address and kills the old one at once - the fix when a link spreads too far.
+ */
+export async function setDrifterSignup(action: "open" | "replace" | "close"): Promise<ActionResult> {
+  try {
+    const { userId } = await assertStaff("admin");
+    const a = z.enum(["open", "replace", "close"]).parse(action);
+    const event = await getActiveEvent();
+    if (!event) return { ok: false, error: "No active event" };
+    const admin = createAdminClient();
+    const { data: type } = await admin
+      .from("ticket_types")
+      .select("id, drifter_signup_slug")
+      .eq("event_id", event.id)
+      .eq("drifter_family", true)
+      .limit(1)
+      .maybeSingle();
+    if (!type) return { ok: false, error: "No drifter wristband label is set up for this event" };
+
+    const slug = a === "close" ? null : a === "open" && type.drifter_signup_slug ? type.drifter_signup_slug : newDrifterToken();
+    const { error } = await admin.from("ticket_types").update({ drifter_signup_slug: slug }).eq("id", type.id);
+    if (error) return { ok: false, error: error.message };
+    await admin.from("audit_log").insert({
+      actor: userId, action: "drifter.signup_link", entity: "ticket_type", entity_id: type.id, data: { action: a },
+    });
+    revalidatePath("/admin/drifters");
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}

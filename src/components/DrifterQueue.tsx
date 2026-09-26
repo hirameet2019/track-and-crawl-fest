@@ -145,9 +145,14 @@ export function DrifterQueue({
                     {s.paid === 0 ? "all free" : `${s.free} free · ${s.paid} × ${php(priceCentavos)}`}
                   </div>
                 </div>
-                <div className="w-36 text-xs">
+                <div className="w-40 space-y-1 text-xs">
                   <span className="inline-block rounded-full border border-emerald-500/35 bg-emerald-500/10 px-2 py-0.5 font-semibold uppercase tracking-wide text-emerald-300">Rules confirmed</span>
-                  {e.rules_ack_at && <div className="mt-0.5 text-zinc-500">{when(e.rules_ack_at)}</div>}
+                  {e.self_registered && (
+                    <span className="block w-fit rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 font-semibold uppercase tracking-wide text-amber-300" title="Signed up through the shared link, not from an entry list">
+                      Check competitor pass
+                    </span>
+                  )}
+                  {e.rules_ack_at && <div className="text-zinc-500">{when(e.rules_ack_at)}</div>}
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
                   <button type="button" className="text-xs text-cyan-300 hover:underline" onClick={() => setOpen(isOpen ? null : e.id)} aria-expanded={isOpen}>
@@ -155,6 +160,7 @@ export function DrifterQueue({
                   </button>
                   {confirming === e.id ? (
                     <>
+                      {e.self_registered && <span className="text-xs text-amber-200">Seen the pass?</span>}
                       <button type="button" className="btn-primary px-3 py-1.5 text-sm" disabled={pending} onClick={() => handOver(e)}>
                         {pending ? "…" : `Yes, ${s.n} band${s.n === 1 ? "" : "s"}${s.paid > 0 ? ` + ${php(s.paid * priceCentavos)}` : ""}`}
                       </button>

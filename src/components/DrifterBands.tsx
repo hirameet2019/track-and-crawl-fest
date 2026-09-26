@@ -555,7 +555,7 @@ export function DrifterBands({
         </div>
       </div>
 
-      {isAdmin && <DrifterLinks entries={entries} siteUrl={siteUrl} />}
+      {isAdmin && <DrifterLinks entries={entries} siteUrl={siteUrl} signupSlug={type.drifter_signup_slug} />}
     </div>
   );
 }

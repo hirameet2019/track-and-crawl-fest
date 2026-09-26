@@ -78,6 +78,8 @@ export interface TicketTypeRow {
   drifter_family: boolean;
   /** Bands per drifter at no charge before the gate price applies. */
   free_allowance: number;
+  /** Shared drifter sign-up link (/drifters/<slug>); null while closed. */
+  drifter_signup_slug: string | null;
 }
 
 export interface TicketNumberRow {
@@ -349,6 +351,8 @@ export interface DrifterEntryRow {
   car_no: string | null;
   token: string;
   active: boolean;
+  /** Signed up through the shared link, not added from an entry list: check the competitor pass. */
+  self_registered: boolean;
   people: { name: string; role: DrifterRole }[];
   band_count: number | null;
   rules_ack_at: string | null;

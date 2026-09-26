@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { addDrifterEntries, removeDrifterEntry } from "@/app/actions/drifter-entries";
+import { addDrifterEntries, removeDrifterEntry, setDrifterSignup } from "@/app/actions/drifter-entries";
 import { drifterLink, drifterReference } from "@/lib/drifter";
 import type { DrifterEntryRow } from "@/lib/supabase/types";
 
@@ -37,7 +37,7 @@ async function copy(text: string) {
  * Admin: the organizer's entry list and each drifter's private link. Add drifters
  * one at a time or paste the whole list, then copy each link into Messenger.
  */
-export function DrifterLinks({ entries, siteUrl }: { entries: DrifterEntryRow[]; siteUrl: string }) {
+export function DrifterLinks({ entries, siteUrl, signupSlug }: { entries: DrifterEntryRow[]; siteUrl: string; signupSlug: string | null }) {
   const router = useRouter();
   const [name, setName] = useState("");
   const [team, setTeam] = useState("");
@@ -47,6 +47,7 @@ export function DrifterLinks({ entries, siteUrl }: { entries: DrifterEntryRow[];
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const [removing, setRemoving] = useState<string | null>(null);
+  const [replacing, setReplacing] = useState(false);
   const [pending, start] = useTransition();
 
   const live = entries.filter((e) => e.active);
@@ -88,13 +89,67 @@ export function DrifterLinks({ entries, siteUrl }: { entries: DrifterEntryRow[];
       : { ok: false, text: "Copy was blocked by the browser. Use Export CSV instead." });
   }
 
+  const signupUrl = signupSlug ? `${siteUrl.replace(/\/$/, "")}/drifters/${signupSlug}` : null;
+  const signup = (a: "open" | "replace" | "close", done: string) =>
+    start(async () => {
+      const r = await setDrifterSignup(a);
+      setReplacing(false);
+      setMsg(r.ok ? { ok: true, text: done } : { ok: false, text: r.error });
+      router.refresh();
+    });
+
   return (
     <div className="card space-y-4 p-4">
+      {/* One link for every drifter, for when there is no final entry list. */}
+      <div className={`rounded-lg border p-3 ${signupUrl ? "border-cyan-400/30 bg-cyan-400/5" : "border-white/10 bg-black/20"}`}>
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <div>
+            <h2 className="font-semibold">Shared sign-up link</h2>
+            <p className="text-xs text-zinc-500">
+              One link for all drifters, for when there is no final list. Each drifter types their own name, team and car number and
+              gets a personal link back. Entries made this way are marked <b>Self</b>: check the competitor pass before handing over.
+            </p>
+          </div>
+          <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${signupUrl ? "border-emerald-500/35 bg-emerald-500/10 text-emerald-300" : "border-white/15 text-zinc-400"}`}>
+            {signupUrl ? "Open" : "Closed"}
+          </span>
+        </div>
+        {signupUrl ? (
+          <>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <input readOnly className="input min-w-0 flex-1 py-1.5 font-mono text-xs" value={signupUrl} onFocus={(e) => e.currentTarget.select()} aria-label="Shared drifter sign-up link" />
+              <button type="button" className="btn-primary shrink-0 px-3 py-1.5 text-sm" onClick={async () => {
+                const ok = await copy(signupUrl);
+                setMsg(ok ? { ok: true, text: "Sign-up link copied. Post it to the drifters only." } : { ok: false, text: "Copy was blocked. Select the link and copy it by hand." });
+              }}>Copy</button>
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-3 text-xs">
+              {replacing ? (
+                <>
+                  <span className="text-amber-200">The old link stops working immediately.</span>
+                  <button type="button" className="btn-secondary px-2 py-1 text-xs" disabled={pending} onClick={() => signup("replace", "New sign-up link made. The old one no longer works.")}>Make a new link</button>
+                  <button type="button" className="text-zinc-400 hover:underline" onClick={() => setReplacing(false)}>Cancel</button>
+                </>
+              ) : (
+                <>
+                  <button type="button" className="text-cyan-300 hover:underline" onClick={() => setReplacing(true)}>Replace the link&hellip;</button>
+                  <button type="button" className="text-zinc-400 hover:text-rose-300" disabled={pending} onClick={() => signup("close", "Sign-up link closed. Drifters who already signed up keep their personal links.")}>Close sign-up</button>
+                </>
+              )}
+            </div>
+          </>
+        ) : (
+          <button type="button" className="btn-primary mt-3" disabled={pending} onClick={() => signup("open", "Sign-up link is open. Copy it and send it to the drifters.")}>
+            Open a sign-up link
+          </button>
+        )}
+      </div>
+
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div>
           <h2 className="font-semibold">Drifter links</h2>
           <p className="text-xs text-zinc-500">
-            The organizer&apos;s entry list. Each drifter gets a private link to send in who is coming with them.
+            Everyone signed up or added by hand. Each drifter has a private link to send in or change who is coming with them.
             {live.length > 0 && <> {counts.waiting} waiting &middot; {counts.submitted} sent a list &middot; {counts.done} handed over.</>}
           </p>
         </div>
@@ -160,7 +215,7 @@ export function DrifterLinks({ entries, siteUrl }: { entries: DrifterEntryRow[];
       {msg && <p className={`rounded-lg border p-2 text-xs ${msg.ok ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300" : "border-rose-500/40 bg-rose-500/10 text-rose-300"}`}>{msg.text}</p>}
 
       {live.length === 0 ? (
-        <p className="text-sm text-zinc-500">No drifters on the list yet. Add them above, then send each one their link.</p>
+        <p className="text-sm text-zinc-500">No drifters yet. Open the shared sign-up link above, or add drifters by hand.</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[640px] text-sm [&_td]:px-3 [&_th]:px-3 [&_td:first-child]:pl-0 [&_th:first-child]:pl-0 [&_td:last-child]:pr-0 [&_th:last-child]:pr-0">
@@ -171,7 +226,10 @@ export function DrifterLinks({ entries, siteUrl }: { entries: DrifterEntryRow[];
               {live.map((e) => (
                 <tr key={e.id} className="border-t border-white/10 align-top">
                   <td className="py-2">
-                    <div className="font-semibold">{e.drifter_name}</div>
+                    <div className="font-semibold">
+                      {e.drifter_name}
+                      {e.self_registered && <span className="ml-2 rounded border border-amber-500/40 px-1 text-[10px] font-semibold uppercase text-amber-300" title="Signed up through the shared link">Self</span>}
+                    </div>
                     <div className="text-xs text-zinc-500">{[e.team_name ?? "no team", e.car_no ? `Car #${e.car_no}` : null].filter(Boolean).join(" · ")}</div>
                   </td>
                   <td className="py-2">
