@@ -7,7 +7,10 @@ import { recordDrifterBands, setDrifterAllowance } from "@/app/actions/drifters"
 import { setWalkinPrice } from "@/app/actions/walkin";
 import { php } from "@/lib/money";
 import { BandSwatch } from "@/components/BandSwatch";
-import type { AvailabilityRow, DrifterBandRow, PaymentMethod, TicketTypeRow } from "@/lib/supabase/types";
+import { DRIFTER_CONFIRMATION, drifterRules } from "@/lib/drifter-rules";
+import { DrifterQueue } from "@/components/DrifterQueue";
+import { DrifterLinks } from "@/components/DrifterLinks";
+import type { AvailabilityRow, DrifterBandRow, DrifterEntryRow, PaymentMethod, TicketTypeRow } from "@/lib/supabase/types";
 
 export interface DrifterEntry {
   id: string;
@@ -36,36 +39,6 @@ const METHODS: { key: PaymentMethod; label: string }[] = [
   { key: "gotyme", label: "GoTyme" },
   { key: "gcash", label: "GCash" },
   { key: "maya", label: "Maya" },
-];
-
-/**
- * The organizer's wristband rules, in the three languages spoken at the gate.
- * EN first because it is the working language of the desk; the other two are for
- * the person being handed the bands.
- */
-const RULES = (allowance: number, price: string): [string, string][][] => [
-  [
-    ["EN", "Everyone inside the drifter area must wear a wristband at all times. Anyone without one will be asked to leave."],
-    ["TAGALOG", "Dapat laging naka-suot ng wristband ang lahat ng nasa loob ng drifter area. Sinumang walang suot ay palalabasin."],
-    ["中文", "进入漂移区域的所有人员必须全程佩戴手环。未佩戴手环者将被请离现场。"],
-  ],
-  [
-    ["EN", `Red wristbands are for the drifter and the people with them: family, friends, pit crew, spotter, manager and other team staff.`],
-    ["TAGALOG", "Ang pulang wristband ay para sa drifter at sa mga kasama niya: pamilya, kaibigan, pit crew, spotter, manager at iba pang team staff."],
-    ["中文", "红色手环仅限车手及其随行人员：家人、朋友、维修人员、观察员、领队及其他团队工作人员。"],
-  ],
-  [
-    ["EN", `${allowance} bands are free per drifter. Any beyond that cost ${price} each.`],
-    ["TAGALOG", `${allowance} ang libre kada drifter. Ang lampas dito ay ${price} bawat isa.`],
-    ["中文", `每位车手可免费领取 ${allowance} 条，超出部分每条 ${price}。`],
-  ],
-];
-
-/** What the drifter is agreeing to, in the same three languages. */
-const CONFIRMATION: [string, string][] = [
-  ["EN", "I hereby confirm that I have read and understood the rules above, and I accept responsibility for every person wearing these wristbands."],
-  ["TAGALOG", "Kinukumpirma ko na nabasa at naintindihan ko ang mga patakaran sa itaas, at mananagot ako sa bawat taong may suot ng mga wristband na ito."],
-  ["中文", "本人确认已阅读并理解以上规则，并对佩戴这些手环的所有人员负责。"],
 ];
 
 const norm = (s: string) => s.trim().replace(/\s+/g, " ").toLowerCase();
@@ -137,6 +110,8 @@ export function DrifterBands({
   drifters,
   recent,
   orderBands,
+  entries,
+  siteUrl,
   isAdmin,
 }: {
   type: TicketTypeRow;
@@ -144,6 +119,9 @@ export function DrifterBands({
   drifters: DrifterBandRow[];
   recent: DrifterEntry[];
   orderBands: OrderBandRow[];
+  /** The organizer's entry list with each drifter's link and submitted list. */
+  entries: DrifterEntryRow[];
+  siteUrl: string;
   isAdmin: boolean;
 }) {
   const router = useRouter();
@@ -187,6 +165,10 @@ export function DrifterBands({
   }, [name, drifters]);
 
   const already = match?.bands ?? 0;
+  const waitingList = useMemo(() => {
+    const key = norm(name);
+    return key ? entries.find((e) => e.active && e.submitted_at && !e.handed_over_at && norm(e.drifter_name) === key) ?? null : null;
+  }, [name, entries]);
   const freeLeft = Math.max(0, allowance - already);
 
   /** What "+n" would cost this drifter right now. */
@@ -288,8 +270,19 @@ export function DrifterBands({
         </p>
       )}
 
-      {/* hand bands to a drifter */}
+      <DrifterQueue
+        entries={entries}
+        allowance={allowance}
+        priceCentavos={price}
+        alreadyOut={Object.fromEntries(drifters.map((d) => [d.drifter_name.trim().toLowerCase(), d.bands]))}
+      />
+
+      {/* hand bands to a drifter who did not pre-register */}
       <div className="card space-y-4 p-4">
+        <div>
+          <h2 className="font-semibold">Hand out at the desk</h2>
+          <p className="text-xs text-zinc-500">For a drifter who did not send in a list, or who needs more bands on the day.</p>
+        </div>
         <div className="space-y-3">
           <div>
             <label className="label" htmlFor="drifter-name">Drifter (competing driver)</label>
@@ -335,6 +328,12 @@ export function DrifterBands({
             <p id="drifter-team-hint" className="mt-1 text-xs text-zinc-500">Leave blank for a privateer.</p>
           </div>
         </div>
+        {waitingList && (
+          <p className="-mt-1 rounded-lg border border-cyan-400/40 bg-cyan-400/10 p-2 text-xs text-cyan-200">
+            {waitingList.drifter_name} already sent in a list of {waitingList.band_count} through their link. Use <b>Hand over</b> in
+            Pre-registered lists above instead of typing it again.
+          </p>
+        )}
         <p id="drifter-hint" className="-mt-2 text-xs text-zinc-500">
           {match
             ? <>{match.drifter_name}{match.team_name ? ` (${match.team_name})` : ""} already has <b>{already}</b> band{already === 1 ? "" : "s"} &middot; {freeLeft > 0 ? <>{freeLeft} free left</> : <span className="text-amber-300">free allowance used up, next bands cost {php(price)} each</span>}</>
@@ -367,7 +366,7 @@ export function DrifterBands({
           </h3>
 
           <ol className="mt-3 space-y-3 text-sm">
-            {RULES(allowance, php(price)).map((rule, i) => (
+            {drifterRules(allowance, php(price), "desk").map((rule, i) => (
               <li key={i} className="border-l-2 border-white/15 pl-3">
                 {rule.map(([lang, text]) => (
                   <p key={lang} className="grid grid-cols-[2.75rem_1fr] gap-2 py-0.5">
@@ -392,7 +391,7 @@ export function DrifterBands({
               </span>
             </span>
             <span className="mt-2 block space-y-0.5 pl-6 text-sm">
-              {CONFIRMATION.map(([lang, text]) => (
+              {DRIFTER_CONFIRMATION.map(([lang, text]) => (
                 <span key={lang} className="grid grid-cols-[2.75rem_1fr] gap-2 py-0.5">
                   <span className="pt-px text-[10px] font-semibold uppercase tracking-wide text-zinc-500">{lang}</span>
                   <span className={lang === "EN" ? (rulesAck ? "text-emerald-100" : "text-amber-100") : "text-zinc-400"}>{text}</span>
@@ -555,6 +554,8 @@ export function DrifterBands({
           )}
         </div>
       </div>
+
+      {isAdmin && <DrifterLinks entries={entries} siteUrl={siteUrl} />}
     </div>
   );
 }

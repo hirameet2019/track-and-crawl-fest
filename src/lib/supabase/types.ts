@@ -331,3 +331,29 @@ export interface DrifterBandRow {
   first_at: string;
   last_at: string;
 }
+
+/** Roles a drifter can give the people on their pre-registered list. */
+export const DRIFTER_ROLES = ["Family", "Friend", "Pit crew", "Spotter", "Manager", "Team staff"] as const;
+export type DrifterRole = (typeof DRIFTER_ROLES)[number];
+
+/**
+ * One competing drifter from the organizer's entry list, with the private link
+ * they pre-register through and the list they submitted (if any).
+ */
+export interface DrifterEntryRow {
+  id: string;
+  event_id: string;
+  ticket_type_id: string;
+  drifter_name: string;
+  team_name: string | null;
+  car_no: string | null;
+  token: string;
+  active: boolean;
+  people: { name: string; role: DrifterRole }[];
+  band_count: number | null;
+  rules_ack_at: string | null;
+  submitted_at: string | null;
+  handed_over_at: string | null;
+  handed_over_by: string | null;
+  created_at: string;
+}

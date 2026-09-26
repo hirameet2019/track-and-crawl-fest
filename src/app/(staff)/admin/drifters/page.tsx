@@ -2,7 +2,8 @@ import { requireStaff } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getActiveEvent, getAvailability, getTicketTypes } from "@/lib/queries";
 import { DrifterBands, type DrifterEntry, type OrderBandRow } from "@/components/DrifterBands";
-import type { DrifterBandRow, PaymentMethod } from "@/lib/supabase/types";
+import type { DrifterBandRow, DrifterEntryRow, PaymentMethod } from "@/lib/supabase/types";
+import { SITE_URL } from "@/config/event";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +29,7 @@ export default async function DriftersPage() {
   }
 
   const admin = createAdminClient();
-  const [{ data: drifterRows }, { data: recentRows }, { data: orderTickets }, { data: orderLines }] = await Promise.all([
+  const [{ data: drifterRows }, { data: recentRows }, { data: orderTickets }, { data: orderLines }, { data: entryRows }] = await Promise.all([
     admin.from("v_drifter_bands").select("*").eq("ticket_type_id", type.id).order("drifter_name"),
     admin
       .from("walkin_sales")
@@ -49,6 +50,13 @@ export default async function DriftersPage() {
       .from("order_items")
       .select("order_id, qty, unit_price_centavos")
       .eq("ticket_type_id", type.id),
+    // The organizer's entry list: each drifter's private link and the list they sent in.
+    admin
+      .from("drifter_entries")
+      .select("*")
+      .eq("ticket_type_id", type.id)
+      .eq("active", true)
+      .order("drifter_name"),
   ]);
 
   type RecentRow = {
@@ -95,8 +103,9 @@ export default async function DriftersPage() {
       <div>
         <h1 className="text-2xl font-bold">{type.name}</h1>
         <p className="mt-2 text-sm text-zinc-500">
-          Wristbands for a competing drifter and the people with them. Type the drifter&apos;s name, read them the rules below, then tap
-          the number of bands handed over. The first <b>{type.free_allowance}</b> per drifter are free; anything beyond that is charged.
+          Wristbands for a competing drifter and the people with them. Drifters who sent in their list through their private link are
+          waiting under Pre-registered lists; anyone else is handled at the desk below: type the name, read them the rules, tap the
+          number of bands handed over. The first <b>{type.free_allowance}</b> per drifter are free; anything beyond that is charged.
           These bands never mix with the Walk-in tally, so the gate numbers stay clean. Bands can also reach a team through a converted
           order &mdash; those are listed separately below and are already paid for.
         </p>
@@ -107,6 +116,8 @@ export default async function DriftersPage() {
         drifters={(drifterRows ?? []) as DrifterBandRow[]}
         recent={recent}
         orderBands={orderBands}
+        entries={(entryRows ?? []) as DrifterEntryRow[]}
+        siteUrl={SITE_URL}
         isAdmin={session.staff.role === "admin"}
       />
     </div>

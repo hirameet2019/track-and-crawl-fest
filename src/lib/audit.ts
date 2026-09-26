@@ -50,6 +50,10 @@ const ACTIONS: Record<string, { cat: AuditCategory; label: string }> = {
   "ticket_type.walkin_price": { cat: "walkin", label: "Gate price changed" },
   "drifter.bands": { cat: "walkin", label: "Drifter wristbands" },
   "ticket_type.free_allowance": { cat: "walkin", label: "Free bands per drifter changed" },
+  "drifter.entry_added": { cat: "walkin", label: "Drifters added to the entry list" },
+  "drifter.entry_removed": { cat: "walkin", label: "Drifter removed from the entry list" },
+  "drifter.registered": { cat: "walkin", label: "Drifter sent in their list" },
+  "drifter.handed_over": { cat: "walkin", label: "Pre-registered bands handed over" },
   "numbers.imported": { cat: "numbers", label: "Wristband range imported" },
   "numbers.imported_list": { cat: "numbers", label: "Wristband list imported" },
   "number.voided": { cat: "numbers", label: "Wristband voided" },
@@ -121,6 +125,16 @@ export function describe(action: string, data: Record<string, unknown> | null | 
         paid ? `${paid} paid at ${peso(d.unit_price_centavos)} (${String(d.method ?? "cash").toUpperCase()})` : "",
         qty > 0 ? (d.rules_ack ? "rules confirmed" : "RULES NOT CONFIRMED") : "",
       ].filter(Boolean).join(" · ");
+    }
+    case "drifter.entry_added":
+      return `${d.count} drifter(s)${Array.isArray(d.names) ? `: ${(d.names as string[]).slice(0, 6).join(", ")}${(d.names as string[]).length > 6 ? "..." : ""}` : ""}`;
+    case "drifter.entry_removed":
+      return `${d.drifter ?? "?"} - link closed`;
+    case "drifter.registered":
+      return `${d.drifter ?? "?"}${d.team ? ` (${d.team})` : ""} listed ${d.bands} band(s)${d.resubmitted ? " (updated)" : ""} and confirmed the rules`;
+    case "drifter.handed_over": {
+      const charge = Number(d.charge_centavos ?? 0);
+      return `${d.drifter ?? "?"}${d.team ? ` (${d.team})` : ""}: ${d.bands} band(s) handed over${charge ? ` - collected ${peso(charge)}` : " - all free"}`;
     }
     case "ticket_type.free_allowance":
       return `${d.free_allowance} free band(s) per drifter`;
