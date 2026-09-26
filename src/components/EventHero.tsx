@@ -85,7 +85,9 @@ export function EventBanner({ event, backHref = "/", backLabel = "Back to ticket
     <header className="relative isolate overflow-hidden bg-[#0a0a0c] text-white">
       <div className="absolute -inset-2 -z-20 bg-cover bg-[position:center_45%] opacity-60 blur-[3px]" style={{ backgroundImage: POSTER_BG }} aria-hidden />
       <div className="absolute inset-0 -z-10 bg-gradient-to-r from-black/90 via-black/75 to-black/60" aria-hidden />
-      <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-4 py-6">
+      {/* Full width, so the logo sits at the left edge like any site header rather than
+          floating beside a narrower page column. */}
+      <div className="flex w-full items-center justify-between gap-4 px-4 py-6 sm:px-6">
         <div>
           <Link href={backHref} className="text-xs text-zinc-300 hover:underline">&larr; {backLabel}</Link>
           {/* eslint-disable-next-line @next/next/no-img-element */}
