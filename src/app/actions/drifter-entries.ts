@@ -1,11 +1,15 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { z } from "zod";
 import { assertStaff } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getActiveEvent } from "@/lib/queries";
 import { newDrifterToken } from "@/lib/tokens";
+import { drifterLink, drifterReference } from "@/lib/drifter";
+import { sendDrifterLinkEmail } from "@/lib/email";
+import { SITE_URL } from "@/config/event";
 import { DRIFTER_ROLES, type PaymentMethod } from "@/lib/supabase/types";
 import type { ActionResult } from "./orders";
 
@@ -120,25 +124,29 @@ export async function handOverDrifterEntry(
   entryId: string,
   method: PaymentMethod,
   payment: { confirmed: boolean; ref?: string } = { confirmed: false },
-): Promise<ActionResult & { chargeCentavos?: number; bands?: number }> {
+  /** Positions on the list of the people collecting now; omitted = everyone still waiting. */
+  indices?: number[],
+): Promise<ActionResult & { chargeCentavos?: number; bands?: number; collected?: number; of?: number }> {
   try {
     const { userId } = await assertStaff("staff");
     const id = z.string().uuid().parse(entryId);
     const m = z.enum(["cash", "gotyme", "gcash", "maya"]).parse(method);
     const admin = createAdminClient();
     const ref = z.string().trim().max(60).optional().parse(payment.ref);
+    const who = indices === undefined ? null : z.array(z.number().int().min(0).max(19)).min(1, "Tick at least one person who is here").max(20).parse(indices);
     const { data, error } = await admin.rpc("hand_over_drifter_entry", {
       p_entry_id: id,
       p_actor: userId,
       p_method: m,
       p_payment_confirmed: payment.confirmed === true,
       p_payment_ref: ref || null,
+      p_indices: who,
     });
     if (error) return { ok: false, error: error.message };
-    const r = data as { total: number; charge_centavos: number } | null;
+    const r = data as { total: number; charge_centavos: number; collected: number; of: number } | null;
     revalidatePath("/admin");
     revalidatePath("/admin/drifters");
-    return { ok: true, chargeCentavos: r?.charge_centavos ?? 0, bands: r?.total ?? 0 };
+    return { ok: true, chargeCentavos: r?.charge_centavos ?? 0, bands: r?.total ?? 0, collected: r?.collected, of: r?.of };
   } catch (e) {
     return fail(e);
   }
@@ -190,14 +198,16 @@ export async function selfRegisterDrifter(input: {
   name: string;
   team?: string;
   car?: string;
+  email?: string;
   people: { name: string; role: string }[];
   rulesAck: boolean;
-}): Promise<ActionResult & { token?: string; bandCount?: number }> {
+}): Promise<ActionResult & { token?: string; bandCount?: number; emailed?: boolean }> {
   try {
     const slug = z.string().trim().min(10).max(40).parse(input.slug);
     const name = z.string().trim().min(2, "Enter your full name as the drifter").max(80).parse(input.name);
     const team = z.string().trim().max(80).optional().parse(input.team);
     const car = z.string().trim().max(20).optional().parse(input.car);
+    const email = z.union([z.literal(""), z.string().trim().toLowerCase().email("That email address does not look right").max(120)]).optional().parse(input.email);
     const people = z.array(personSchema).min(1, "List at least one person").max(20).parse(input.people);
     if (!input.rulesAck) return { ok: false, error: "Please confirm that you understand the wristband rules." };
 
@@ -211,10 +221,28 @@ export async function selfRegisterDrifter(input: {
       p_car: car || null,
       p_people: people,
       p_rules_ack: true,
+      p_email: email || null,
     });
     if (error) return { ok: false, error: error.message };
+
+    // The link goes to their inbox so closing the page loses nothing. It is sent after
+    // the response: a slow mail server once held a sign-up for 41 seconds, long enough
+    // for a drifter to give up and try again.
+    if (email) {
+      after(async () => {
+        try {
+          const event = await getActiveEvent();
+          const sent = await sendDrifterLinkEmail(email, {
+            drifterName: name, link: drifterLink(SITE_URL, token), reference: drifterReference(token), eventName: event?.name ?? "Meet & Drift 3",
+          });
+          if (sent?.ok) await createAdminClient().from("drifter_entries").update({ link_sent_at: new Date().toISOString() }).eq("token", token);
+        } catch (e) {
+          console.error("[drifter] link email failed", e);
+        }
+      });
+    }
     revalidatePath("/admin/drifters");
-    return { ok: true, token, bandCount: Number((data as { band_count: number } | null)?.band_count ?? people.length) };
+    return { ok: true, token, emailed: !!email, bandCount: Number((data as { band_count: number } | null)?.band_count ?? people.length) };
   } catch (e) {
     if (e instanceof z.ZodError) return { ok: false, error: e.issues[0]?.message ?? "Check the form and try again." };
     return fail(e);
@@ -251,5 +279,47 @@ export async function setDrifterSignup(action: "open" | "replace" | "close"): Pr
     return { ok: true };
   } catch (e) {
     return fail(e);
+  }
+}
+
+/**
+ * Public: "lost your link?". Sends the personal link to the email given at sign
+ * up, and only there. The answer is the same whether or not the address is on
+ * file, so the form cannot be used to find out who signed up. Each entry is sent
+ * at most once every ten minutes, so the form cannot flood someone's inbox.
+ */
+export async function resendDrifterLink(input: { email: string }): Promise<ActionResult & { message?: string }> {
+  const message = "If that email is on a drifter registration, the link is on its way. Check your inbox and Spam folder.";
+  try {
+    const email = z.string().trim().toLowerCase().email("Enter the email you signed up with").max(120).parse(input.email);
+    const admin = createAdminClient();
+    const { data } = await admin
+      .from("drifter_entries")
+      .select("id, drifter_name, token, link_sent_at")
+      .eq("active", true)
+      .ilike("contact_email", email)
+      .limit(5);
+    const tenMinutesAgo = Date.now() - 10 * 60 * 1000;
+    const due = (data ?? []).filter((e) => !e.link_sent_at || new Date(e.link_sent_at).getTime() <= tenMinutesAgo);
+    if (due.length > 0) {
+      after(async () => {
+        const event = await getActiveEvent();
+        for (const e of due) {
+          try {
+            const sent = await sendDrifterLinkEmail(email, {
+              drifterName: e.drifter_name, link: drifterLink(SITE_URL, e.token), reference: drifterReference(e.token),
+              eventName: event?.name ?? "Meet & Drift 3", resend: true,
+            });
+            if (sent?.ok) await createAdminClient().from("drifter_entries").update({ link_sent_at: new Date().toISOString() }).eq("id", e.id);
+          } catch (err) {
+            console.error("[drifter] link resend failed", err);
+          }
+        }
+      });
+    }
+    return { ok: true, message };
+  } catch (e) {
+    if (e instanceof z.ZodError) return { ok: false, error: e.issues[0]?.message ?? "Enter a valid email" };
+    return { ok: true, message };
   }
 }

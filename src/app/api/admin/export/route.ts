@@ -124,24 +124,24 @@ async function drifterLinksCsv() {
   const admin = createAdminClient();
   const { data } = await admin
     .from("drifter_entries")
-    .select("drifter_name, team_name, car_no, token, self_registered, band_count, submitted_at, rules_ack_at, handed_over_at, paid_centavos, payment_method, payment_ref, people")
+    .select("drifter_name, team_name, car_no, contact_email, token, self_registered, band_count, bands_given, submitted_at, rules_ack_at, handed_over_at, paid_centavos, payment_method, payment_ref, people")
     .eq("active", true)
     .order("drifter_name");
   type Row = {
     drifter_name: string; team_name: string | null; car_no: string | null; token: string; self_registered: boolean; band_count: number | null;
     submitted_at: string | null; rules_ack_at: string | null; handed_over_at: string | null; people: { name: string; role: string }[];
-    paid_centavos: number; payment_method: string | null; payment_ref: string | null;
+    paid_centavos: number; payment_method: string | null; payment_ref: string | null; contact_email: string | null; bands_given: number;
   };
   const rows = (data ?? []) as Row[];
   return csv([
-    ["drifter", "team", "car_no", "added_by", "link", "reference", "status", "bands", "rules_confirmed_manila", "handed_over_manila", "paid_php", "payment_method", "payment_ref", "people"],
+    ["drifter", "team", "car_no", "email", "added_by", "link", "reference", "status", "bands", "collected", "rules_confirmed_manila", "handed_over_manila", "paid_php", "payment_method", "payment_ref", "people"],
     ...rows.map((r) => [
-      r.drifter_name, r.team_name, r.car_no, r.self_registered ? "self sign-up" : "organizer",
+      r.drifter_name, r.team_name, r.car_no, r.contact_email ?? "", r.self_registered ? "self sign-up" : "organizer",
       drifterLink(SITE_URL, r.token), drifterReference(r.token),
-      r.handed_over_at ? "handed over" : r.submitted_at ? "list sent" : "waiting",
-      r.band_count ?? "", r.rules_ack_at ? manilaTime(r.rules_ack_at) : "", r.handed_over_at ? manilaTime(r.handed_over_at) : "",
+      r.handed_over_at ? "handed over" : r.bands_given > 0 ? "partly collected" : r.submitted_at ? "list sent" : "waiting",
+      r.band_count ?? "", r.bands_given ?? 0, r.rules_ack_at ? manilaTime(r.rules_ack_at) : "", r.handed_over_at ? manilaTime(r.handed_over_at) : "",
       (Number(r.paid_centavos ?? 0) / 100).toFixed(2), r.payment_method ?? "", r.payment_ref ?? "",
-      (r.people ?? []).map((p) => `${p.name} (${p.role})`).join("; "),
+      (r.people ?? []).map((p) => `${p.name} (${p.role}${(p as { given_at?: string }).given_at ? ", collected" : ""})`).join("; "),
     ]),
   ]);
 }

@@ -5,6 +5,7 @@ import { selfRegisterDrifter, submitDrifterRegistration } from "@/app/actions/dr
 import { DRIFTER_CONFIRMATION, drifterRules } from "@/lib/drifter-rules";
 import { drifterLink, drifterReference } from "@/lib/drifter";
 import { DRIFTER_ROLES, type DrifterRole } from "@/lib/supabase/types";
+import { rememberDrifterLink } from "@/components/DrifterLinkMemory";
 
 type Person = { name: string; role: DrifterRole };
 
@@ -62,7 +63,8 @@ export function DrifterRegistrationForm({
 }) {
   const signup = mode === "signup";
   const [token, setToken] = useState(initialToken);
-  const [who, setWho] = useState({ name: drifterName, team: teamName ?? "", car: carNo ?? "" });
+  const [who, setWho] = useState({ name: drifterName, team: teamName ?? "", car: carNo ?? "", email: "" });
+  const [emailedTo, setEmailedTo] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [people, setPeople] = useState<Person[]>(
     initialPeople.length > 0 ? initialPeople : [{ name: "", role: "Family" }],
@@ -105,11 +107,17 @@ export function DrifterRegistrationForm({
           name: who.name.trim(),
           team: who.team.trim() || undefined,
           car: who.car.trim() || undefined,
+          email: who.email.trim() || undefined,
           people: list,
           rulesAck: ack,
         });
         if (!r.ok) { setError(r.error); return; }
-        if (r.token) setToken(r.token);
+        if (r.token) {
+          setToken(r.token);
+          // this phone remembers it, so reopening the shared link finds the list again
+          rememberDrifterLink(r.token, who.name.trim());
+        }
+        setEmailedTo(r.emailed ? who.email.trim() : null);
       } else {
         const r = await submitDrifterRegistration({ token, people: list, rulesAck: ack });
         if (!r.ok) { setError(r.error); return; }
@@ -149,6 +157,9 @@ export function DrifterRegistrationForm({
             <div className="text-xs font-semibold text-cyan-200">Save your personal link</div>
             <p className="mt-1 text-xs text-zinc-400">
               Open it any time to change your list before event day. Keep it to yourself.
+              {emailedTo
+                ? <> We are also emailing it to <b className="text-zinc-200">{emailedTo}</b>; check Spam if it is not there in a few minutes.</>
+                : " This phone will remember it too."}
               <span className="block text-zinc-500">I-save ang link na ito para mabago ang listahan mo.</span>
             </p>
             <div className="mt-2 flex items-center gap-2">
@@ -218,6 +229,14 @@ export function DrifterRegistrationForm({
               <input id="self-car" className="input mt-1" inputMode="numeric" placeholder="e.g. 17"
                 value={who.car} onChange={(e) => setWho((w) => ({ ...w, car: e.target.value }))} />
             </div>
+          </div>
+          <div>
+            <label className="label" htmlFor="self-email">Email (recommended)</label>
+            <input id="self-email" type="email" className="input mt-1" autoComplete="email" placeholder="name@gmail.com"
+              value={who.email} onChange={(e) => { setWho((w) => ({ ...w, email: e.target.value })); setError(null); }} />
+            <p className="mt-1 text-xs text-zinc-500">
+              We send your personal link here, so you can get back to your list if you close this page.
+            </p>
           </div>
         </div>
       ) : (

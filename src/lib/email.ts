@@ -263,3 +263,31 @@ export async function sendConvertedEmail(
     attachments: [{ filename: `tickets-order-${b.order.order_no}.pdf`, content: Buffer.from(pdf) }],
   });
 }
+
+/**
+ * A drifter's personal pre-registration link, sent when they sign up through the
+ * shared link and again when they ask for it. Only ever goes to the address they
+ * gave, so knowing a drifter's name is not enough to open their list.
+ */
+export async function sendDrifterLinkEmail(
+  to: string,
+  opts: { drifterName: string; link: string; reference: string; eventName: string; resend?: boolean },
+) {
+  const html = `
+  <div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;color:#111">
+    <h2 style="margin-bottom:4px">${opts.eventName}</h2>
+    <p style="margin-top:0;color:#555">${opts.resend ? "Here is your drifter wristband link again." : "You are on the drifter wristband list."}</p>
+    <p>Hi ${opts.drifterName}, open this link any time before event day to see or change the list of people coming with you:</p>
+    <p><a href="${opts.link}" style="background:#111;color:#fff;padding:12px 18px;text-decoration:none;border-radius:6px;display:inline-block;font-weight:bold">Open my list</a></p>
+    <p style="font-size:13px;color:#555">Or copy it: <a href="${opts.link}">${opts.link}</a></p>
+    <p style="background:#f5f5f5;padding:10px;border-radius:6px">Reference at the registration desk: <b style="font-family:monospace;font-size:16px">${opts.reference}</b><br>
+    Bring your competitor pass. Your wristbands are handed over at the desk.</p>
+    <p style="color:#555;font-size:13px">Buksan ang link para makita o baguhin ang listahan ng mga kasama mo. Dalhin ang competitor pass sa registration desk.</p>
+    <p style="color:#777;font-size:12px">Keep this link to yourself. If you did not sign up, you can ignore this email.</p>
+  </div>`;
+  return send({
+    to,
+    subject: `${opts.resend ? "Your drifter link" : "You are on the drifter list"} - ${opts.eventName}`,
+    html,
+  });
+}

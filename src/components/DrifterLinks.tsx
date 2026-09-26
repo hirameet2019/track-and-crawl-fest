@@ -231,9 +231,12 @@ export function DrifterLinks({ entries, siteUrl, signupSlug }: { entries: Drifte
                       {e.self_registered && <span className="ml-2 rounded border border-amber-500/40 px-1 text-[10px] font-semibold uppercase text-amber-300" title="Signed up through the shared link">Self</span>}
                     </div>
                     <div className="text-xs text-zinc-500">{[e.team_name ?? "no team", e.car_no ? `Car #${e.car_no}` : null].filter(Boolean).join(" · ")}</div>
+                    {e.contact_email && <div className="text-xs text-zinc-500">{e.contact_email}</div>}
                   </td>
                   <td className="py-2">
-                    {e.handed_over_at ? (
+                    {!e.handed_over_at && e.bands_given > 0 ? (
+                      <span className="inline-block rounded-full border border-cyan-400/35 bg-cyan-400/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-cyan-300">{e.bands_given}/{e.band_count} collected</span>
+                    ) : e.handed_over_at ? (
                       <span className="inline-block rounded-full border border-emerald-500/35 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-300">Handed over</span>
                     ) : e.submitted_at ? (
                       <span className="inline-block rounded-full border border-cyan-400/35 bg-cyan-400/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-cyan-300">List in &middot; {e.band_count}</span>

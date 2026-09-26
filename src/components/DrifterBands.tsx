@@ -139,6 +139,8 @@ export function DrifterBands({
   // Payment for bands past the free allowance; cleared after every hand-out.
   const [payRef, setPayRef] = useState("");
   const [payReceived, setPayReceived] = useState(false);
+  // The manual form is the exception once lists are pre-registered, so it starts folded.
+  const [deskOpen, setDeskOpen] = useState(false);
   const [, start] = useTransition();
 
   const price = type.walkin_price_centavos ?? type.price_centavos;
@@ -294,10 +296,20 @@ export function DrifterBands({
 
       {/* hand bands to a drifter who did not pre-register */}
       <div ref={formRef} className="card space-y-4 p-4">
-        <div>
-          <h2 className="font-semibold">Hand out at the desk</h2>
-          <p className="text-xs text-zinc-500">For a drifter who did not send in a list, or who needs more bands on the day.</p>
-        </div>
+        <button
+          type="button"
+          className="flex w-full items-center justify-between gap-3 text-left"
+          onClick={() => setDeskOpen((v) => !v)}
+          aria-expanded={deskOpen}
+          aria-controls="desk-handout"
+        >
+          <span>
+            <span className="block font-semibold">Hand out at the desk</span>
+            <span className="block text-xs text-zinc-500">For a drifter who did not send in a list, or who needs more bands on the day.</span>
+          </span>
+          <span aria-hidden className={`shrink-0 text-zinc-400 transition-transform ${deskOpen ? "rotate-180" : ""}`}>&#9662;</span>
+        </button>
+        <div id="desk-handout" hidden={!deskOpen} className="space-y-4">
         <div className="space-y-3">
           <div>
             <label className="label" htmlFor="drifter-name">Drifter (competing driver)</label>
@@ -481,6 +493,7 @@ export function DrifterBands({
         </div>
 
         {error && <p className="rounded-lg border border-rose-500/40 bg-rose-500/10 p-3 text-sm text-rose-300">{error}</p>}
+        </div>
         {flash && !error && <p className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-2 text-xs text-emerald-300">Recorded: {flash}</p>}
       </div>
 
@@ -573,6 +586,7 @@ export function DrifterBands({
                               setRulesAck(false);
                               setPayReceived(false);
                               setPayRef("");
+                              setDeskOpen(true);
                               formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
                             }}
                             aria-label={`Add paid bands for ${d.drifter_name}`}

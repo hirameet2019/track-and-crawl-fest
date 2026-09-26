@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { EventBanner } from "@/components/EventHero";
 import { DrifterRegistrationForm } from "@/components/DrifterRegistrationForm";
+import { LostDrifterLink, RememberedDrifterLinks } from "@/components/DrifterLinkMemory";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getActiveEvent } from "@/lib/queries";
 import { php } from "@/lib/money";
@@ -41,9 +42,12 @@ export default async function DrifterSignupPage({ params }: { params: Promise<{ 
               The organizer may have replaced it with a new one. Ask them for the current drifter sign-up link.
             </p>
             <p className="mt-2 text-xs text-zinc-500">Sarado na ang link na ito. Humingi ng bago sa organizer.</p>
+            <RememberedDrifterLinks />
+            <LostDrifterLink />
           </div>
         ) : (
           <>
+            <RememberedDrifterLinks />
             <div className="mb-5">
               <h1 className="text-2xl font-bold">Drifter sign-up</h1>
               <p className="mt-1 text-sm text-zinc-400">
@@ -61,6 +65,7 @@ export default async function DrifterSignupPage({ params }: { params: Promise<{ 
               allowance={type.free_allowance}
               priceLabel={php(type.walkin_price_centavos ?? type.price_centavos)}
             />
+            <LostDrifterLink />
           </>
         )}
       </div>

@@ -353,8 +353,14 @@ export interface DrifterEntryRow {
   active: boolean;
   /** Signed up through the shared link, not added from an entry list: check the competitor pass. */
   self_registered: boolean;
-  people: { name: string; role: DrifterRole }[];
+  /** given_at is set on each person as the desk hands their band over. */
+  people: { name: string; role: DrifterRole; given_at?: string }[];
   band_count: number | null;
+  /** How many people on the list have collected so far; equals band_count when done. */
+  bands_given: number;
+  /** Given at self sign-up; the personal link is sent here, and resent on request. */
+  contact_email: string | null;
+  link_sent_at: string | null;
   rules_ack_at: string | null;
   submitted_at: string | null;
   handed_over_at: string | null;

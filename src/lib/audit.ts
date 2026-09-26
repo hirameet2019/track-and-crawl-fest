@@ -140,7 +140,8 @@ export function describe(action: string, data: Record<string, unknown> | null | 
       return d.action === "close" ? "Sign-up link closed" : d.action === "replace" ? "Sign-up link replaced; the old one stopped working" : "Sign-up link opened";
     case "drifter.handed_over": {
       const charge = Number(d.charge_centavos ?? 0);
-      return `${d.drifter ?? "?"}${d.team ? ` (${d.team})` : ""}: ${d.bands} band(s) handed over${charge ? ` - ${peso(charge)} received ${String(d.method ?? "cash").toUpperCase()}${d.payment_ref ? ` ref ${d.payment_ref}` : ""}` : " - all free"}`;
+      const progress = d.collected !== undefined && d.of !== undefined ? ` (${d.collected} of ${d.of} collected)` : "";
+      return `${d.drifter ?? "?"}${d.team ? ` (${d.team})` : ""}: ${d.bands} band(s) handed over${progress}${charge ? ` - ${peso(charge)} received ${String(d.method ?? "cash").toUpperCase()}${d.payment_ref ? ` ref ${d.payment_ref}` : ""}` : " - free"}`;
     }
     case "ticket_type.free_allowance":
       return `${d.free_allowance} free band(s) per drifter`;
