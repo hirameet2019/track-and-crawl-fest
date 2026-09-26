@@ -359,5 +359,9 @@ export interface DrifterEntryRow {
   submitted_at: string | null;
   handed_over_at: string | null;
   handed_over_by: string | null;
+  /** Collected at hand-over for bands past the free allowance; 0 when all were free. */
+  paid_centavos: number;
+  payment_method: PaymentMethod | null;
+  payment_ref: string | null;
   created_at: string;
 }

@@ -38,6 +38,10 @@ export async function recordDrifterBands(input: {
   delta: number;
   method: PaymentMethod;
   rulesAck: boolean;
+  /** Staff confirm the money for bands past the free allowance was received. */
+  paymentConfirmed?: boolean;
+  /** Required by SQL for a GoTyme, GCash or Maya payment. */
+  paymentRef?: string;
 }): Promise<ActionResult & { result?: DrifterResult }> {
   try {
     const { userId } = await assertStaff("staff");
@@ -59,6 +63,8 @@ export async function recordDrifterBands(input: {
       p_method: method,
       p_rules_ack: rulesAck,
       p_team: team || null,
+      p_payment_confirmed: input.paymentConfirmed === true,
+      p_payment_ref: z.string().trim().max(60).optional().parse(input.paymentRef) || null,
     });
     if (error) return { ok: false, error: error.message };
     revalidatePath("/admin");

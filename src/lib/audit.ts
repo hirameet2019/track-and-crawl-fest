@@ -124,7 +124,7 @@ export function describe(action: string, data: Record<string, unknown> | null | 
       return [
         `${d.drifter ?? "?"}${d.team ? ` (${d.team})` : ""}: ${qty > 0 ? "+" : ""}${qty} band(s)`,
         Number(d.free ?? 0) ? `${d.free} free` : "",
-        paid ? `${paid} paid at ${peso(d.unit_price_centavos)} (${String(d.method ?? "cash").toUpperCase()})` : "",
+        paid ? `${paid} paid at ${peso(d.unit_price_centavos)} (${String(d.method ?? "cash").toUpperCase()}${d.payment_ref ? ` ref ${d.payment_ref}` : ""}${d.payment_confirmed ? ", payment confirmed" : ""})` : "",
         qty > 0 ? (d.rules_ack ? "rules confirmed" : "RULES NOT CONFIRMED") : "",
       ].filter(Boolean).join(" · ");
     }
@@ -140,7 +140,7 @@ export function describe(action: string, data: Record<string, unknown> | null | 
       return d.action === "close" ? "Sign-up link closed" : d.action === "replace" ? "Sign-up link replaced; the old one stopped working" : "Sign-up link opened";
     case "drifter.handed_over": {
       const charge = Number(d.charge_centavos ?? 0);
-      return `${d.drifter ?? "?"}${d.team ? ` (${d.team})` : ""}: ${d.bands} band(s) handed over${charge ? ` - collected ${peso(charge)}` : " - all free"}`;
+      return `${d.drifter ?? "?"}${d.team ? ` (${d.team})` : ""}: ${d.bands} band(s) handed over${charge ? ` - ${peso(charge)} received ${String(d.method ?? "cash").toUpperCase()}${d.payment_ref ? ` ref ${d.payment_ref}` : ""}` : " - all free"}`;
     }
     case "ticket_type.free_allowance":
       return `${d.free_allowance} free band(s) per drifter`;

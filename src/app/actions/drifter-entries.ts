@@ -119,13 +119,21 @@ export async function removeDrifterEntry(entryId: string): Promise<ActionResult>
 export async function handOverDrifterEntry(
   entryId: string,
   method: PaymentMethod,
+  payment: { confirmed: boolean; ref?: string } = { confirmed: false },
 ): Promise<ActionResult & { chargeCentavos?: number; bands?: number }> {
   try {
     const { userId } = await assertStaff("staff");
     const id = z.string().uuid().parse(entryId);
     const m = z.enum(["cash", "gotyme", "gcash", "maya"]).parse(method);
     const admin = createAdminClient();
-    const { data, error } = await admin.rpc("hand_over_drifter_entry", { p_entry_id: id, p_actor: userId, p_method: m });
+    const ref = z.string().trim().max(60).optional().parse(payment.ref);
+    const { data, error } = await admin.rpc("hand_over_drifter_entry", {
+      p_entry_id: id,
+      p_actor: userId,
+      p_method: m,
+      p_payment_confirmed: payment.confirmed === true,
+      p_payment_ref: ref || null,
+    });
     if (error) return { ok: false, error: error.message };
     const r = data as { total: number; charge_centavos: number } | null;
     revalidatePath("/admin");

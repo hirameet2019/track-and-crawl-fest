@@ -24,7 +24,8 @@ function download(body: string, name: string) {
 }
 
 type TallyRow = {
-  created_at: string; qty: number; free_qty: number; drifter_name: string | null; team_name: string | null; rules_ack: boolean; unit_price_centavos: number; payment_method: string;
+  created_at: string; qty: number; free_qty: number; drifter_name: string | null; team_name: string | null; rules_ack: boolean;
+  payment_ref: string | null; payment_confirmed: boolean; unit_price_centavos: number; payment_method: string;
   ticket_type: { code: string; name: string; band_color: string | null; drifter_family: boolean } | null;
   staff: { full_name: string } | null;
 };
@@ -33,7 +34,7 @@ async function tallyRows(): Promise<TallyRow[]> {
   const admin = createAdminClient();
   const { data } = await admin
     .from("walkin_sales")
-    .select("created_at, qty, free_qty, drifter_name, team_name, rules_ack, unit_price_centavos, payment_method, ticket_type:ticket_types(code, name, band_color, drifter_family), staff:staff(full_name)")
+    .select("created_at, qty, free_qty, drifter_name, team_name, rules_ack, payment_ref, payment_confirmed, unit_price_centavos, payment_method, ticket_type:ticket_types(code, name, band_color, drifter_family), staff:staff(full_name)")
     .order("created_at")
     .limit(50000);
   return (data ?? []) as unknown as TallyRow[];
@@ -79,10 +80,11 @@ async function driftersCsv() {
       .sort((a, b) => a.name.localeCompare(b.name))
       .map((d) => [d.name, d.team, d.bands, d.free, d.bands - d.free, (d.amount / 100).toFixed(2)]),
     [],
-    ["time_manila", "drifter", "team", "qty", "free_qty", "charged_qty", "unit_price_php", "amount_php", "payment_method", "rules_confirmed", "staff"],
+    ["time_manila", "drifter", "team", "qty", "free_qty", "charged_qty", "unit_price_php", "amount_php", "payment_method", "payment_ref", "payment_confirmed", "rules_confirmed", "staff"],
     ...rows.map((r) => [
       manilaTime(r.created_at), r.drifter_name, r.team_name, r.qty, r.free_qty, r.qty - r.free_qty,
       (r.unit_price_centavos / 100).toFixed(2), (tallyAmount(r) / 100).toFixed(2), r.payment_method,
+      r.payment_ref ?? "", r.qty - r.free_qty > 0 ? (r.payment_confirmed ? "yes" : "no") : "",
       r.qty > 0 ? (r.rules_ack ? "yes" : "no") : "", r.staff?.full_name,
     ]),
     [],
@@ -122,21 +124,23 @@ async function drifterLinksCsv() {
   const admin = createAdminClient();
   const { data } = await admin
     .from("drifter_entries")
-    .select("drifter_name, team_name, car_no, token, self_registered, band_count, submitted_at, rules_ack_at, handed_over_at, people")
+    .select("drifter_name, team_name, car_no, token, self_registered, band_count, submitted_at, rules_ack_at, handed_over_at, paid_centavos, payment_method, payment_ref, people")
     .eq("active", true)
     .order("drifter_name");
   type Row = {
     drifter_name: string; team_name: string | null; car_no: string | null; token: string; self_registered: boolean; band_count: number | null;
     submitted_at: string | null; rules_ack_at: string | null; handed_over_at: string | null; people: { name: string; role: string }[];
+    paid_centavos: number; payment_method: string | null; payment_ref: string | null;
   };
   const rows = (data ?? []) as Row[];
   return csv([
-    ["drifter", "team", "car_no", "added_by", "link", "reference", "status", "bands", "rules_confirmed_manila", "handed_over_manila", "people"],
+    ["drifter", "team", "car_no", "added_by", "link", "reference", "status", "bands", "rules_confirmed_manila", "handed_over_manila", "paid_php", "payment_method", "payment_ref", "people"],
     ...rows.map((r) => [
       r.drifter_name, r.team_name, r.car_no, r.self_registered ? "self sign-up" : "organizer",
       drifterLink(SITE_URL, r.token), drifterReference(r.token),
       r.handed_over_at ? "handed over" : r.submitted_at ? "list sent" : "waiting",
       r.band_count ?? "", r.rules_ack_at ? manilaTime(r.rules_ack_at) : "", r.handed_over_at ? manilaTime(r.handed_over_at) : "",
+      (Number(r.paid_centavos ?? 0) / 100).toFixed(2), r.payment_method ?? "", r.payment_ref ?? "",
       (r.people ?? []).map((p) => `${p.name} (${p.role})`).join("; "),
     ]),
   ]);

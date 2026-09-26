@@ -64,6 +64,16 @@ export default async function DrifterLinkPage({ params }: { params: Promise<{ to
           {entry.band_count} wristband{entry.band_count === 1 ? "" : "s"} for {entry.drifter_name} were handed over at the registration desk on{" "}
           {new Date(entry.handed_over_at).toLocaleString("en-PH", { timeZone: "Asia/Manila", dateStyle: "medium", timeStyle: "short" })}.
         </p>
+        {entry.paid_centavos > 0 && (
+          <div className="mx-auto mt-4 max-w-xs rounded-xl border border-emerald-400/30 bg-emerald-400/5 p-3 text-sm">
+            <div className="font-semibold text-emerald-200">Payment received: {php(entry.paid_centavos)}</div>
+            <div className="mt-0.5 text-xs text-zinc-400">
+              For the bands past the free {type.free_allowance}
+              {entry.payment_method ? ` · ${entry.payment_method === "cash" ? "cash" : entry.payment_method.toUpperCase()}` : ""}
+              {entry.payment_ref ? ` · ref ${entry.payment_ref}` : ""}
+            </div>
+          </div>
+        )}
         <p className="mt-3 font-mono text-sm text-zinc-500">{drifterReference(entry.token)}</p>
         <p className="mt-3 text-xs text-zinc-500">Need more bands? Ask at the registration desk.</p>
       </div>,

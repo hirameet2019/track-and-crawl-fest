@@ -39,7 +39,19 @@ export function DrifterQueue({
   const [confirming, setConfirming] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  // Payment for bands past the free allowance, confirmed per hand-over.
+  const [payRef, setPayRef] = useState("");
+  const [received, setReceived] = useState(false);
   const [pending, start] = useTransition();
+
+  const beginConfirm = (id: string | null) => {
+    setConfirming(id);
+    setMethod("cash");
+    setPayRef("");
+    setReceived(false);
+    setMsg(null);
+  };
+  const methodLabel = METHODS.find((m) => m.key === method)?.label ?? method;
 
   const waiting = entries.filter((e) => e.active && e.submitted_at && !e.handed_over_at);
   const q = query.trim().toLowerCase();
@@ -56,19 +68,18 @@ export function DrifterQueue({
     const free = Math.max(0, Math.min(n, allowance - before));
     return { n, free, paid: n - free };
   };
-  const anyPaid = waiting.some((e) => split(e).paid > 0);
   const bandsWaiting = waiting.reduce((s, e) => s + (e.band_count ?? 0), 0);
 
   function handOver(e: DrifterEntryRow) {
     setMsg(null);
     start(async () => {
-      const r = await handOverDrifterEntry(e.id, method);
-      setConfirming(null);
+      const r = await handOverDrifterEntry(e.id, method, { confirmed: received, ref: payRef });
+      if (r.ok) beginConfirm(null);
       if (!r.ok) { setMsg({ ok: false, text: r.error }); return; }
       const charge = r.chargeCentavos ?? 0;
       setMsg({
         ok: true,
-        text: `Handed over ${e.band_count} band${e.band_count === 1 ? "" : "s"} to ${e.drifter_name}${charge > 0 ? ` · collect ${php(charge)} ${method.toUpperCase()}` : " · all free"}`,
+        text: `Handed over ${e.band_count} band${e.band_count === 1 ? "" : "s"} to ${e.drifter_name}${charge > 0 ? ` · ${php(charge)} received ${method === "cash" ? "in cash" : `via ${methodLabel}${payRef.trim() ? ` (ref ${payRef.trim()})` : ""}`}` : " · all free"}`,
       });
       router.refresh();
     });
@@ -106,24 +117,6 @@ export function DrifterQueue({
         />
       </div>
 
-      {anyPaid && (
-        <div className="mt-3 flex flex-wrap items-center gap-3">
-          <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Extra bands paid by</span>
-          <div className="inline-flex rounded-lg border border-white/15 bg-black/30 p-0.5">
-            {METHODS.map((m) => (
-              <button
-                key={m.key}
-                type="button"
-                onClick={() => setMethod(m.key)}
-                className={`rounded-md px-3 py-1.5 text-sm font-semibold transition ${method === m.key ? "bg-gradient-to-r from-cyan-300 to-green-300 text-zinc-950" : "text-zinc-300 hover:bg-white/10"}`}
-              >
-                {m.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
       {msg && <p className={`mt-3 rounded-lg border p-2 text-xs ${msg.ok ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300" : "border-rose-500/40 bg-rose-500/10 text-rose-300"}`}>{msg.text}</p>}
 
       <ul className="mt-3 divide-y divide-white/10">
@@ -159,20 +152,85 @@ export function DrifterQueue({
                     {isOpen ? "Hide names" : "Names"}
                   </button>
                   {confirming === e.id ? (
-                    <>
-                      {e.self_registered && <span className="text-xs text-amber-200">Seen the pass?</span>}
-                      <button type="button" className="btn-primary px-3 py-1.5 text-sm" disabled={pending} onClick={() => handOver(e)}>
-                        {pending ? "…" : `Yes, ${s.n} band${s.n === 1 ? "" : "s"}${s.paid > 0 ? ` + ${php(s.paid * priceCentavos)}` : ""}`}
-                      </button>
-                      <button type="button" className="btn-secondary px-3 py-1.5 text-sm" disabled={pending} onClick={() => setConfirming(null)}>Cancel</button>
-                    </>
+                    s.paid > 0 ? (
+                      <button type="button" className="btn-secondary px-3 py-1.5 text-sm" disabled={pending} onClick={() => beginConfirm(null)}>Cancel</button>
+                    ) : (
+                      <>
+                        {e.self_registered && <span className="text-xs text-amber-200">Seen the pass?</span>}
+                        <button type="button" className="btn-primary px-3 py-1.5 text-sm" disabled={pending} onClick={() => handOver(e)}>
+                          {pending ? "…" : `Yes, ${s.n} band${s.n === 1 ? "" : "s"}`}
+                        </button>
+                        <button type="button" className="btn-secondary px-3 py-1.5 text-sm" disabled={pending} onClick={() => beginConfirm(null)}>Cancel</button>
+                      </>
+                    )
                   ) : (
-                    <button type="button" className="btn-primary px-3 py-1.5 text-sm" disabled={pending} onClick={() => { setConfirming(e.id); setMsg(null); }}>
+                    <button type="button" className="btn-primary px-3 py-1.5 text-sm" disabled={pending} onClick={() => beginConfirm(e.id)}>
                       Hand over
                     </button>
                   )}
                 </div>
               </div>
+              {/* Bands past the free allowance: nothing leaves the desk until the money is confirmed. */}
+              {confirming === e.id && s.paid > 0 && (
+                <div className="mt-3 space-y-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3">
+                  <div>
+                    <div className="text-sm font-semibold text-amber-100">
+                      Collect {php(s.paid * priceCentavos)} for {s.paid} extra band{s.paid === 1 ? "" : "s"}
+                    </div>
+                    <div className="text-xs text-amber-200/80">
+                      {s.free} of the {s.n} are free.{e.self_registered ? " Check the competitor pass first." : ""}
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Paid by</span>
+                    <div className="inline-flex rounded-lg border border-white/15 bg-black/30 p-0.5">
+                      {METHODS.map((m) => (
+                        <button
+                          key={m.key}
+                          type="button"
+                          onClick={() => { setMethod(m.key); setReceived(false); }}
+                          className={`rounded-md px-3 py-1 text-sm font-semibold transition ${method === m.key ? "bg-gradient-to-r from-cyan-300 to-green-300 text-zinc-950" : "text-zinc-300 hover:bg-white/10"}`}
+                        >
+                          {m.label}
+                        </button>
+                      ))}
+                    </div>
+                    {method !== "cash" && (
+                      <input
+                        id={`pay-ref-${e.id}`}
+                        className="input w-full sm:w-56"
+                        placeholder={`${methodLabel} reference number`}
+                        value={payRef}
+                        onChange={(ev) => setPayRef(ev.target.value)}
+                        aria-label={`${methodLabel} reference number`}
+                      />
+                    )}
+                  </div>
+                  <label className="flex cursor-pointer items-start gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      className="mt-0.5 h-4 w-4 shrink-0 accent-emerald-400"
+                      checked={received}
+                      onChange={(ev) => setReceived(ev.target.checked)}
+                    />
+                    <span className="text-amber-50">
+                      I received {php(s.paid * priceCentavos)} {method === "cash" ? "in cash" : `via ${methodLabel}`}
+                      {method !== "cash" && " and checked it in the account"}.
+                    </span>
+                  </label>
+                  <button
+                    type="button"
+                    className="btn-primary px-4 py-2 text-sm"
+                    disabled={pending || !received || (method !== "cash" && payRef.trim().length < 4)}
+                    onClick={() => handOver(e)}
+                  >
+                    {pending ? "…" : `Hand over ${s.n} band${s.n === 1 ? "" : "s"}`}
+                  </button>
+                  {method !== "cash" && payRef.trim().length < 4 && (
+                    <p className="text-xs text-zinc-400">Enter the reference number from the {methodLabel} transfer.</p>
+                  )}
+                </div>
+              )}
               {isOpen && (
                 <ol className="mt-2 grid gap-x-6 gap-y-1 rounded-lg border border-white/10 bg-black/20 p-3 text-sm sm:grid-cols-2">
                   {e.people.map((p, i) => (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { recordDrifterBands, setDrifterAllowance } from "@/app/actions/drifters";
@@ -17,6 +17,8 @@ export interface DrifterEntry {
   created_at: string;
   drifter_name: string;
   team_name: string | null;
+  payment_ref: string | null;
+  payment_confirmed: boolean;
   qty: number;
   free_qty: number;
   unit_price_centavos: number;
@@ -134,6 +136,9 @@ export function DrifterBands({
   // Cleared after every hand-out and whenever the name changes, so the drifter in
   // front of the staff member is the one who agreed - not the previous team.
   const [rulesAck, setRulesAck] = useState(false);
+  // Payment for bands past the free allowance; cleared after every hand-out.
+  const [payRef, setPayRef] = useState("");
+  const [payReceived, setPayReceived] = useState(false);
   const [, start] = useTransition();
 
   const price = type.walkin_price_centavos ?? type.price_centavos;
@@ -176,6 +181,11 @@ export function DrifterBands({
     const free = Math.min(n, freeLeft);
     return { free, paid: n - free, charge: (n - free) * price };
   }
+  const methodLabel = METHODS.find((m) => m.key === method)?.label ?? method;
+  /** Payment is confirmed well enough to hand over charged bands. */
+  const paymentOk = payReceived && (method === "cash" || payRef.trim().length >= 4);
+  const payBlock = preview(6).paid > 0;
+  const formRef = useRef<HTMLDivElement>(null);
 
   function tap(delta: number) {
     const trimmed = name.trim();
@@ -183,15 +193,20 @@ export function DrifterBands({
     setError(null);
     setBusy(true);
     start(async () => {
-      const r = await recordDrifterBands({ ticketTypeId: type.id, drifterName: trimmed, team, delta, method, rulesAck });
+      const r = await recordDrifterBands({
+        ticketTypeId: type.id, drifterName: trimmed, team, delta, method, rulesAck,
+        paymentConfirmed: payReceived, paymentRef: payRef,
+      });
       if (!r.ok) setError(r.error);
       else if (r.result) {
         setRulesAck(false);
         setTeam("");
+        setPayRef("");
+        setPayReceived(false);
         const { drifter_name, total, free, paid, charge_centavos } = r.result;
         setFlash(
           delta > 0
-            ? `${drifter_name}: +${delta} band${delta === 1 ? "" : "s"} (${free} free${paid > 0 ? `, ${paid} paid ${php(charge_centavos)} ${method.toUpperCase()}` : ""}) · ${total} total`
+            ? `${drifter_name}: +${delta} band${delta === 1 ? "" : "s"} (${free} free${paid > 0 ? `, ${paid} paid · ${php(charge_centavos)} received ${method === "cash" ? "in cash" : `via ${methodLabel}${payRef.trim() ? ` ref ${payRef.trim()}` : ""}`}` : ""}) · ${total} total`
             : `${drifter_name}: ${delta} band${delta === -1 ? "" : "s"} returned · ${total} total`
         );
         setName("");
@@ -278,7 +293,7 @@ export function DrifterBands({
       />
 
       {/* hand bands to a drifter who did not pre-register */}
-      <div className="card space-y-4 p-4">
+      <div ref={formRef} className="card space-y-4 p-4">
         <div>
           <h2 className="font-semibold">Hand out at the desk</h2>
           <p className="text-xs text-zinc-500">For a drifter who did not send in a list, or who needs more bands on the day.</p>
@@ -357,6 +372,37 @@ export function DrifterBands({
           <span className="text-xs text-zinc-500">Ignored while the bands are still free.</span>
         </div>
 
+        {payBlock && (
+          <div className="space-y-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3">
+            <div className="text-xs font-semibold uppercase tracking-wide text-amber-200">Payment for bands past the free {allowance}</div>
+            {method !== "cash" && (
+              <input
+                id="drifter-pay-ref"
+                className="input sm:w-72"
+                placeholder={`${methodLabel} reference number`}
+                value={payRef}
+                onChange={(e) => { setPayRef(e.target.value); setError(null); }}
+                aria-label={`${methodLabel} reference number`}
+              />
+            )}
+            <label className="flex cursor-pointer items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="mt-0.5 h-4 w-4 shrink-0 accent-emerald-400"
+                checked={payReceived}
+                onChange={(e) => { setPayReceived(e.target.checked); setError(null); }}
+              />
+              <span className="text-amber-50">
+                I received the payment for the extra bands {method === "cash" ? "in cash" : `via ${methodLabel} and checked it in the account`}.
+              </span>
+            </label>
+            <p className="text-xs text-zinc-400">
+              The amount is on each button below. Paid bands cannot be handed over until this is ticked
+              {method !== "cash" ? " and the reference number is in" : ""}.
+            </p>
+          </div>
+        )}
+
         {/* Read to the drifter before anything is handed over. Three languages, each
             on its own line behind a fixed-width tag, so a staff member can find the
             one they need without reading the other two. */}
@@ -409,9 +455,9 @@ export function DrifterBands({
               <button
                 key={n}
                 type="button"
-                title={!rulesAck ? "Tick the confirmation above first" : undefined}
+                title={!rulesAck ? "Tick the confirmation above first" : p.paid > 0 && !paymentOk ? "Confirm the payment for the extra bands first" : undefined}
                 className="btn-primary h-16 min-w-28 flex-1 px-4"
-                disabled={busy || !rulesAck || !name.trim() || left < n || (p.paid > 0 && price <= 0)}
+                disabled={busy || !rulesAck || !name.trim() || left < n || (p.paid > 0 && (price <= 0 || !paymentOk))}
                 onClick={() => tap(n)}
                 aria-label={`Hand over ${n} band${n === 1 ? "" : "s"}${p.paid > 0 ? `, ${php(p.charge)} to pay` : ", free"}`}
               >
@@ -515,7 +561,27 @@ export function DrifterBands({
                     <td className="py-1 text-right">
                       <span className="inline-flex gap-1">
                         <button type="button" className="btn-secondary px-2 py-1 text-sm font-black" disabled={busy || d.bands <= 0} onClick={() => tapFor(d, -1)} aria-label={`Take back one band from ${d.drifter_name}`}>&minus;</button>
-                        <button type="button" className="btn-secondary px-2 py-1 text-sm font-black" disabled={busy || !rulesAck || left <= 0 || (d.bands >= allowance && price <= 0)} title={!rulesAck ? "Tick the confirmation above first" : undefined} onClick={() => tapFor(d, 1)} aria-label={`Add one band for ${d.drifter_name}`}>+</button>
+                        {d.bands >= allowance ? (
+                          <button
+                            type="button"
+                            className="btn-secondary px-2 py-1 text-xs font-semibold"
+                            disabled={busy || left <= 0}
+                            title="Past the free bands: fill in the form to take the payment"
+                            onClick={() => {
+                              setName(d.drifter_name);
+                              setTeam(d.team_name ?? "");
+                              setRulesAck(false);
+                              setPayReceived(false);
+                              setPayRef("");
+                              formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+                            }}
+                            aria-label={`Add paid bands for ${d.drifter_name}`}
+                          >
+                            + paid
+                          </button>
+                        ) : (
+                          <button type="button" className="btn-secondary px-2 py-1 text-sm font-black" disabled={busy || !rulesAck || left <= 0} title={!rulesAck ? "Tick the confirmation above first" : undefined} onClick={() => tapFor(d, 1)} aria-label={`Add one free band for ${d.drifter_name}`}>+</button>
+                        )}
                       </span>
                     </td>
                   </tr>
@@ -543,7 +609,14 @@ export function DrifterBands({
                         <div>{e.drifter_name}</div>
                         {e.team_name && <div className="text-xs text-zinc-500">{e.team_name}</div>}
                       </td>
-                      <td className="text-right text-xs text-zinc-500">{paid === 0 ? "free" : `${paid} paid`}</td>
+                      <td className="text-right text-xs text-zinc-500">
+                        {paid === 0 ? "free" : paid < 0 ? `${paid} paid` : (
+                          <>
+                            <span className={e.payment_confirmed ? "text-emerald-300" : "text-amber-300"}>{paid} paid{e.payment_confirmed ? " \u2713" : ""}</span>
+                            <span className="block uppercase">{e.payment_method}{e.payment_ref ? ` ${e.payment_ref}` : ""}</span>
+                          </>
+                        )}
+                      </td>
                       <td className="text-right tabular-nums">{php(paid * e.unit_price_centavos)}</td>
                       <td className="text-right text-xs text-zinc-500">{e.staff ?? ""}</td>
                     </tr>
