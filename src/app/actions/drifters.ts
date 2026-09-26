@@ -24,16 +24,18 @@ export interface DrifterResult {
 }
 
 /**
- * Hand family wristbands to a competing drifter (or -N to take them back).
+ * Hand wristbands to a competing drifter's team (or -N to take them back).
  * The first `free_allowance` bands per drifter are free; the rest are charged at
  * the label's gate price. Splitting is done in SQL so two staff tapping at once
- * cannot both claim the same free band.
+ * cannot both claim the same free band, and so is the rules confirmation: SQL
+ * refuses a hand-out without it, whatever the form does.
  */
 export async function recordDrifterBands(input: {
   ticketTypeId: string;
   drifterName: string;
   delta: number;
   method: PaymentMethod;
+  rulesAck: boolean;
 }): Promise<ActionResult & { result?: DrifterResult }> {
   try {
     const { userId } = await assertStaff("staff");
@@ -42,6 +44,8 @@ export async function recordDrifterBands(input: {
     const delta = z.number().int().min(-20).max(20).parse(input.delta);
     if (delta === 0) return { ok: false, error: "Nothing to record" };
     const method = methodSchema.parse(input.method);
+    const rulesAck = z.boolean().parse(input.rulesAck);
+    if (delta > 0 && !rulesAck) return { ok: false, error: "Tick the confirmation first: the drifter must understand the wristband rules." };
 
     const admin = createAdminClient();
     const { data, error } = await admin.rpc("record_drifter_bands", {
@@ -50,6 +54,7 @@ export async function recordDrifterBands(input: {
       p_qty: delta,
       p_actor: userId,
       p_method: method,
+      p_rules_ack: rulesAck,
     });
     if (error) return { ok: false, error: error.message };
     revalidatePath("/admin");

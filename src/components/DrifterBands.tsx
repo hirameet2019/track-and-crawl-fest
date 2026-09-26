@@ -95,9 +95,10 @@ function InlineNumber({
 }
 
 /**
- * Drifter family wristbands: a tally kept per competing driver, separate from the
- * public gate tally. The first few bands per drifter are free and the rest are
- * charged, so every hand-out is booked against a name rather than a bare count.
+ * Drifter wristbands: a tally kept per competing driver, separate from the public
+ * gate tally. The first few bands per drifter are free and the rest are charged,
+ * so every hand-out is booked against a name rather than a bare count, and none
+ * leaves the desk until the drifter has confirmed the rules.
  */
 export function DrifterBands({
   type,
@@ -120,6 +121,9 @@ export function DrifterBands({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
+  // Cleared after every hand-out and whenever the name changes, so the drifter in
+  // front of the staff member is the one who agreed - not the previous team.
+  const [rulesAck, setRulesAck] = useState(false);
   const [, start] = useTransition();
 
   const price = type.walkin_price_centavos ?? type.price_centavos;
@@ -165,9 +169,10 @@ export function DrifterBands({
     setError(null);
     setBusy(true);
     start(async () => {
-      const r = await recordDrifterBands({ ticketTypeId: type.id, drifterName: trimmed, delta, method });
+      const r = await recordDrifterBands({ ticketTypeId: type.id, drifterName: trimmed, delta, method, rulesAck });
       if (!r.ok) setError(r.error);
       else if (r.result) {
+        setRulesAck(false);
         const { drifter_name, total, free, paid, charge_centavos } = r.result;
         setFlash(
           delta > 0
@@ -185,7 +190,8 @@ export function DrifterBands({
     setError(null);
     setBusy(true);
     start(async () => {
-      const r = await recordDrifterBands({ ticketTypeId: type.id, drifterName: drifter.drifter_name, delta, method });
+      // The row buttons only take bands back or top up a team that already confirmed.
+      const r = await recordDrifterBands({ ticketTypeId: type.id, drifterName: drifter.drifter_name, delta, method, rulesAck: delta > 0 });
       if (!r.ok) setError(r.error);
       else if (r.result) setFlash(`${r.result.drifter_name}: ${delta > 0 ? "+" : ""}${delta} · ${r.result.total} total${r.result.paid > 0 ? ` · charge ${php(r.result.charge_centavos)}` : ""}`);
       setBusy(false);
@@ -260,7 +266,7 @@ export function DrifterBands({
             placeholder="e.g. Juan Dela Cruz"
             autoComplete="off"
             value={name}
-            onChange={(e) => { setName(e.target.value); setError(null); }}
+            onChange={(e) => { setName(e.target.value); setError(null); setRulesAck(false); }}
             aria-describedby="drifter-hint"
           />
           <datalist id="drifter-names">
@@ -269,7 +275,7 @@ export function DrifterBands({
           <p id="drifter-hint" className="mt-1 text-xs text-zinc-500">
             {match
               ? <>{match.drifter_name} already has <b>{already}</b> band{already === 1 ? "" : "s"} &middot; {freeLeft > 0 ? <>{freeLeft} free left</> : <span className="text-amber-300">free allowance used up, next bands cost {php(price)} each</span>}</>
-              : <>Type the family under the drifter&apos;s name. The first {allowance} bands are free; extra bands are {php(price)} each.</>}
+              : <>Everyone with the team is booked under the drifter&apos;s name. The first {allowance} bands are free; extra bands are {php(price)} each.</>}
           </p>
         </div>
 
@@ -290,15 +296,50 @@ export function DrifterBands({
           <span className="text-xs text-zinc-500">Ignored while the bands are still free.</span>
         </div>
 
+        {/* Read to the drifter before anything is handed over. English and Chinese
+            because part of the grid is Chinese-speaking. */}
+        <div className="rounded-lg border border-white/15 bg-black/30 p-3">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-300">Wristband rules &middot; 手环规则</h3>
+          <dl className="mt-2 space-y-2 text-sm">
+            <div>
+              <dt className="text-zinc-300">Everyone inside the drifter area must wear a wristband at all times. Anyone without one will be asked to leave.</dt>
+              <dd className="text-zinc-400">进入漂移区域的所有人员必须全程佩戴手环。未佩戴手环者将被请离现场。</dd>
+            </div>
+            <div>
+              <dt className="text-zinc-300">
+                Red wristbands are for the drifter and the people with them: family, friends, pit crew, spotter, manager and other team staff.
+                {allowance} are free per drifter; any beyond that cost {php(price)} each.
+              </dt>
+              <dd className="text-zinc-400">
+                红色手环仅限车手及其随行人员：家人、朋友、维修人员、观察员、领队及其他团队工作人员。每位车手可免费领取 {allowance} 条，超出部分每条 {php(price)}。
+              </dd>
+            </div>
+          </dl>
+          <label className={`mt-3 flex cursor-pointer items-start gap-2 rounded-md border p-2 text-sm transition ${rulesAck ? "border-emerald-500/40 bg-emerald-500/10" : "border-amber-500/40 bg-amber-500/10"}`}>
+            <input
+              type="checkbox"
+              className="mt-0.5 h-4 w-4 shrink-0 accent-emerald-400"
+              checked={rulesAck}
+              onChange={(e) => { setRulesAck(e.target.checked); setError(null); }}
+            />
+            <span className={rulesAck ? "text-emerald-200" : "text-amber-200"}>
+              I hereby confirm that I have read and understood the rules above, and I accept responsibility for every person wearing
+              these wristbands. <span className="text-zinc-400">本人确认已阅读并理解以上规则，并对佩戴这些手环的所有人员负责。</span>
+            </span>
+          </label>
+          {!rulesAck && <p className="mt-1 text-xs text-zinc-500">The drifter confirms this in front of you. Nothing can be handed over until it is ticked.</p>}
+        </div>
+
         <div className="flex flex-wrap items-stretch gap-2">
-          {[1, 2, 4].map((n) => {
+          {[1, 2, 6].map((n) => {
             const p = preview(n);
             return (
               <button
                 key={n}
                 type="button"
+                title={!rulesAck ? "Tick the confirmation above first" : undefined}
                 className="btn-primary h-16 min-w-28 flex-1 px-4"
-                disabled={busy || !name.trim() || left < n || (p.paid > 0 && price <= 0)}
+                disabled={busy || !rulesAck || !name.trim() || left < n || (p.paid > 0 && price <= 0)}
                 onClick={() => tap(n)}
                 aria-label={`Hand over ${n} band${n === 1 ? "" : "s"}${p.paid > 0 ? `, ${php(p.charge)} to pay` : ", free"}`}
               >
@@ -399,7 +440,7 @@ export function DrifterBands({
                     <td className="py-1 text-right">
                       <span className="inline-flex gap-1">
                         <button type="button" className="btn-secondary px-2 py-1 text-sm font-black" disabled={busy || d.bands <= 0} onClick={() => tapFor(d, -1)} aria-label={`Take back one band from ${d.drifter_name}`}>&minus;</button>
-                        <button type="button" className="btn-secondary px-2 py-1 text-sm font-black" disabled={busy || left <= 0 || (d.bands >= allowance && price <= 0)} onClick={() => tapFor(d, 1)} aria-label={`Add one band for ${d.drifter_name}`}>+</button>
+                        <button type="button" className="btn-secondary px-2 py-1 text-sm font-black" disabled={busy || !rulesAck || left <= 0 || (d.bands >= allowance && price <= 0)} title={!rulesAck ? "Tick the confirmation above first" : undefined} onClick={() => tapFor(d, 1)} aria-label={`Add one band for ${d.drifter_name}`}>+</button>
                       </span>
                     </td>
                   </tr>

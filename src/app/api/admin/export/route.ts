@@ -22,7 +22,7 @@ function download(body: string, name: string) {
 }
 
 type TallyRow = {
-  created_at: string; qty: number; free_qty: number; drifter_name: string | null; unit_price_centavos: number; payment_method: string;
+  created_at: string; qty: number; free_qty: number; drifter_name: string | null; rules_ack: boolean; unit_price_centavos: number; payment_method: string;
   ticket_type: { code: string; name: string; band_color: string | null; drifter_family: boolean } | null;
   staff: { full_name: string } | null;
 };
@@ -31,7 +31,7 @@ async function tallyRows(): Promise<TallyRow[]> {
   const admin = createAdminClient();
   const { data } = await admin
     .from("walkin_sales")
-    .select("created_at, qty, free_qty, drifter_name, unit_price_centavos, payment_method, ticket_type:ticket_types(code, name, band_color, drifter_family), staff:staff(full_name)")
+    .select("created_at, qty, free_qty, drifter_name, rules_ack, unit_price_centavos, payment_method, ticket_type:ticket_types(code, name, band_color, drifter_family), staff:staff(full_name)")
     .order("created_at")
     .limit(50000);
   return (data ?? []) as unknown as TallyRow[];
@@ -76,10 +76,11 @@ async function driftersCsv() {
       .sort((a, b) => a.name.localeCompare(b.name))
       .map((d) => [d.name, d.bands, d.free, d.bands - d.free, (d.amount / 100).toFixed(2)]),
     [],
-    ["time_manila", "drifter", "qty", "free_qty", "charged_qty", "unit_price_php", "amount_php", "payment_method", "staff"],
+    ["time_manila", "drifter", "qty", "free_qty", "charged_qty", "unit_price_php", "amount_php", "payment_method", "rules_confirmed", "staff"],
     ...rows.map((r) => [
       manilaTime(r.created_at), r.drifter_name, r.qty, r.free_qty, r.qty - r.free_qty,
-      (r.unit_price_centavos / 100).toFixed(2), (tallyAmount(r) / 100).toFixed(2), r.payment_method, r.staff?.full_name,
+      (r.unit_price_centavos / 100).toFixed(2), (tallyAmount(r) / 100).toFixed(2), r.payment_method,
+      r.qty > 0 ? (r.rules_ack ? "yes" : "no") : "", r.staff?.full_name,
     ]),
     [],
     ["issued through a converted order"],

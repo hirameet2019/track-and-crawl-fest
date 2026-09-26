@@ -92,12 +92,12 @@ export default async function DriftersPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Drifters</h1>
+        <h1 className="text-2xl font-bold">{type.name}</h1>
         <p className="mt-2 text-sm text-zinc-500">
-          Family wristbands for the drivers competing on the day. Type the drifter&apos;s name and tap the number of bands handed over.
-          The first <b>{type.free_allowance}</b> per drifter are free; anything beyond that is charged. These bands never mix with the
-          Walk-in tally, so the gate numbers stay clean. Bands can also reach a family through a converted order &mdash; those are
-          listed separately below and are already paid for.
+          Wristbands for a competing drifter and the people with them. Type the drifter&apos;s name, read them the rules below, then tap
+          the number of bands handed over. The first <b>{type.free_allowance}</b> per drifter are free; anything beyond that is charged.
+          These bands never mix with the Walk-in tally, so the gate numbers stay clean. Bands can also reach a team through a converted
+          order &mdash; those are listed separately below and are already paid for.
         </p>
       </div>
       <DrifterBands
