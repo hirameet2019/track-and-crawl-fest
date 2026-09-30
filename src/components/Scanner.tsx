@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { downloadTicketCache, markKitClaimed, redeemTicket, type ScanResult } from "@/app/actions/scan";
+import { downloadTicketCache, findTickets, markKitClaimed, redeemTicket, type ScanResult, type TicketMatch } from "@/app/actions/scan";
 
 type Cached = { token: string; number: string; type: string; holder: string | null; status: string };
 const CACHE_KEY = "ticket-cache-v1";
@@ -10,6 +10,16 @@ const PENDING_KEY = "pending-redeems-v1";
 function tokenFrom(raw: string) {
   const m = raw.match(/\/t\/([A-Za-z0-9_-]+)/);
   return m ? m[1] : raw.trim();
+}
+
+/**
+ * Decides what the staff typed. QR tokens are 32 random characters; wristband
+ * numbers are short (G001, P040301) and names contain spaces, so anything long
+ * and unbroken is a token to redeem and everything else is a search.
+ */
+function looksLikeToken(raw: string) {
+  const s = raw.trim();
+  return s.includes("/t/") || /^[A-Za-z0-9_-]{20,}$/.test(s);
 }
 
 // --- offline cache helpers (localStorage; wrapped because private mode can throw)
@@ -26,6 +36,8 @@ const subscribeOnline = (cb: () => void) => {
 export function Scanner() {
   const [result, setResult] = useState<AnyResult | null>(null);
   const [manual, setManual] = useState("");
+  const [matches, setMatches] = useState<TicketMatch[] | null>(null);
+  const [searching, setSearching] = useState(false);
   const [busy, setBusy] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [cacheInfo, setCacheInfo] = useState<{ count: number; at: string } | null>(null);
@@ -106,6 +118,42 @@ export function Scanner() {
     if (navigator.vibrate) navigator.vibrate(80);
   }, [offlineRedeem]);
 
+  // --- find a ticket when the QR cannot be read (band number, holder or buyer)
+  const search = useCallback(async (q: string) => {
+    setSearching(true);
+    setResult(null);
+    if (navigator.onLine) {
+      const found = await findTickets(q).catch(() => null);
+      if (found) {
+        setMatches(found);
+        setSearching(false);
+        return;
+      }
+    }
+    // Offline, or the lookup failed: the cache already holds number and holder.
+    const needle = q.trim().toLowerCase();
+    setMatches(
+      readCache()
+        .filter((c) => c.number.toLowerCase().includes(needle) || (c.holder ?? "").toLowerCase().includes(needle))
+        .slice(0, 12)
+        .map((c) => ({ token: c.token, number: c.number, type: c.type, holder: c.holder, status: c.status as TicketMatch["status"], order_no: 0, buyer_name: "" }))
+    );
+    setSearching(false);
+  }, []);
+
+  /** One box for everything staff can type: a scanned link, a token, a band number or a name. */
+  const submitManual = useCallback(() => {
+    const q = manual.trim();
+    if (!q) return;
+    setManual("");
+    if (looksLikeToken(q)) {
+      setMatches(null);
+      handle(q);
+    } else {
+      search(q);
+    }
+  }, [manual, handle, search]);
+
   // --- camera
   useEffect(() => {
     let cancelled = false;
@@ -144,10 +192,36 @@ export function Scanner() {
       <div id="qr-reader" className="overflow-hidden rounded-xl bg-black [&_video]:!w-full" />
       {cameraError && <p className="text-xs text-amber-700">{cameraError}</p>}
 
-      <form onSubmit={(e) => { e.preventDefault(); if (manual) { handle(manual); setManual(""); } }} className="flex gap-2">
-        <input className="input" placeholder="Or paste ticket link / token" value={manual} onChange={(e) => setManual(e.target.value)} />
-        <button className="btn-primary" disabled={busy}>Check</button>
+      <form onSubmit={(e) => { e.preventDefault(); submitManual(); }} className="flex gap-2">
+        <input className="input" placeholder="Band number, name, or paste ticket link" value={manual} onChange={(e) => setManual(e.target.value)} />
+        <button className="btn-primary" disabled={busy || searching}>{searching ? "Finding..." : "Check"}</button>
       </form>
+
+      {matches && (
+        <div className="space-y-2 rounded-xl border border-zinc-200 p-3">
+          <div className="flex items-center justify-between text-xs text-zinc-500">
+            <span>{matches.length ? `${matches.length} match${matches.length === 1 ? "" : "es"}${online ? "" : " (from cache)"}` : "No ticket matches that."}</span>
+            <button className="underline" onClick={() => setMatches(null)}>clear</button>
+          </div>
+          {matches.map((m) => (
+            <div key={m.token} className="flex items-center justify-between gap-3 border-t border-zinc-100 pt-2 first:border-0 first:pt-0">
+              <div className="min-w-0">
+                <div className="font-mono text-lg font-bold">{m.number}</div>
+                <div className="truncate text-xs text-zinc-600">
+                  {m.type}{m.holder ? ` · ${m.holder}` : ""}{m.order_no ? ` · Order #${m.order_no}` : ""}
+                </div>
+              </div>
+              {m.status === "issued" ? (
+                <button className="btn-primary shrink-0 px-3 py-1 text-sm" disabled={busy} onClick={() => { setMatches(null); handle(m.token); }}>Admit</button>
+              ) : (
+                <span className={`shrink-0 text-xs font-semibold ${m.status === "redeemed" ? "text-red-600" : "text-zinc-500"}`}>
+                  {m.status === "redeemed" ? "already used" : "void"}
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
 
       {result && <ResultCard r={result} onKit={(id, item, v) => markKitClaimed(id, item, v).then((kit) => setResult((prev) => prev && "ticket" in prev ? { ...prev, ticket: { ...prev.ticket, kit_claimed: kit } } : prev))} />}
     </div>

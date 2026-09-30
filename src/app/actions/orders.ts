@@ -6,7 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getActiveEvent, getOrderBundle, getTicketTypes, isSalesOpen } from "@/lib/queries";
 import { fmtCutoff, isTypeClosed } from "@/lib/cutoff";
 import { sendOrderReceivedEmail } from "@/lib/email";
-import { EXPIRED_GRACE_HOURS, MAX_COMPANIONS_PER_CAR, MAX_QTY_PER_TYPE, PAYMENT_WINDOW_MINUTES, SHIRT_SIZES } from "@/config/event";
+import { MAX_COMPANIONS_PER_CAR, MAX_QTY_PER_TYPE, PAYMENT_WINDOW_MINUTES, SHIRT_SIZES } from "@/config/event";
 import { IMAGE_MIME, MAX_UPLOAD_BYTES } from "@/lib/image";
 import { MOBILE_RE, emailProblem, normalizeEmail, normalizeMobile } from "@/lib/contact";
 import { audit } from "@/lib/audit";
@@ -229,19 +229,10 @@ export async function submitPaymentProof(formData: FormData): Promise<ActionResu
   const { data: order } = await admin.from("orders").select("*").eq("id", parsed.data.order_id).maybeSingle();
   if (!order) return { ok: false, error: "Order not found" };
   if (order.status === "expired") {
-    // Grace period: the buyer paid but ran out the timer. Restore the order if
-    // the wristbands it wanted are still available.
-    const ageHours = (Date.now() - new Date(order.created_at).getTime()) / 3600000;
-    if (ageHours > EXPIRED_GRACE_HOURS)
-      return { ok: false, error: `This order expired more than ${EXPIRED_GRACE_HOURS} hours ago. Please place a new order, or contact the organizer with your reference number if you already paid.` };
-    const { data: items } = await admin.from("order_items").select("ticket_type_id, qty").eq("order_id", order.id);
-    const ids = (items ?? []).map((i) => i.ticket_type_id);
-    const { data: avail } = await admin.from("v_ticket_type_availability").select("ticket_type_id, name, sellable").in("ticket_type_id", ids);
-    for (const it of items ?? []) {
-      const a = (avail ?? []).find((x) => x.ticket_type_id === it.ticket_type_id);
-      if (!a || Number(a.sellable) < it.qty)
-        return { ok: false, error: `Sorry, ${a?.name ?? "some tickets"} sold out while this order was expired. If you already paid, contact the organizer with your reference number.` };
-    }
+    // Expiry is final: the wristbands went back to the pool the moment the hold
+    // lapsed, so accepting a late upload here would promise stock that may already
+    // belong to someone else. A buyer who did pay is sent to the organizer.
+    return { ok: false, error: "This order expired, so the wristbands were released. Please place a new order. If you already paid, contact the organizer with your reference number and they will sort it out." };
   } else if (order.status !== "pending_payment" && order.status !== "awaiting_verification") {
     return { ok: false, error: `This order is already ${order.status.replace("_", " ")}` };
   }

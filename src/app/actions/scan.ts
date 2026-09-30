@@ -98,6 +98,72 @@ export async function markKitClaimed(ticketId: string, item: string, claimed: bo
   return next;
 }
 
+export interface TicketMatch {
+  token: string;
+  number: string;
+  type: string;
+  holder: string | null;
+  status: TicketRow["status"];
+  order_no: number;
+  buyer_name: string;
+}
+
+/**
+ * Fallback for a QR that cannot be read: find tickets by wristband number, by
+ * the holder's name or by the buyer's name. A torn print, a dead phone or a
+ * camera that will not focus is then no longer a dead end, because the number
+ * is printed large on the ticket and stamped on the physical band.
+ *
+ * Deliberately uses separate ilike() calls instead of one or() filter: commas
+ * and parentheses are PostgREST filter syntax, so user text does not belong in
+ * an or() string.
+ */
+export async function findTickets(query: string): Promise<TicketMatch[]> {
+  await assertStaff("scanner");
+  // Strip the LIKE wildcards so a typed % or _ matches literally, not everything.
+  const q = query.trim().replace(/[%_]/g, "");
+  if (q.length < 2) return [];
+  const admin = createAdminClient();
+  const cols =
+    "id, qr_token, number, status, holder_name, ticket_type:ticket_types(name), order:orders(order_no, buyer_name)";
+
+  const byOrderIds = await admin.from("orders").select("id").ilike("buyer_name", `%${q}%`).limit(20);
+  const orderIds = (byOrderIds.data ?? []).map((o) => o.id);
+
+  const [byNumber, byHolder, byBuyer] = await Promise.all([
+    admin.from("tickets").select(cols).ilike("number", `%${q}%`).limit(20),
+    admin.from("tickets").select(cols).ilike("holder_name", `%${q}%`).limit(20),
+    orderIds.length ? admin.from("tickets").select(cols).in("order_id", orderIds).limit(20) : Promise.resolve({ data: [] }),
+  ]);
+
+  type Row = {
+    id: string;
+    qr_token: string;
+    number: string;
+    status: TicketRow["status"];
+    holder_name: string | null;
+    ticket_type: { name: string } | null;
+    order: { order_no: number; buyer_name: string } | null;
+  };
+  const seen = new Map<string, TicketMatch>();
+  for (const row of [...(byNumber.data ?? []), ...(byHolder.data ?? []), ...(byBuyer.data ?? [])] as unknown as Row[]) {
+    if (seen.has(row.id)) continue;
+    seen.set(row.id, {
+      token: row.qr_token,
+      number: row.number,
+      type: row.ticket_type?.name ?? "",
+      holder: row.holder_name,
+      status: row.status,
+      order_no: row.order?.order_no ?? 0,
+      buyer_name: row.order?.buyer_name ?? "",
+    });
+  }
+  // Unused bands first: at a gate the staff almost always wants the one that can still be admitted.
+  return [...seen.values()]
+    .sort((a, b) => (a.status === b.status ? a.number.localeCompare(b.number) : a.status === "issued" ? -1 : 1))
+    .slice(0, 12);
+}
+
 /** Offline support: the scanner page caches this list and validates locally when the network is down. */
 export async function downloadTicketCache(): Promise<{ token: string; number: string; type: string; holder: string | null; status: string }[]> {
   await assertStaff("scanner");

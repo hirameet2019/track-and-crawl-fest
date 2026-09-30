@@ -4,5 +4,11 @@
   "regions": ["sin1"],
   "functions": {
     "src/app/api/**/*.ts": { "maxDuration": 30 }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/cron/payment-emails",
+      "schedule": "*/5 * * * *"
+    }
+  ]
 }

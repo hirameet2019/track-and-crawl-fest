@@ -157,13 +157,75 @@ export async function sendOrderReceivedEmail(b: OrderBundle) {
       <li>Pay exactly <b>${total}</b> via ${PAY_VIA}${account}. The QR code is on the payment page below.</li>
       <li>Take a screenshot of the confirmation and upload it, with the reference number, on the same page.</li>
     </ol>
-    ${deadline ? `<p style="background:#fff7e0;border:1px solid #f1d58a;padding:10px;border-radius:6px"><b>Please finish within ${PAYMENT_WINDOW_MINUTES} minutes</b>, by ${deadline}. Already paid but the timer ran out? Open the link anyway and upload your proof; your order is restored while wristbands remain.</p>` : ""}
+    ${deadline ? `<p style="background:#fff7e0;border:1px solid #f1d58a;padding:10px;border-radius:6px"><b>Please finish within ${PAYMENT_WINDOW_MINUTES} minutes</b>, by ${deadline}. <b>After that the order is cancelled</b> and the wristbands are released to other buyers, so pay and upload before the deadline.</p>` : ""}
     <p><a href="${payUrl}" style="background:#111;color:#fff;padding:12px 18px;text-decoration:none;border-radius:6px;display:inline-block;font-weight:bold">Pay and upload proof</a></p>
     <p style="color:#555;font-size:13px">Bayaran ang eksaktong <b>${total}</b> via GoTyme, i-screenshot ang confirmation, at i-upload sa link sa itaas. Kapag na-verify, ipapadala ang tickets sa email na ito.</p>
     <p style="color:#777;font-size:12px">After we verify your payment, your receipt and QR tickets are emailed here within 24 hours. Check your order any time: <a href="${SITE_URL}/order/${b.order.id}">${SITE_URL}/order/${b.order.id}</a></p>
     <p style="color:#777;font-size:12px">Found this in Spam or Promotions? Mark it as "Not spam" so your tickets land in your inbox.</p>
   </div>`;
   return send({ to: b.order.buyer_email, subject: `Order #${b.order.order_no} received - pay ${total} within ${PAYMENT_WINDOW_MINUTES} minutes`, html });
+}
+
+/**
+ * Sent a few minutes before the hold runs out, to a buyer who has not uploaded
+ * proof yet. The most common reason an order dies is simply that the buyer got
+ * pulled away mid-payment, so this recovers sales rather than chasing anyone.
+ */
+export async function sendPaymentReminderEmail(b: OrderBundle, minutesLeft: number) {
+  if (!b.order.buyer_email) return { ok: false, reason: "no email" as const };
+  const total = php(b.order.total_centavos);
+  return send({ to: b.order.buyer_email, subject: `${minutesLeft} minutes left to pay ${total} - Order #${b.order.order_no}`, html: paymentReminderHtml(b, minutesLeft) });
+}
+
+/** Body of the reminder, split out from sending so it can be previewed without mailing anyone. */
+export function paymentReminderHtml(b: OrderBundle, minutesLeft: number): string {
+  const total = php(b.order.total_centavos);
+  const payUrl = `${SITE_URL}/pay/${b.order.id}`;
+  const account = b.event.gotyme_account_name ? ` (account name: <b>${b.event.gotyme_account_name}</b>)` : "";
+  return `
+  <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#111">
+    <h2 style="margin-bottom:4px">${b.event.name}</h2>
+    <p style="margin-top:0;color:#555">Your wristbands for order <b>#${b.order.order_no}</b> are still on hold, but not for much longer.</p>
+    <p style="background:#fff7e0;border:1px solid #f1d58a;padding:10px;border-radius:6px">
+      <b>About ${minutesLeft} minutes left</b> to pay ${total} via ${PAY_VIA}${account} and upload your screenshot.
+    </p>
+    <p><a href="${payUrl}" style="background:#111;color:#fff;padding:12px 18px;text-decoration:none;border-radius:6px;display:inline-block;font-weight:bold">Pay and upload proof</a></p>
+    <p style="color:#555;font-size:13px">May <b>${minutesLeft} minuto</b> pa bago matapos ang hold sa wristbands mo. Bayaran ang eksaktong ${total} via GoTyme at i-upload ang screenshot sa link sa itaas.</p>
+    <p style="color:#777;font-size:12px">Already paid? Just upload the screenshot and reference number on that page; you do not need to pay again. <b>When the timer ends the order is cancelled</b> and the wristbands go back to the pool, so upload before then.</p>
+  </div>`;
+}
+
+/**
+ * Sent once the hold has lapsed. Expiry is final, so this does not offer a way
+ * back into the order. It still has to reach the buyer who already paid, whose
+ * only route now is the organizer, and it has to stop them paying twice.
+ */
+export async function sendExpiryNoticeEmail(b: OrderBundle) {
+  if (!b.order.buyer_email) return { ok: false, reason: "no email" as const };
+  return send({ to: b.order.buyer_email, subject: `Order #${b.order.order_no} was cancelled: the payment timer ran out`, html: expiryNoticeHtml(b) });
+}
+
+/** Body of the expiry notice, split out from sending so it can be previewed without mailing anyone. */
+export function expiryNoticeHtml(b: OrderBundle): string {
+  const orderUrl = `${SITE_URL}/order/${b.order.id}`;
+  // The label is a full instruction like "Call or text Tintin Sy - 0917...", so it
+  // has to stand on its own line rather than be dropped mid-sentence.
+  const support =
+    b.event.support_contact_label && b.event.support_contact_url
+      ? `<br><a href="${b.event.support_contact_url}" style="font-size:16px"><b>${b.event.support_contact_label}</b></a>`
+      : "";
+  return `
+  <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#111">
+    <h2 style="margin-bottom:4px">${b.event.name}</h2>
+    <p style="margin-top:0;color:#555">The payment timer on order <b>#${b.order.order_no}</b> ran out, so the order was cancelled and the wristbands went back to the pool.</p>
+    <p style="background:#fff1f0;border:1px solid #f3c2bd;padding:10px;border-radius:6px">
+      <b>Already paid? Do not pay again.</b> Reach the organizer with your order number <b>#${b.order.order_no}</b> and your payment reference, and they will sort it out for you.${support}
+    </p>
+    <p><b>Not paid yet?</b> Nothing was charged. You are welcome to place a new order while tickets last.</p>
+    <p><a href="${SITE_URL}" style="background:#111;color:#fff;padding:12px 18px;text-decoration:none;border-radius:6px;display:inline-block;font-weight:bold">Place a new order</a></p>
+    <p style="color:#555;font-size:13px">Tapos na ang oras kaya kanselado na ang order at naibalik na sa pool ang wristbands. <b>Kung nakabayad ka na, huwag nang magbayad ulit.</b> Kontakin ang organizer, sabihin ang order number #${b.order.order_no} at ang reference number mo. Kung hindi ka pa nakakabayad, walang nasingil sa iyo at pwede ka nang mag-order ulit.</p>
+    <p style="color:#777;font-size:12px">Your cancelled order stays viewable here: <a href="${orderUrl}">${orderUrl}</a></p>
+  </div>`;
 }
 
 /**

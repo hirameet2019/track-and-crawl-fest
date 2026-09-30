@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { unvoidTicket, voidTicket } from "@/app/actions/admin";
+import { unredeemTicket, unvoidTicket, voidTicket } from "@/app/actions/admin";
 import type { TicketStatus } from "@/lib/supabase/types";
 
 /**
@@ -24,7 +24,27 @@ export function TicketActions({ ticketId, number, status, voidReason }: { ticket
       if (r.ok) { setOpen(false); setReason(""); router.refresh(); }
     });
 
-  if (status === "redeemed") return <span className="text-xs text-zinc-400">Used at gate</span>;
+  // A mis-scan at the gate (wrong band, wrong person's phone) would otherwise
+  // leave the real holder locked out, so the scan can be undone with a reason.
+  if (status === "redeemed") {
+    return (
+      <div className="space-y-1 text-xs">
+        <div className="text-zinc-400">Used at gate</div>
+        {!open ? (
+          <button className="underline" onClick={() => setOpen(true)}>Undo scan…</button>
+        ) : (
+          <div className="flex min-w-[16rem] flex-col gap-1">
+            <input className="input py-1 text-xs" autoFocus placeholder={`Why undo the scan of ${number}?`} value={reason} onChange={(e) => setReason(e.target.value)} />
+            <div className="flex gap-1">
+              <button className="btn-primary flex-1 py-1 text-xs" disabled={pending || reason.trim().length < 3} onClick={() => run(() => unredeemTicket(ticketId, reason), `${number} can be scanned again`)}>Undo scan</button>
+              <button className="btn-secondary flex-1 py-1 text-xs" disabled={pending} onClick={() => { setOpen(false); setReason(""); }}>Cancel</button>
+            </div>
+          </div>
+        )}
+        {msg && <div className="text-zinc-500">{msg}</div>}
+      </div>
+    );
+  }
 
   if (status === "void") {
     return (

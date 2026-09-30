@@ -8,7 +8,7 @@ import { php } from "@/lib/money";
 import { ticketUrl } from "@/lib/pdf/ticket-pdf";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SupportContact } from "@/components/SupportContact";
-import { EXPIRED_GRACE_HOURS } from "@/config/event";
+
 import { itemLabel } from "@/lib/items";
 
 export const dynamic = "force-dynamic";
@@ -66,10 +66,16 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ or
         <div className="card mt-6 border-zinc-300 bg-zinc-100">
           <h2 className="font-semibold">This order expired before payment was submitted</h2>
           <p className="mt-1 text-sm">
-            <b>Already paid?</b> You can still <Link href={`/pay/${order.id}`} className="font-semibold underline">upload your proof here</Link> within {EXPIRED_GRACE_HOURS} hours of ordering and the order is restored while wristbands remain.
-            Otherwise <Link href="/" className="underline">place a new order</Link>.
+            The wristbands were released back to the pool, so this order can no longer be paid.{" "}
+            <Link href="/" className="underline">Place a new order</Link> while tickets are still available.
           </p>
-          <p className="mt-1 text-xs text-zinc-600">Nakabayad na? I-upload pa rin ang proof sa link sa itaas. Kung hindi pa, mag-order ulit.</p>
+          <p className="mt-1 text-sm">
+            <b>Already paid?</b> Do not pay again. Contact the organizer below with your order number and payment reference.
+          </p>
+          <p className="mt-1 text-xs text-zinc-600">
+            Kanselado na ang order at naibalik na sa pool ang wristbands, kaya mag-order ulit. Kung nakabayad ka na, huwag nang magbayad
+            ulit, kontakin ang organizer sa ibaba at sabihin ang order number at reference number mo.
+          </p>
         </div>
       )}
 

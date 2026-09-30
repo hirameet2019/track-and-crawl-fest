@@ -122,6 +122,10 @@ export interface OrderRow {
   sold_by: string | null;
   receipt_no: number | null;
   email_sent_at: string | null;
+  /** Stamped when the "your hold is about to expire" email went out; null means not sent. */
+  reminder_sent_at: string | null;
+  /** Stamped when the "your order was cancelled, the timer ran out" email went out. */
+  expiry_notice_sent_at: string | null;
   notes: string | null;
   /** Left over after a conversion: positive = refund owed to the buyer, negative = the buyer owes. */
   balance_centavos: number;

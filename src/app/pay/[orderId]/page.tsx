@@ -1,4 +1,3 @@
-/* eslint-disable react-hooks/purity -- server component: rendered once per request, Date.now() is intentional */
 import Image from "next/image";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -8,7 +7,7 @@ import { Countdown } from "@/components/Countdown";
 import { getOrderBundle } from "@/lib/queries";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { php } from "@/lib/money";
-import { EXPIRED_GRACE_HOURS, PAYMENT_CHANNELS } from "@/config/event";
+import { PAYMENT_CHANNELS, PAYMENT_WINDOW_MINUTES } from "@/config/event";
 import { SupportContact } from "@/components/SupportContact";
 import type { OnlinePaymentMethod } from "@/lib/supabase/types";
 
@@ -19,9 +18,9 @@ export default async function PayPage({ params }: { params: Promise<{ orderId: s
   await createAdminClient().rpc("expire_stale_orders", {});
   const b = await getOrderBundle(orderId);
   if (!b) notFound();
-  // An expired order may still upload proof within the grace period (the action re-checks stock).
-  const recoverable = b.order.status === "expired" && Date.now() - new Date(b.order.created_at).getTime() < EXPIRED_GRACE_HOURS * 3600000;
-  if (b.order.status !== "pending_payment" && !recoverable) redirect(`/order/${orderId}`);
+  // Expiry is final: the wristbands are already back in the pool, so there is
+  // nothing to pay for here. The order page explains what to do instead.
+  if (b.order.status !== "pending_payment") redirect(`/order/${orderId}`);
 
   const { event, order, items } = b;
   // A channel is offered only when the organizer has set its QR image on the
@@ -41,18 +40,19 @@ export default async function PayPage({ params }: { params: Promise<{ orderId: s
     <EventBanner event={event} />
     <div className="mx-auto w-full max-w-3xl px-4 py-8">
       <h1 className="text-2xl font-bold">Pay {php(order.total_centavos)}</h1>
-      {recoverable ? (
-        <div className="mt-2 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
-          <b>The reservation timer has ended, but you can still finish.</b> If you already paid, upload your proof below and your order #{order.order_no} is restored as long as wristbands remain. If you have not paid yet, pay now and upload right after.
-          <div className="mt-1 text-xs text-amber-800">Tapos na ang oras, pero pwede pang ituloy. Kung nakabayad ka na, i-upload lang ang proof sa ibaba at maibabalik ang order mo.</div>
-        </div>
-      ) : (
-        <p className="text-sm text-zinc-600">
-          Order #{order.order_no} for {order.buyer_name}. Your tickets are reserved for{" "}
-          {order.expires_at ? <Countdown until={order.expires_at} /> : "a limited time"}.
-          <span className="block text-xs text-zinc-500">Naka-hold ang wristbands mo habang tumatakbo ang oras. Bayaran at i-upload ang proof bago ito matapos.</span>
-        </p>
-      )}
+      <p className="text-sm text-zinc-600">
+        Order #{order.order_no} for {order.buyer_name}. Your wristbands are held for {PAYMENT_WINDOW_MINUTES} minutes, and{" "}
+        {order.expires_at ? <Countdown until={order.expires_at} /> : "a limited time"} of that is left.
+        {/* Expiry is final, so say so plainly while the buyer can still act on it. */}
+        <span className="block text-xs font-semibold text-amber-800">
+          Pay and upload before the timer ends. When it runs out the order is cancelled, the wristbands go back to the pool, and this
+          page stops accepting payment.
+        </span>
+        <span className="block text-xs text-zinc-500">
+          Naka-hold ang wristbands mo ng {PAYMENT_WINDOW_MINUTES} minuto. Bayaran at i-upload ang proof bago matapos ang oras. Pag naubos
+          ito, kanselado na ang order at kailangan mo nang mag-order ulit.
+        </span>
+      </p>
 
       <div className="card mt-6">
         <h2 className="font-semibold">Order summary</h2>

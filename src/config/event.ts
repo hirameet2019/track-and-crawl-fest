@@ -9,11 +9,26 @@ export const SITE_URL =
 /** Minutes a buyer has to pay and upload proof before the order expires. */
 export const PAYMENT_WINDOW_MINUTES = 60;
 /**
- * An expired order can still accept a proof upload for this many hours after it
- * was placed, as long as the wristbands are still available. Buyers who paid but
- * ran out the timer are not punished for being slow in their bank app.
+ * Expiry is final: once the hold lapses the wristbands go straight back to the
+ * pool and the order cannot be revived by the buyer. Organizer's decision, taken
+ * to keep wristband inventory unambiguous.
+ *
+ * The case this gives up on is the buyer who paid at minute 58 and uploaded at
+ * minute 62. They are sent to the support contact on the events row instead, so
+ * make sure that contact is always set while sales are open.
  */
-export const EXPIRED_GRACE_HOURS = 24;
+/**
+ * How long before the hold runs out the reminder email goes. Late enough that
+ * the buyer has had a real go at paying, early enough to still act on it.
+ * Keep it comfortably above the cron interval or a run can skip an order.
+ */
+export const REMINDER_MINUTES_BEFORE_EXPIRY = 15;
+/**
+ * Upper age on the "your hold expired" notice. If the cron is paused or the
+ * deploy is rolled back for a day, the backlog must not all go out at once:
+ * a notice about a hold that lapsed hours ago is noise, not help.
+ */
+export const EXPIRY_NOTICE_MAX_AGE_HOURS = 3;
 
 /**
  * Shirt sizes offered on ticket types that include a shirt (VIP Pass, VIP Car

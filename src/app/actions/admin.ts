@@ -157,6 +157,58 @@ export async function unvoidTicket(ticketId: string): Promise<ActionResult> {
   }
 }
 
+/**
+ * Undo a scan. Gate staff can scan the wrong band or the wrong person's phone,
+ * and the real holder is then turned away with "already used" and no way back.
+ * Admin only. The QR itself is unchanged and stays valid, so nothing is emailed.
+ *
+ * Unlike void/unvoid this is a guarded update rather than an RPC: it touches
+ * three columns on one row and nothing else (no wristband pool, no order
+ * status), and the status filter makes it atomic on its own.
+ */
+export async function unredeemTicket(ticketId: string, reason: string): Promise<ActionResult> {
+  try {
+    const { userId } = await assertStaff("admin");
+    const r = reason.trim();
+    if (r.length < 3) return { ok: false, error: "Give a short reason (it goes in the audit log)" };
+    const admin = createAdminClient();
+
+    const { data: before, error: readError } = await admin
+      .from("tickets")
+      .select("number, order_id, status, redeemed_at")
+      .eq("id", ticketId)
+      .maybeSingle();
+    if (readError) return { ok: false, error: readError.message };
+    if (!before) return { ok: false, error: "Ticket not found" };
+    if (before.status !== "redeemed") {
+      return { ok: false, error: `That ticket is "${before.status}", not scanned. There is nothing to undo.` };
+    }
+
+    const { data, error } = await admin
+      .from("tickets")
+      .update({ status: "issued", redeemed_at: null, redeemed_by: null })
+      .eq("id", ticketId)
+      .eq("status", "redeemed")
+      .select("id")
+      .maybeSingle();
+    if (error) return { ok: false, error: error.message };
+    if (!data) return { ok: false, error: "Someone changed this ticket just now. Refresh and try again." };
+
+    await audit(admin, {
+      actor: userId,
+      action: "ticket.unredeemed",
+      entity: "ticket",
+      entity_id: ticketId,
+      data: { number: before.number, reason: r, was_redeemed_at: before.redeemed_at },
+    });
+    revalidatePath("/admin");
+    revalidatePath(`/admin/orders/${before.order_id}`);
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
 /** Void every unused ticket of a paid order; tickets already scanned are skipped. */
 export async function voidOrder(orderId: string, reason: string): Promise<ActionResult> {
   try {

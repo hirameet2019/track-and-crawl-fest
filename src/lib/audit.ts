@@ -40,6 +40,7 @@ const ACTIONS: Record<string, { cat: AuditCategory; label: string }> = {
   "order.resent": { cat: "orders", label: "Tickets re-sent by email" },
   "order.reverted": { cat: "orders", label: "Paid order reverted, wristband released" },
   "ticket.redeemed": { cat: "tickets", label: "Ticket scanned at gate" },
+  "ticket.unredeemed": { cat: "tickets", label: "Gate scan undone, ticket usable again" },
   "ticket.voided": { cat: "payments", label: "Ticket voided" },
   "ticket.unvoided": { cat: "payments", label: "Voided ticket restored" },
   "order.voided": { cat: "payments", label: "Paid order voided" },
@@ -60,6 +61,7 @@ const ACTIONS: Record<string, { cat: AuditCategory; label: string }> = {
   "numbers.imported_list": { cat: "numbers", label: "Wristband list imported" },
   "number.voided": { cat: "numbers", label: "Wristband voided" },
   "number.unvoided": { cat: "numbers", label: "Wristband restored to pool" },
+  "number.deleted": { cat: "numbers", label: "Wristband removed from the pool" },
   "staff.signed_in": { cat: "staff", label: "Staff signed in" },
   "staff.signed_out": { cat: "staff", label: "Staff signed out" },
   "settings.email_updated": { cat: "settings", label: "Email settings changed" },
@@ -92,6 +94,12 @@ export function describe(action: string, data: Record<string, unknown> | null | 
       return [d.number ? String(d.number) : "", d.reason ? `Reason: ${d.reason}` : "", d.order_voided ? "whole order now void" : ""].filter(Boolean).join(" · ");
     case "ticket.unvoided":
       return d.number ? String(d.number) : "";
+    case "ticket.unredeemed":
+      return [
+        d.number ? String(d.number) : "",
+        d.was_redeemed_at ? `was scanned ${new Date(String(d.was_redeemed_at)).toLocaleString("en-PH", { timeZone: "Asia/Manila", dateStyle: "medium", timeStyle: "short" })}` : "",
+        d.reason ? `Reason: ${d.reason}` : "",
+      ].filter(Boolean).join(" · ");
     case "order.voided":
       return [d.order_no ? `Order #${d.order_no}` : "", d.tickets !== undefined ? `${d.tickets} ticket(s)` : "", d.reason ? `Reason: ${d.reason}` : ""].filter(Boolean).join(" · ");
     case "order.converted": {
@@ -153,6 +161,8 @@ export function describe(action: string, data: Record<string, unknown> | null | 
       return d.reason ? `Reason: ${d.reason}` : "";
     case "number.unvoided":
       return [d.number ? String(d.number) : "", d.previous_reason ? `was void: ${d.previous_reason}` : ""].filter(Boolean).join(" · ");
+    case "number.deleted":
+      return [d.number ? String(d.number) : "", d.ticket_type ? String(d.ticket_type) : "", d.reason ? String(d.reason) : ""].filter(Boolean).join(" · ");
     case "ticket.kit":
       return `${d.item ?? "item"} ${d.claimed ? "handed over" : "un-ticked"}`;
     case "staff.signed_in":
