@@ -110,7 +110,8 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
         </div>
       </div>
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+      {/* Side by side, the tiles share three rows (label, amount, note) so the amounts line up even when a label wraps. */}
+      <div className="mt-4 grid gap-3 sm:grid-cols-3 sm:gap-y-0">
         <Total
           label="Paid"
           value={php(paid.centavos)}
@@ -124,7 +125,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
           tone="unpaid"
         />
         <Total
-          label="Expired or rejected"
+          label="Expired, rejected or cancelled"
           value={php(dropped.centavos)}
           sub={`${dropped.count} order${dropped.count === 1 ? "" : "s"} that will not be collected`}
           tone="dropped"
@@ -157,7 +158,7 @@ function Total({ label, value, sub, tone }: { label: string; value: string; sub:
   const stripe =
     tone === "paid" ? "border-l-emerald-500" : tone === "unpaid" ? "border-l-amber-500" : "border-l-zinc-400";
   return (
-    <div className={`card border-l-4 ${stripe}`}>
+    <div className={`card border-l-4 sm:row-span-3 sm:grid sm:grid-rows-subgrid ${stripe}`}>
       <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{label}</div>
       <div className="mt-1 text-2xl font-bold tabular-nums">{value}</div>
       <div className="mt-0.5 text-xs text-zinc-500">{sub}</div>
