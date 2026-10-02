@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { hasRole, homeFor, roleRank } from "@/lib/roles";
 import type { StaffRole, StaffRow } from "@/lib/supabase/types";
 
 export interface StaffSession {
@@ -28,18 +29,20 @@ export async function getStaff(): Promise<StaffSession | null> {
   return { userId: user.id, email: user.email ?? null, staff };
 }
 
-const ROLE_RANK: Record<StaffRole, number> = { scanner: 1, staff: 2, admin: 3 };
-
-/** Redirects to /login when not signed in, or to /scan when the role is too low. */
+/**
+ * Redirects to /login when not signed in, or to the role's own home page when the
+ * page needs more than the role has.
+ */
 export async function requireStaff(minRole: StaffRole = "scanner"): Promise<StaffSession> {
   const session = await getStaff();
-  if (!session) {
-    // Signed in to Supabase Auth but not on the staff list: say so instead of bouncing silently.
+  // Not on the staff list, or on it with a role this code does not know: say so
+  // instead of bouncing silently (or in a loop between pages it cannot open).
+  if (!session || roleRank(session.staff.role) === 0) {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     redirect(user ? `/login?reason=not_staff&who=${encodeURIComponent(user.email ?? "")}` : "/login");
   }
-  if (ROLE_RANK[session.staff.role] < ROLE_RANK[minRole]) redirect("/scan");
+  if (!hasRole(session.staff.role, minRole)) redirect(homeFor(session.staff.role));
   return session;
 }
 
@@ -47,6 +50,6 @@ export async function requireStaff(minRole: StaffRole = "scanner"): Promise<Staf
 export async function assertStaff(minRole: StaffRole = "scanner"): Promise<StaffSession> {
   const session = await getStaff();
   if (!session) throw new Error("Not signed in");
-  if (ROLE_RANK[session.staff.role] < ROLE_RANK[minRole]) throw new Error("Not allowed");
+  if (!hasRole(session.staff.role, minRole)) throw new Error("Not allowed");
   return session;
 }

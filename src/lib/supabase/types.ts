@@ -18,7 +18,7 @@ export type PaymentMethod = "gotyme" | "gcash" | "maya" | "cash";
 export type OnlinePaymentMethod = Exclude<PaymentMethod, "cash">;
 export type TicketStatus = "issued" | "redeemed" | "void";
 export type NumberStatus = "available" | "assigned" | "void";
-export type StaffRole = "admin" | "staff" | "scanner";
+export type StaffRole = "admin" | "staff" | "gate" | "scanner";
 
 export interface EventRow {
   id: string;

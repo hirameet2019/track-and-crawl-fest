@@ -4,20 +4,20 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { recordSignOut } from "@/app/actions/auth";
+import { hasRole, homeFor } from "@/lib/roles";
 import type { StaffRole } from "@/lib/supabase/types";
 
 const LINKS: { href: string; label: string; min: StaffRole }[] = [
   { href: "/admin", label: "Dashboard", min: "staff" },
   { href: "/admin/verify", label: "Verify", min: "staff" },
   { href: "/admin/orders", label: "Orders", min: "staff" },
-  { href: "/admin/walkin", label: "Walk-in", min: "staff" },
+  { href: "/admin/walkin", label: "Walk-in", min: "gate" },
   { href: "/admin/drifters", label: "Drifters", min: "staff" },
   { href: "/admin/numbers", label: "Numbers", min: "admin" },
   { href: "/admin/audit", label: "Audit", min: "admin" },
   { href: "/admin/settings", label: "Settings", min: "admin" },
   { href: "/scan", label: "Scan", min: "scanner" },
 ];
-const RANK: Record<StaffRole, number> = { scanner: 1, staff: 2, admin: 3 };
 
 export function StaffNav({ name, role }: { name: string; role: StaffRole }) {
   const path = usePathname();
@@ -35,12 +35,12 @@ export function StaffNav({ name, role }: { name: string; role: StaffRole }) {
       <div className="absolute inset-0 -z-10 bg-gradient-to-r from-zinc-950 via-zinc-950/90 to-zinc-950/70" aria-hidden />
       {/* Full width: the logo sits in the top-left corner, Tickets and Sign out in the top-right. */}
       <div className="flex w-full flex-wrap items-center gap-x-1 gap-y-2 px-3 py-2 text-sm sm:px-4 xl:px-6">
-        <Link prefetch={false} href={RANK[role] >= RANK.staff ? "/admin" : "/scan"} className="mr-2 flex items-center gap-2 xl:mr-3" aria-label="Meet & Drift 3 staff home">
+        <Link prefetch={false} href={homeFor(role)} className="mr-2 flex items-center gap-2 xl:mr-3" aria-label="Meet & Drift 3 staff home">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo.png" alt="Meet & Drift 3" className="h-9 w-auto sm:h-11" />
           <span className="hidden rounded border border-white/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-zinc-300 xl:inline">Staff</span>
         </Link>
-        {LINKS.filter((l) => RANK[role] >= RANK[l.min]).map((l) => {
+        {LINKS.filter((l) => hasRole(role, l.min)).map((l) => {
           const active = l.href === "/admin" ? path === "/admin" : path.startsWith(l.href);
           return (
             <Link prefetch={false}

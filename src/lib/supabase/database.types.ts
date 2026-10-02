@@ -637,7 +637,7 @@ export type Database = {
         | "expired"
         | "cancelled"
       payment_method: "gotyme" | "gcash" | "maya" | "cash"
-      staff_role: "admin" | "staff" | "scanner"
+      staff_role: "admin" | "staff" | "scanner" | "gate"
       ticket_status: "issued" | "redeemed" | "void"
     }
     CompositeTypes: {
@@ -660,7 +660,7 @@ export const Constants = {
         "cancelled",
       ],
       payment_method: ["gotyme", "gcash", "maya", "cash"],
-      staff_role: ["admin", "staff", "scanner"],
+      staff_role: ["admin", "staff", "scanner", "gate"],
       ticket_status: ["issued", "redeemed", "void"],
     },
   },

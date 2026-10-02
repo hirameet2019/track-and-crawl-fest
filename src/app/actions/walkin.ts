@@ -19,7 +19,7 @@ const methodSchema = z.enum(["cash", "gotyme", "gcash", "maya"]);
  */
 export async function recordWalkin(input: { ticketTypeId: string; delta: number; method: PaymentMethod }): Promise<ActionResult & { count?: number }> {
   try {
-    const { userId } = await assertStaff("staff");
+    const { userId } = await assertStaff("gate");
     const ticketTypeId = z.string().uuid().parse(input.ticketTypeId);
     const delta = z.number().int().min(-50).max(50).parse(input.delta);
     if (delta === 0) return { ok: false, error: "Nothing to record" };

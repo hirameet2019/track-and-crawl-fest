@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getStaff } from "@/lib/auth";
+import { hasRole } from "@/lib/roles";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { actionMeta, describe } from "@/lib/audit";
 import { buildTicketsWorkbook } from "@/lib/export-xlsx";
@@ -174,8 +175,12 @@ async function auditCsv() {
  */
 export async function GET(req: NextRequest) {
   const session = await getStaff();
-  if (!session || session.staff.role === "scanner") return new NextResponse("Forbidden", { status: 403 });
   const type = req.nextUrl.searchParams.get("type");
+  // The gate desk gets its own tally (counts only, no buyers). Everything else holds
+  // buyer names and contacts, so it needs staff or above.
+  if (!session || !hasRole(session.staff.role, type === "walkin" ? "gate" : "staff")) {
+    return new NextResponse("Forbidden", { status: 403 });
+  }
   if (type === "walkin") return download(await walkinCsv(), "walkin-tally");
   if (type === "drifters") return download(await driftersCsv(), "drifter-family-bands");
   if (type === "drifter-links") {

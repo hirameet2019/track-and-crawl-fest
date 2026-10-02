@@ -1,4 +1,5 @@
 import { requireStaff } from "@/lib/auth";
+import { hasRole } from "@/lib/roles";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getActiveEvent, getAvailability, getTicketTypes } from "@/lib/queries";
 import { WalkinTally, type TallyEntry, type TallyToday } from "@/components/WalkinTally";
@@ -14,7 +15,8 @@ function manilaDayStart(): string {
 }
 
 export default async function WalkinPage() {
-  const session = await requireStaff("staff");
+  const session = await requireStaff("gate");
+  const seesDrifters = hasRole(session.staff.role, "staff");
   const event = await getActiveEvent();
   if (!event) return <p>No active event.</p>;
 
@@ -69,7 +71,9 @@ export default async function WalkinPage() {
           Tap <b>−</b> to undo a mistake. Every tap deducts from the wristbands left for that label.
         </p>
         <p className="mt-1 text-sm text-zinc-500">
-          Bands for a competing drifter&apos;s family go on the <b>Drifters</b> tab instead, recorded under the driver&apos;s name.
+          {seesDrifters
+            ? <>Bands for a competing drifter&apos;s family go on the <b>Drifters</b> tab instead, recorded under the driver&apos;s name.</>
+            : <>A competing drifter&apos;s family does not buy here: send them to the registration desk.</>}
         </p>
       </div>
       <WalkinTally types={types.filter((t) => !t.drifter_family)} availability={availability} today={today} recent={recent} isAdmin={session.staff.role === "admin"} />

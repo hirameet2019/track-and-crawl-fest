@@ -2,13 +2,16 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { LoginForm } from "@/components/LoginForm";
 import { getStaff } from "@/lib/auth";
+import { homeFor, roleRank } from "@/lib/roles";
 
 export const dynamic = "force-dynamic";
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string; reason?: string; who?: string }> }) {
   const { next, reason, who } = await searchParams;
   const session = await getStaff();
-  if (session) redirect(next && next.startsWith("/") ? next : session.staff.role === "scanner" ? "/scan" : "/admin");
+  // A role this code does not know stays here with the not-staff note, rather than
+  // bouncing between pages it cannot open.
+  if (session && roleRank(session.staff.role) > 0) redirect(next && next.startsWith("/") ? next : homeFor(session.staff.role));
   const notStaff = reason === "not_staff";
 
   return (
@@ -26,7 +29,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         {notStaff && (
           <div className="mb-4 rounded-xl border border-amber-400/40 bg-amber-400/10 p-3 text-sm text-amber-200">
             <b>{who || "This account"}</b> can sign in, but it is not on the staff list yet. Ask an administrator to add it in the
-            <code className="mx-1 rounded bg-black/40 px-1">staff</code>table with a role (admin, staff, or scanner), then sign in again.
+            <code className="mx-1 rounded bg-black/40 px-1">staff</code>table with a role (admin, staff, gate, or scanner), then sign in again.
           </div>
         )}
         <div className="dark-zone">
