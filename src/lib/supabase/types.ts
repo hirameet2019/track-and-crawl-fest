@@ -246,6 +246,50 @@ export interface WalkinSaleRow {
   vehicle_plate: string | null;
 }
 
+/** One label in a gate shift's figures (gate_shift_figures / close_gate_shift). */
+export interface GateShiftLabel {
+  ticket_type_id: string;
+  code: string;
+  name: string;
+  band_color: string | null;
+  /** Bands handed over at the start; null when the label was not given out. */
+  received: number | null;
+  sold_bands: number;
+  sales: number;
+  amount_centavos: number;
+  expected_left: number | null;
+  /** Only after the close. */
+  counted_left?: number | null;
+  difference?: number | null;
+}
+
+/** A gate shift's figures; the close adds the counted cash and differences. */
+export interface GateShiftResult {
+  opening_cash_centavos: number;
+  cash_sales_centavos: number;
+  expected_cash_centavos: number;
+  methods: Partial<Record<PaymentMethod, { amount_centavos: number; sales: number }>>;
+  total_centavos: number;
+  labels: GateShiftLabel[];
+  counted_cash_centavos?: number;
+  cash_difference_centavos?: number;
+}
+
+export interface GateShiftRow {
+  id: string;
+  event_id: string;
+  staff_id: string;
+  opened_at: string;
+  opening_cash_centavos: number;
+  opening_bands: Record<string, number>;
+  closed_at: string | null;
+  closed_by: string | null;
+  counted_cash_centavos: number | null;
+  counted_bands: Record<string, number> | null;
+  result: GateShiftResult | null;
+  note: string | null;
+}
+
 type Table<Row, Insert = Partial<Row>, Update = Partial<Row>> = {
   Row: Row;
   Insert: Insert;

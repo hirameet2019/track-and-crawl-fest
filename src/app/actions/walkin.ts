@@ -5,7 +5,8 @@ import { z } from "zod";
 import { assertStaff } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SHIRT_SIZES } from "@/config/event";
-import type { PaymentMethod } from "@/lib/supabase/types";
+import { getActiveEvent } from "@/lib/queries";
+import type { GateShiftResult, PaymentMethod } from "@/lib/supabase/types";
 import type { ActionResult } from "./orders";
 
 function fail(e: unknown): ActionResult {
@@ -14,16 +15,27 @@ function fail(e: unknown): ActionResult {
 
 const methodSchema = z.enum(["cash", "gotyme", "gcash", "maya"]);
 
+export interface RecordWalkinInput {
+  ticketTypeId: string;
+  delta: number;
+  method: PaymentMethod;
+  shirtSize?: string | null;
+  holderName?: string | null;
+  vehiclePlate?: string | null;
+  /** A fresh id per sale from the device; send the same one again on a retry. */
+  clientRef?: string | null;
+  /** GCash, Maya and GoTyme sales: the transfer's reference number. */
+  paymentRef?: string | null;
+}
+
 /**
  * Walk-in tally: +N sales at the gate (or -N to correct a mistake). A sale is one
  * band, or for a label with included passengers one car with all its bands. A label
- * that includes a shirt needs the size handed over, and a car label the driver's
- * name and the plate (a car goes back by its plate). No tickets, no email. Returns
- * the new running band count for the label.
+ * that includes a shirt needs the size handed over, a label with gate_needs_name the
+ * person's name, and a car label the plate too. The seller needs an open shift. A
+ * retry with the same clientRef records nothing new. No tickets, no email.
  */
-export async function recordWalkin(input: {
-  ticketTypeId: string; delta: number; method: PaymentMethod; shirtSize?: string | null; holderName?: string | null; vehiclePlate?: string | null;
-}): Promise<ActionResult & { count?: number }> {
+export async function recordWalkin(input: RecordWalkinInput): Promise<ActionResult & { count?: number; saleId?: string; duplicate?: boolean }> {
   try {
     const { userId } = await assertStaff("gate");
     const ticketTypeId = z.string().uuid().parse(input.ticketTypeId);
@@ -33,15 +45,75 @@ export async function recordWalkin(input: {
     const shirtSize = input.shirtSize ? z.enum(SHIRT_SIZES).parse(input.shirtSize) : null;
     const holderName = z.string().trim().max(80).optional().nullable().parse(input.holderName) || null;
     const vehiclePlate = z.string().trim().max(20).optional().nullable().parse(input.vehiclePlate) || null;
+    const clientRef = input.clientRef ? z.string().uuid().parse(input.clientRef) : null;
+    const paymentRef = z.string().trim().max(60).optional().nullable().parse(input.paymentRef) || null;
     const admin = createAdminClient();
     const { data, error } = await admin.rpc("record_walkin", {
       p_ticket_type_id: ticketTypeId, p_qty: delta, p_actor: userId, p_method: method, p_shirt_size: shirtSize,
-      p_holder_name: holderName, p_vehicle_plate: vehiclePlate,
+      p_holder_name: holderName, p_vehicle_plate: vehiclePlate, p_client_ref: clientRef, p_payment_ref: paymentRef,
     });
     if (error) return { ok: false, error: error.message };
     revalidatePath("/admin");
     revalidatePath("/admin/walkin");
-    return { ok: true, count: data ?? 0 };
+    const d = data as { count: number; sale_id: string; duplicate: boolean } | null;
+    return { ok: true, count: Number(d?.count ?? 0), saleId: d?.sale_id, duplicate: !!d?.duplicate };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/** Reverse exactly one gate sale, once, shortly after it was made (seller or admin). */
+export async function undoWalkinSale(saleId: string): Promise<ActionResult> {
+  try {
+    const { userId } = await assertStaff("gate");
+    const id = z.string().uuid().parse(saleId);
+    const { error } = await createAdminClient().rpc("undo_walkin_sale", { p_actor: userId, p_sale_id: id });
+    if (error) return { ok: false, error: error.message };
+    revalidatePath("/admin");
+    revalidatePath("/admin/walkin");
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+const bandCounts = z.record(z.string().uuid(), z.number().int().min(0).max(100000));
+
+/** Start a gate shift: the cash in the drawer and the bands handed over, per label. */
+export async function openGateShift(input: { openingCash: number; bands: Record<string, number> }): Promise<ActionResult> {
+  try {
+    const { userId } = await assertStaff("gate");
+    const pesos = z.number().min(0).max(1000000).parse(input.openingCash);
+    const bands = bandCounts.parse(input.bands);
+    const event = await getActiveEvent();
+    if (!event) return { ok: false, error: "No active event" };
+    const { error } = await createAdminClient().rpc("open_gate_shift", {
+      p_actor: userId, p_event_id: event.id, p_opening_cash: Math.round(pesos * 100), p_opening_bands: bands,
+    });
+    if (error) return { ok: false, error: error.message };
+    revalidatePath("/admin/walkin");
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/** Close a gate shift with what was counted; returns the reconciliation. */
+export async function closeGateShift(input: {
+  shiftId: string; countedCash: number; bands: Record<string, number>; note?: string;
+}): Promise<ActionResult & { result?: GateShiftResult }> {
+  try {
+    const { userId } = await assertStaff("gate");
+    const shiftId = z.string().uuid().parse(input.shiftId);
+    const pesos = z.number().min(0).max(1000000).parse(input.countedCash);
+    const bands = bandCounts.parse(input.bands);
+    const note = z.string().trim().max(500).optional().parse(input.note) || null;
+    const { data, error } = await createAdminClient().rpc("close_gate_shift", {
+      p_actor: userId, p_shift_id: shiftId, p_counted_cash: Math.round(pesos * 100), p_counted_bands: bands, p_note: note,
+    });
+    if (error) return { ok: false, error: error.message };
+    revalidatePath("/admin/walkin");
+    return { ok: true, result: data as GateShiftResult };
   } catch (e) {
     return fail(e);
   }

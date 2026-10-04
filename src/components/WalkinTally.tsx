@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { recordWalkin, setWalkinPrice } from "@/app/actions/walkin";
+import { recordWalkin, setWalkinPrice, undoWalkinSale, type RecordWalkinInput } from "@/app/actions/walkin";
 import { php } from "@/lib/money";
 import { SHIRT_SIZES, type ShirtSize } from "@/config/event";
 import type { AvailabilityRow, PaymentMethod, TicketTypeRow } from "@/lib/supabase/types";
@@ -22,6 +22,7 @@ export interface TallyEntry {
   free_qty: number;
   unit_price_centavos: number;
   payment_method: PaymentMethod;
+  payment_ref: string | null;
   shirt_size: string | null;
   holder_name: string | null;
   vehicle_plate: string | null;
@@ -95,6 +96,13 @@ function PriceEditor({ t, onSaved }: { t: TicketTypeRow; onSaved: () => void }) 
   );
 }
 
+/** A sale sent with no answer back: it may or may not be in, and a retry is safe. */
+interface Unconfirmed { t: TicketTypeRow; delta: number; input: RecordWalkinInput; label: string }
+/** The last sale, undoable for a few seconds. */
+interface LastSale { saleId: string; label: string; until: number }
+
+const UNDO_SECONDS = 10;
+
 export function WalkinTally({
   types,
   availability,
@@ -102,6 +110,7 @@ export function WalkinTally({
   recent,
   shirts,
   gateSales,
+  shiftOpen,
   isAdmin,
 }: {
   types: TicketTypeRow[];
@@ -112,13 +121,32 @@ export function WalkinTally({
   shirts: Record<string, Record<string, number>>;
   /** Named gate sales per label (cars, VIP Pass holders), newest first. */
   gateSales: Record<string, GateSale[]>;
+  /** Selling needs the staff member's shift to be open. */
+  shiftOpen: boolean;
   isAdmin: boolean;
 }) {
   const router = useRouter();
+  // Back to Cash after every sale, so one GCash buyer does not turn the next ten into GCash.
   const [method, setMethod] = useState<PaymentMethod>("cash");
+  // The e-wallet reference for the next sale; cleared after every sale.
+  const [payRef, setPayRef] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
+  const [unconfirmed, setUnconfirmed] = useState<Unconfirmed | null>(null);
+  const [last, setLast] = useState<LastSale | null>(null);
+  const [now, setNow] = useState(0);
+  // One request at a time: two taps in the same instant would otherwise be two sales.
+  const inFlight = useRef(false);
+  const methodLabel = METHODS.find((m) => m.key === method)?.label ?? method;
+
+  // Tick the undo countdown while there is something to undo.
+  useEffect(() => {
+    if (!last) return;
+    const id = setInterval(() => setNow(Date.now()), 500);
+    return () => clearInterval(id);
+  }, [last]);
+  const undoLeft = last ? Math.max(0, Math.ceil((last.until - now) / 1000)) : 0;
   const [editing, setEditing] = useState<string | null>(null);
   // Optimistic adjustments until the server refresh lands: typeId -> sales
   const [pendingDelta, setPendingDelta] = useState<Record<string, number>>({});
@@ -138,6 +166,7 @@ export function WalkinTally({
   };
 
   function tap(t: TicketTypeRow, delta: number) {
+    if (!shiftOpen) { setError("Open your shift first, at the top of this page."); return; }
     const car = t.requires_vehicle;
     const isNamed = car || t.gate_needs_name;
     const who = whoOf(t.id);
@@ -151,27 +180,55 @@ export function WalkinTally({
       return;
     }
     if (t.includes_shirt && !(isNamed && back) && !size) { setError(`Pick the shirt size for ${gateName(t)} first.`); return; }
+    const ewallet = !back && method !== "cash";
+    if (ewallet && payRef.trim().length < 4) { setError(`Enter the ${methodLabel} reference number for this sale.`); return; }
+
+    const n = Math.abs(delta);
+    const what = bandsPerSale(t) > 1 ? `${n} car${n === 1 ? "" : "s"} (${n * bandsPerSale(t)} bands)` : `${n} band${n === 1 ? "" : "s"}`;
+    const whoText = car
+      ? ` · ${who.plate.trim().toUpperCase()}${back ? "" : `, ${who.name.trim()}`}`
+      : isNamed ? ` · ${who.name.trim()}` : "";
+    const label = `${back ? "−" : "+"}${what} · ${gateName(t)}${whoText}${size ? ` · ${size} shirt` : ""} · ${php(gatePrice(t) * n)} ${methodLabel.toUpperCase()}${ewallet ? ` ref ${payRef.trim()}` : ""}`;
+    send({
+      t, delta, label,
+      input: {
+        ticketTypeId: t.id, delta, method, shirtSize: size,
+        holderName: sendName ? who.name.trim() : null, vehiclePlate: car ? who.plate.trim() : null,
+        paymentRef: ewallet ? payRef.trim() : null,
+        // a fresh id per sale; a retry of this same sale sends it again
+        clientRef: crypto.randomUUID(),
+      },
+    });
+  }
+
+  function send(job: Unconfirmed) {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    const { t, delta, input } = job;
     setError(null);
+    setUnconfirmed(null);
     setBusy(t.id);
     setPendingDelta((d) => ({ ...d, [t.id]: (d[t.id] ?? 0) + delta }));
     start(async () => {
-      const r = await recordWalkin({
-        ticketTypeId: t.id, delta, method, shirtSize: size,
-        holderName: sendName ? who.name.trim() : null, vehiclePlate: car ? who.plate.trim() : null,
-      });
-      if (!r.ok) {
-        setError(r.error);
-        setPendingDelta((d) => ({ ...d, [t.id]: (d[t.id] ?? 0) - delta }));
-      } else {
-        const n = Math.abs(delta);
-        const what = bandsPerSale(t) > 1 ? `${n} car${n === 1 ? "" : "s"} (${n * bandsPerSale(t)} bands)` : `${n} band${n === 1 ? "" : "s"}`;
-        const whoText = car
-          ? ` · ${who.plate.trim().toUpperCase()}${back ? "" : `, ${who.name.trim()}`}`
-          : isNamed ? ` · ${who.name.trim()}` : "";
-        setFlash(`${back ? "−" : "+"}${what} · ${gateName(t)}${whoText}${size ? ` · ${size} shirt` : ""} · ${php(gatePrice(t) * n)} ${method.toUpperCase()}`);
-        setSizeFor((s) => ({ ...s, [t.id]: null }));
-        if (isNamed) setWhoFor((c) => ({ ...c, [t.id]: { name: "", plate: "" } }));
+      let r: Awaited<ReturnType<typeof recordWalkin>> | null = null;
+      try {
+        r = await recordWalkin(input);
+      } catch {
+        // No answer back. The sale may or may not be in; the same clientRef makes a retry safe.
+        setUnconfirmed(job);
       }
+      if (r && !r.ok) setError(r.error);
+      if (!r || !r.ok) setPendingDelta((d) => ({ ...d, [t.id]: (d[t.id] ?? 0) - delta }));
+      if (r?.ok) {
+        setFlash(`${job.label}${r.duplicate ? " (it had already gone through)" : ""}`);
+        if (delta > 0 && r.saleId) { setLast({ saleId: r.saleId, label: job.label, until: Date.now() + UNDO_SECONDS * 1000 }); setNow(Date.now()); }
+        else setLast(null);
+        setSizeFor((s) => ({ ...s, [t.id]: null }));
+        if (t.requires_vehicle || t.gate_needs_name) setWhoFor((c) => ({ ...c, [t.id]: { name: "", plate: "" } }));
+        setMethod("cash");
+        setPayRef("");
+      }
+      inFlight.current = false;
       setBusy(null);
       router.refresh();
       // Once the fresh numbers arrive the optimistic delta is redundant.
@@ -179,28 +236,84 @@ export function WalkinTally({
     });
   }
 
+  /** Reverse the last sale exactly: same bands, shirt, name, plate, payment. */
+  function undo() {
+    if (!last || inFlight.current) return;
+    const sale = last;
+    inFlight.current = true;
+    setLast(null);
+    start(async () => {
+      try {
+        const r = await undoWalkinSale(sale.saleId);
+        if (!r.ok) setError(r.error);
+        else setFlash(`Undone: ${sale.label}`);
+      } catch {
+        setError("No answer from the server. Check Recent entries before undoing again.");
+      }
+      inFlight.current = false;
+      router.refresh();
+    });
+  }
+
   return (
     <div className="space-y-5">
-      {/* payment method for the next taps */}
-      <div className="flex flex-wrap items-center gap-3">
-        <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Paid by</span>
-        <div className="inline-flex rounded-lg border border-white/15 bg-black/30 p-0.5">
-          {METHODS.map((m) => (
-            <button
-              key={m.key}
-              type="button"
-              onClick={() => setMethod(m.key)}
-              className={`rounded-md px-4 py-1.5 text-sm font-semibold transition ${method === m.key ? "bg-gradient-to-r from-cyan-300 to-green-300 text-zinc-950" : "text-zinc-300 hover:bg-white/10"}`}
-            >
-              {m.label}
-            </button>
-          ))}
+      {/* payment for the next sale only */}
+      <div className="space-y-2">
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Paid by</span>
+          <div className="inline-flex rounded-lg border border-white/15 bg-black/30 p-0.5">
+            {METHODS.map((m) => (
+              <button
+                key={m.key}
+                type="button"
+                onClick={() => { setMethod(m.key); setError(null); }}
+                className={`rounded-md px-4 py-1.5 text-sm font-semibold transition ${method === m.key ? "bg-gradient-to-r from-cyan-300 to-green-300 text-zinc-950" : "text-zinc-300 hover:bg-white/10"}`}
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
+          <span className="text-xs text-zinc-500">Goes back to Cash after every sale.</span>
         </div>
-        <span className="text-xs text-zinc-500">Applies to the next + / − you tap.</span>
+        {method !== "cash" && (
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              id="walkin-pay-ref"
+              className="input w-full sm:w-72"
+              autoComplete="off"
+              placeholder={`${methodLabel} reference number`}
+              value={payRef}
+              onChange={(e) => { setPayRef(e.target.value); setError(null); }}
+            />
+            <span className="text-xs text-zinc-500">Check that the transfer arrived before handing over the band.</span>
+          </div>
+        )}
       </div>
 
+      {!shiftOpen && (
+        <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-200">Open your shift above before selling.</p>
+      )}
+      {unconfirmed && (
+        <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-100">
+          <b>No answer from the server.</b> This sale may or may not be in: {unconfirmed.label}.
+          Do not hand over another band yet.
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button type="button" className="btn-primary px-3 py-1.5 text-sm" disabled={!!busy} onClick={() => send(unconfirmed)}>
+              Retry (it will not be recorded twice)
+            </button>
+            <button type="button" className="btn-secondary px-3 py-1.5 text-sm" onClick={() => setUnconfirmed(null)}>Dismiss</button>
+          </div>
+        </div>
+      )}
       {error && <p className="rounded-lg border border-rose-500/40 bg-rose-500/10 p-3 text-sm text-rose-300">{error}</p>}
-      {flash && !error && <p className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-2 text-xs text-emerald-300">Recorded: {flash}</p>}
+      {flash && !error && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-2 text-xs text-emerald-300">
+          <span>Recorded: {flash}</span>
+          {last && undoLeft > 0 && (
+            <button type="button" className="btn-secondary px-3 py-1 text-xs" onClick={undo}>Undo ({undoLeft}s)</button>
+          )}
+        </div>
+      )}
 
       {/* one counter per label */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -326,7 +439,7 @@ export function WalkinTally({
                 <button
                   type="button"
                   className="btn-secondary h-14 w-16 shrink-0 text-2xl font-black"
-                  disabled={isBusy || total <= 0 || !canTakeBack}
+                  disabled={isBusy || !shiftOpen || total <= 0 || !canTakeBack}
                   title={!canTakeBack
                     ? car ? "Type or tap the plate of the car to take back"
                       : isNamed ? "Type or tap the name to take back"
@@ -340,7 +453,7 @@ export function WalkinTally({
                 <button
                   type="button"
                   className="btn-primary h-14 flex-1 text-2xl font-black"
-                  disabled={isBusy || noPrice || left <= 0 || !canAdd}
+                  disabled={isBusy || !shiftOpen || noPrice || left <= 0 || !canAdd}
                   onClick={() => tap(t, 1)}
                   aria-label={`Add one ${gateName(t)}${size ? `, ${size} shirt` : ""}`}
                 >
@@ -351,7 +464,7 @@ export function WalkinTally({
                 </button>
                 {/* five at once only where every sale is the same: no package, no shirt size */}
                 {perSale === 1 && !t.includes_shirt && (
-                  <button type="button" className="btn-secondary h-14 w-16 shrink-0 text-base font-bold" disabled={isBusy || noPrice || left < 5} onClick={() => tap(t, 5)} aria-label={`Add five ${gateName(t)}`}>+5</button>
+                  <button type="button" className="btn-secondary h-14 w-16 shrink-0 text-base font-bold" disabled={isBusy || !shiftOpen || noPrice || left < 5} onClick={() => tap(t, 5)} aria-label={`Add five ${gateName(t)}`}>+5</button>
                 )}
               </div>
               {given.length > 0 && (
@@ -434,7 +547,10 @@ export function WalkinTally({
                     </td>
                     <td className="text-zinc-500"><BandSwatch color={e.band_color} label={false} size={10} /> {e.band_color}</td>
                     <td className="text-right">{php(sales * e.unit_price_centavos)}</td>
-                    <td className="text-right text-xs uppercase text-zinc-500">{e.payment_method}</td>
+                    <td className="text-right text-xs uppercase text-zinc-500">
+                      {e.payment_method}
+                      {e.payment_ref && <span className="block font-mono normal-case text-[10px]">{e.payment_ref}</span>}
+                    </td>
                     <td className="text-right text-xs text-zinc-500">{e.staff ?? ""}</td>
                   </tr>
                   );
