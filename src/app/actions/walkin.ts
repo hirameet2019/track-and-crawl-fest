@@ -17,10 +17,13 @@ const methodSchema = z.enum(["cash", "gotyme", "gcash", "maya"]);
 /**
  * Walk-in tally: +N sales at the gate (or -N to correct a mistake). A sale is one
  * band, or for a label with included passengers one car with all its bands. A label
- * that includes a shirt needs the size handed over. No buyer details, no tickets,
- * no email. Returns the new running band count for the label.
+ * that includes a shirt needs the size handed over, and a car label the driver's
+ * name and the plate (a car goes back by its plate). No tickets, no email. Returns
+ * the new running band count for the label.
  */
-export async function recordWalkin(input: { ticketTypeId: string; delta: number; method: PaymentMethod; shirtSize?: string | null }): Promise<ActionResult & { count?: number }> {
+export async function recordWalkin(input: {
+  ticketTypeId: string; delta: number; method: PaymentMethod; shirtSize?: string | null; holderName?: string | null; vehiclePlate?: string | null;
+}): Promise<ActionResult & { count?: number }> {
   try {
     const { userId } = await assertStaff("gate");
     const ticketTypeId = z.string().uuid().parse(input.ticketTypeId);
@@ -28,9 +31,12 @@ export async function recordWalkin(input: { ticketTypeId: string; delta: number;
     if (delta === 0) return { ok: false, error: "Nothing to record" };
     const method = methodSchema.parse(input.method);
     const shirtSize = input.shirtSize ? z.enum(SHIRT_SIZES).parse(input.shirtSize) : null;
+    const holderName = z.string().trim().max(80).optional().nullable().parse(input.holderName) || null;
+    const vehiclePlate = z.string().trim().max(20).optional().nullable().parse(input.vehiclePlate) || null;
     const admin = createAdminClient();
     const { data, error } = await admin.rpc("record_walkin", {
       p_ticket_type_id: ticketTypeId, p_qty: delta, p_actor: userId, p_method: method, p_shirt_size: shirtSize,
+      p_holder_name: holderName, p_vehicle_plate: vehiclePlate,
     });
     if (error) return { ok: false, error: error.message };
     revalidatePath("/admin");

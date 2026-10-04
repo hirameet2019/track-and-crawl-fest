@@ -239,6 +239,9 @@ export interface WalkinSaleRow {
   created_at: string;
   /** Shirt handed over with a gate sale of a label that includes one. */
   shirt_size: string | null;
+  /** Gate sale of a car label: the driver's name and the car's plate. */
+  holder_name: string | null;
+  vehicle_plate: string | null;
 }
 
 type Table<Row, Insert = Partial<Row>, Update = Partial<Row>> = {

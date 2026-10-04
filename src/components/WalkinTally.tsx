@@ -23,11 +23,23 @@ export interface TallyEntry {
   unit_price_centavos: number;
   payment_method: PaymentMethod;
   shirt_size: string | null;
+  holder_name: string | null;
+  vehicle_plate: string | null;
   type_name: string;
   code: string;
   band_color: string | null;
   staff: string | null;
 }
+/** A car sold at the gate and not taken back. */
+export interface GateCar {
+  plate: string;
+  name: string;
+  size: string | null;
+  at: string;
+}
+
+/** Plates compare on letters and digits only, as the database does. */
+const plateKey = (p: string) => p.toUpperCase().replace(/[^A-Z0-9]/g, "");
 
 const METHODS: { key: PaymentMethod; label: string }[] = [
   { key: "cash", label: "Cash" },
@@ -87,6 +99,7 @@ export function WalkinTally({
   today,
   recent,
   shirts,
+  cars,
   isAdmin,
 }: {
   types: TicketTypeRow[];
@@ -95,6 +108,8 @@ export function WalkinTally({
   recent: TallyEntry[];
   /** Shirts handed over at the gate so far: typeId -> size -> count. */
   shirts: Record<string, Record<string, number>>;
+  /** Cars sold at the gate per car label, newest first. */
+  cars: Record<string, GateCar[]>;
   isAdmin: boolean;
 }) {
   const router = useRouter();
@@ -108,26 +123,42 @@ export function WalkinTally({
   // The shirt size picked for the next tap on a label with a shirt. Cleared after
   // every tap, so each sale is a deliberate choice rather than the last one's size.
   const [sizeFor, setSizeFor] = useState<Record<string, ShirtSize | null>>({});
+  // Car labels: the driver's name and plate for the next sale (or the plate to take back).
+  const [carFor, setCarFor] = useState<Record<string, { name: string; plate: string }>>({});
   const [, start] = useTransition();
 
   const avail = (id: string) => availability.find((a) => a.ticket_type_id === id);
+  const carOf = (id: string) => carFor[id] ?? { name: "", plate: "" };
+  const setCar = (id: string, patch: Partial<{ name: string; plate: string }>) => {
+    setCarFor((cur) => ({ ...cur, [id]: { ...(cur[id] ?? { name: "", plate: "" }), ...patch } }));
+    setError(null);
+  };
 
   function tap(t: TicketTypeRow, delta: number) {
-    const size = t.includes_shirt ? sizeFor[t.id] ?? null : null;
-    if (t.includes_shirt && !size) { setError(`Pick the shirt size for ${gateName(t)} first.`); return; }
+    const car = t.requires_vehicle ? carOf(t.id) : null;
+    // A car goes back by its plate and keeps the size it was sold with.
+    const size = t.includes_shirt && !(car && delta < 0) ? sizeFor[t.id] ?? null : null;
+    if (car && plateKey(car.plate).length < 3) { setError(`Enter the plate number for ${gateName(t)}.`); return; }
+    if (car && delta > 0 && car.name.trim().length < 2) { setError(`Enter the driver's name for ${gateName(t)}.`); return; }
+    if (t.includes_shirt && !(car && delta < 0) && !size) { setError(`Pick the shirt size for ${gateName(t)} first.`); return; }
     setError(null);
     setBusy(t.id);
     setPendingDelta((d) => ({ ...d, [t.id]: (d[t.id] ?? 0) + delta }));
     start(async () => {
-      const r = await recordWalkin({ ticketTypeId: t.id, delta, method, shirtSize: size });
+      const r = await recordWalkin({
+        ticketTypeId: t.id, delta, method, shirtSize: size,
+        holderName: car && delta > 0 ? car.name.trim() : null, vehiclePlate: car ? car.plate.trim() : null,
+      });
       if (!r.ok) {
         setError(r.error);
         setPendingDelta((d) => ({ ...d, [t.id]: (d[t.id] ?? 0) - delta }));
       } else {
         const n = Math.abs(delta);
         const what = bandsPerSale(t) > 1 ? `${n} car${n === 1 ? "" : "s"} (${n * bandsPerSale(t)} bands)` : `${n} band${n === 1 ? "" : "s"}`;
-        setFlash(`${delta > 0 ? "+" : "−"}${what} · ${gateName(t)}${size ? ` · ${size} shirt` : ""} · ${php(gatePrice(t) * n)} ${method.toUpperCase()}`);
+        const who = car ? ` · ${car.plate.trim().toUpperCase()}${delta > 0 ? `, ${car.name.trim()}` : ""}` : "";
+        setFlash(`${delta > 0 ? "+" : "−"}${what} · ${gateName(t)}${who}${size ? ` · ${size} shirt` : ""} · ${php(gatePrice(t) * n)} ${method.toUpperCase()}`);
         setSizeFor((s) => ({ ...s, [t.id]: null }));
+        if (car) setCarFor((c) => ({ ...c, [t.id]: { name: "", plate: "" } }));
       }
       setBusy(null);
       router.refresh();
@@ -175,6 +206,13 @@ export function WalkinTally({
           const isBusy = busy === t.id;
           const size = sizeFor[t.id] ?? null;
           const needSize = t.includes_shirt && !size;
+          const car = t.requires_vehicle ? carOf(t.id) : null;
+          const plateOk = !car || plateKey(car.plate).length >= 3;
+          const nameOk = !car || car.name.trim().length >= 2;
+          const canAdd = !needSize && plateOk && nameOk;
+          // taking a car back needs only its plate; other shirt labels need the size
+          const canTakeBack = car ? plateOk : !needSize;
+          const gateCars = cars[t.id] ?? [];
           const given = Object.entries(shirts[t.id] ?? {}).filter(([, n]) => n > 0)
             .sort(([x], [y]) => SHIRT_SIZES.indexOf(x as ShirtSize) - SHIRT_SIZES.indexOf(y as ShirtSize));
           return (
@@ -214,6 +252,36 @@ export function WalkinTally({
                 <div><div className={`text-2xl font-black tabular-nums ${left <= 20 ? "text-rose-400" : ""}`}>{left}</div><div className="text-[10px] uppercase tracking-wide text-zinc-500">{unit} left</div></div>
               </div>
 
+              {/* car labels: who is driving and which car, before the sale */}
+              {car && (
+                <div className="grid grid-cols-[minmax(0,1fr)_7.5rem] gap-2">
+                  <div>
+                    <label className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500" htmlFor={`car-name-${t.id}`}>Driver&apos;s name</label>
+                    <input
+                      id={`car-name-${t.id}`}
+                      className="input mt-1 py-1.5"
+                      autoComplete="off"
+                      placeholder="e.g. Juan Dela Cruz"
+                      value={car.name}
+                      onChange={(e) => setCar(t.id, { name: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500" htmlFor={`car-plate-${t.id}`}>Plate no.</label>
+                    <input
+                      id={`car-plate-${t.id}`}
+                      className="input mt-1 py-1.5 uppercase"
+                      autoComplete="off"
+                      autoCapitalize="characters"
+                      placeholder="ABC 1234"
+                      maxLength={20}
+                      value={car.plate}
+                      onChange={(e) => setCar(t.id, { plate: e.target.value })}
+                    />
+                  </div>
+                </div>
+              )}
+
               {/* the shirt handed over with this sale; required before + or − */}
               {t.includes_shirt && (
                 <div>
@@ -239,21 +307,24 @@ export function WalkinTally({
                 <button
                   type="button"
                   className="btn-secondary h-14 w-16 shrink-0 text-2xl font-black"
-                  disabled={isBusy || total <= 0 || needSize}
-                  title={needSize ? "Pick the shirt size to take back first" : undefined}
+                  disabled={isBusy || total <= 0 || !canTakeBack}
+                  title={!canTakeBack ? (car ? "Type or tap the plate of the car to take back" : "Pick the shirt size to take back first") : undefined}
                   onClick={() => tap(t, -1)}
-                  aria-label={`Take back one ${gateName(t)}${size ? `, ${size} shirt` : ""}`}
+                  aria-label={car ? `Take back the car ${car.plate}` : `Take back one ${gateName(t)}${size ? `, ${size} shirt` : ""}`}
                 >
                   −
                 </button>
                 <button
                   type="button"
                   className="btn-primary h-14 flex-1 text-2xl font-black"
-                  disabled={isBusy || noPrice || left <= 0 || needSize}
+                  disabled={isBusy || noPrice || left <= 0 || !canAdd}
                   onClick={() => tap(t, 1)}
                   aria-label={`Add one ${gateName(t)}${size ? `, ${size} shirt` : ""}`}
                 >
-                  {isBusy ? "…" : needSize ? <span className="text-sm font-bold">Pick a size</span> : perSale > 1 ? "+1 car" : "+1"}
+                  {isBusy ? "…"
+                    : !nameOk || !plateOk ? <span className="text-sm font-bold">Name &amp; plate first</span>
+                    : needSize ? <span className="text-sm font-bold">Pick a size</span>
+                    : perSale > 1 ? "+1 car" : "+1"}
                 </button>
                 {/* five at once only where every sale is the same: no package, no shirt size */}
                 {perSale === 1 && !t.includes_shirt && (
@@ -264,6 +335,30 @@ export function WalkinTally({
                 <p className="text-xs text-zinc-500">
                   Shirts given at the gate: {given.map(([s, n]) => `${s} ${n}`).join(" · ")}
                 </p>
+              )}
+              {/* cars in through the gate; tapping one fills its plate so − takes it back */}
+              {car && gateCars.length > 0 && (
+                <details className="rounded-lg border border-white/10 bg-black/20 text-xs">
+                  <summary className="cursor-pointer px-2 py-1.5 font-semibold text-zinc-300">
+                    {gateCars.length} car{gateCars.length === 1 ? "" : "s"} sold at the gate
+                  </summary>
+                  <ul className="max-h-48 divide-y divide-white/10 overflow-y-auto">
+                    {gateCars.map((c) => (
+                      <li key={c.plate}>
+                        <button
+                          type="button"
+                          className="grid w-full grid-cols-[5.5rem_minmax(0,1fr)_auto] items-center gap-2 px-2 py-1.5 text-left hover:bg-white/5"
+                          onClick={() => setCar(t.id, { plate: c.plate, name: "" })}
+                          title="Fill this plate, then tap − to take the car back"
+                        >
+                          <span className="font-mono font-semibold text-zinc-100">{c.plate}</span>
+                          <span className="truncate text-zinc-400">{c.name}</span>
+                          <span className="text-zinc-500">{c.size ?? ""}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
               )}
               {noPrice && <p className="text-xs text-amber-300">Adding is blocked until an admin sets the gate price.</p>}
             </div>
@@ -306,6 +401,11 @@ export function WalkinTally({
                     <td>
                       <span className="mr-1 rounded bg-white/10 px-1 font-black">{e.code}</span>{e.type_name}
                       {e.shirt_size && <span className="ml-1 rounded border border-white/15 px-1 text-[10px] font-semibold text-zinc-300">{e.shirt_size}</span>}
+                      {e.vehicle_plate && (
+                        <span className="block text-xs text-zinc-500">
+                          <span className="font-mono">{e.vehicle_plate}</span>{e.holder_name ? ` · ${e.holder_name}` : ""}
+                        </span>
+                      )}
                     </td>
                     <td className="text-zinc-500"><BandSwatch color={e.band_color} label={false} size={10} /> {e.band_color}</td>
                     <td className="text-right">{php(sales * e.unit_price_centavos)}</td>
