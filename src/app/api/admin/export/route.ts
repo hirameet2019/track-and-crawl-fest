@@ -50,7 +50,7 @@ async function walkinCsv() {
   const rows = (await tallyRows()).filter((r) => !r.drifter_name);
   return csv([
     // sales = qty - free_qty: one band, or one car whose passenger bands are included
-    ["time_manila", "code", "label", "band_color", "sales", "bands", "unit_price_php", "amount_php", "shirt_size", "driver_name", "plate", "payment_method", "staff"],
+    ["time_manila", "code", "label", "band_color", "sales", "bands", "unit_price_php", "amount_php", "shirt_size", "name", "plate", "payment_method", "staff"],
     ...rows.map((r) => [
       manilaTime(r.created_at), r.ticket_type?.code, r.ticket_type?.walkin_name ?? r.ticket_type?.name, r.ticket_type?.band_color,
       r.qty - r.free_qty, r.qty, (r.unit_price_centavos / 100).toFixed(2), (tallyAmount(r) / 100).toFixed(2), r.shirt_size ?? "", r.holder_name ?? "", r.vehicle_plate ?? "",

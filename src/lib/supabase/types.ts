@@ -84,6 +84,8 @@ export interface TicketTypeRow {
   sell_at_gate: boolean;
   /** Name the gate desk sees on the Walk-in tab; null uses `name`. */
   walkin_name: string | null;
+  /** A gate sale records the person's name (a car label also records the plate). */
+  gate_needs_name: boolean;
 }
 
 export interface TicketNumberRow {

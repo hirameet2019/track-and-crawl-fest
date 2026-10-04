@@ -2,7 +2,7 @@ import { requireStaff } from "@/lib/auth";
 import { hasRole } from "@/lib/roles";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getActiveEvent, getAvailability, getTicketTypes } from "@/lib/queries";
-import { WalkinTally, type GateCar, type TallyEntry, type TallyToday } from "@/components/WalkinTally";
+import { WalkinTally, type GateSale, type TallyEntry, type TallyToday } from "@/components/WalkinTally";
 import type { PaymentMethod } from "@/lib/supabase/types";
 
 export const dynamic = "force-dynamic";
@@ -39,23 +39,28 @@ export default async function WalkinPage() {
       .from("walkin_sales")
       .select("ticket_type_id, created_at, qty, free_qty, shirt_size, holder_name, vehicle_plate")
       .eq("event_id", event.id)
-      .not("vehicle_plate", "is", null)
+      .is("drifter_name", null)
+      .not("holder_name", "is", null)
       .order("created_at"),
   ]);
 
-  // Cars sold at the gate and still in (sales minus take-backs), per label, newest first.
+  // Named gate sales still in (sales minus take-backs), per label, newest first. A car
+  // is one per plate; a name-only sale is counted per name and shirt size, the same
+  // way the database matches a take-back.
   const plateKey = (p: string) => p.toUpperCase().replace(/[^A-Z0-9]/g, "");
-  const carMap = new Map<string, GateCar & { typeId: string; net: number }>();
+  const saleMap = new Map<string, GateSale & { typeId: string }>();
   for (const r of carRows ?? []) {
-    const k = `${r.ticket_type_id}|${plateKey(r.vehicle_plate as string)}`;
-    const cur = carMap.get(k) ?? { typeId: r.ticket_type_id, net: 0, plate: r.vehicle_plate as string, name: "", size: null, at: r.created_at };
-    cur.net += r.qty - r.free_qty;
+    const k = r.vehicle_plate
+      ? `${r.ticket_type_id}|plate|${plateKey(r.vehicle_plate)}`
+      : `${r.ticket_type_id}|name|${(r.holder_name as string).toLowerCase()}|${r.shirt_size ?? ""}`;
+    const cur = saleMap.get(k) ?? { typeId: r.ticket_type_id, count: 0, plate: r.vehicle_plate, name: r.holder_name ?? "", size: r.shirt_size, at: r.created_at };
+    cur.count += r.qty - r.free_qty;
     if (r.qty > 0) Object.assign(cur, { plate: r.vehicle_plate, name: r.holder_name ?? "", size: r.shirt_size, at: r.created_at });
-    carMap.set(k, cur);
+    saleMap.set(k, cur);
   }
-  const cars: Record<string, GateCar[]> = {};
-  for (const c of [...carMap.values()].filter((c) => c.net > 0).sort((x, y) => y.at.localeCompare(x.at))) {
-    (cars[c.typeId] ??= []).push({ plate: c.plate, name: c.name, size: c.size, at: c.at });
+  const named: Record<string, GateSale[]> = {};
+  for (const s of [...saleMap.values()].filter((s) => s.count > 0).sort((x, y) => y.at.localeCompare(x.at))) {
+    (named[s.typeId] ??= []).push({ plate: s.plate, name: s.name, size: s.size, at: s.at, count: s.count });
   }
 
   // A sale is qty - free_qty: one band, or one car whose passenger bands are free.
@@ -121,7 +126,7 @@ export default async function WalkinPage() {
         today={today}
         recent={recent}
         shirts={shirts}
-        cars={cars}
+        gateSales={named}
         isAdmin={session.staff.role === "admin"}
       />
     </div>
