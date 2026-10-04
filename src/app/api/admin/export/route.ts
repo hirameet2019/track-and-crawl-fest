@@ -26,8 +26,8 @@ function download(body: string, name: string) {
 
 type TallyRow = {
   created_at: string; qty: number; free_qty: number; drifter_name: string | null; team_name: string | null; rules_ack: boolean;
-  payment_ref: string | null; payment_confirmed: boolean; unit_price_centavos: number; payment_method: string;
-  ticket_type: { code: string; name: string; band_color: string | null; drifter_family: boolean } | null;
+  payment_ref: string | null; payment_confirmed: boolean; unit_price_centavos: number; payment_method: string; shirt_size: string | null;
+  ticket_type: { code: string; name: string; walkin_name: string | null; band_color: string | null; drifter_family: boolean } | null;
   staff: { full_name: string } | null;
 };
 
@@ -35,7 +35,7 @@ async function tallyRows(): Promise<TallyRow[]> {
   const admin = createAdminClient();
   const { data } = await admin
     .from("walkin_sales")
-    .select("created_at, qty, free_qty, drifter_name, team_name, rules_ack, payment_ref, payment_confirmed, unit_price_centavos, payment_method, ticket_type:ticket_types(code, name, band_color, drifter_family), staff:staff(full_name)")
+    .select("created_at, qty, free_qty, drifter_name, team_name, rules_ack, payment_ref, payment_confirmed, unit_price_centavos, payment_method, shirt_size, ticket_type:ticket_types(code, name, walkin_name, band_color, drifter_family), staff:staff(full_name)")
     .order("created_at")
     .limit(50000);
   return (data ?? []) as unknown as TallyRow[];
@@ -49,10 +49,12 @@ const manilaTime = (iso: string) => new Date(iso).toLocaleString("en-PH", { time
 async function walkinCsv() {
   const rows = (await tallyRows()).filter((r) => !r.drifter_name);
   return csv([
-    ["time_manila", "code", "label", "band_color", "qty", "unit_price_php", "amount_php", "payment_method", "staff"],
+    // sales = qty - free_qty: one band, or one car whose passenger bands are included
+    ["time_manila", "code", "label", "band_color", "sales", "bands", "unit_price_php", "amount_php", "shirt_size", "payment_method", "staff"],
     ...rows.map((r) => [
-      manilaTime(r.created_at), r.ticket_type?.code, r.ticket_type?.name, r.ticket_type?.band_color,
-      r.qty, (r.unit_price_centavos / 100).toFixed(2), (tallyAmount(r) / 100).toFixed(2), r.payment_method, r.staff?.full_name,
+      manilaTime(r.created_at), r.ticket_type?.code, r.ticket_type?.walkin_name ?? r.ticket_type?.name, r.ticket_type?.band_color,
+      r.qty - r.free_qty, r.qty, (r.unit_price_centavos / 100).toFixed(2), (tallyAmount(r) / 100).toFixed(2), r.shirt_size ?? "",
+      r.payment_method, r.staff?.full_name,
     ]),
   ]);
 }

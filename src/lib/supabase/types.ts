@@ -80,6 +80,10 @@ export interface TicketTypeRow {
   free_allowance: number;
   /** Shared drifter sign-up link (/drifters/<slug>); null while closed. */
   drifter_signup_slug: string | null;
+  /** Shown on the Walk-in tab and accepted at the gate. */
+  sell_at_gate: boolean;
+  /** Name the gate desk sees on the Walk-in tab; null uses `name`. */
+  walkin_name: string | null;
 }
 
 export interface TicketNumberRow {
@@ -225,11 +229,16 @@ export interface WalkinSaleRow {
   id: string;
   event_id: string;
   ticket_type_id: string;
+  /** Bands handed over; a package sale counts the included passengers too. */
   qty: number;
+  /** Bands inside qty given at no charge (included passengers, drifter allowance). */
+  free_qty: number;
   unit_price_centavos: number;
   payment_method: PaymentMethod;
   sold_by: string | null;
   created_at: string;
+  /** Shirt handed over with a gate sale of a label that includes one. */
+  shirt_size: string | null;
 }
 
 type Table<Row, Insert = Partial<Row>, Update = Partial<Row>> = {

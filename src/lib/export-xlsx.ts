@@ -15,7 +15,7 @@ type TicketRow = {
   vehicle_photo_path: string | null; companion_of: string | null; redeemed_at: string | null; void_reason: string | null; ticket_type_id: string; created_at: string;
   order: { order_no: number; receipt_no: number | null; status: string; channel: string; buyer_name: string; buyer_email: string | null; buyer_mobile: string | null; total_centavos: number; payment_method: string | null; payment_reference: string | null; paid_at: string | null } | null;
 };
-type WalkinRow = { created_at: string; qty: number; free_qty: number; drifter_name: string | null; unit_price_centavos: number; payment_method: string; ticket_type_id: string; staff: { full_name: string } | null };
+type WalkinRow = { created_at: string; qty: number; free_qty: number; drifter_name: string | null; unit_price_centavos: number; payment_method: string; shirt_size: string | null; ticket_type_id: string; staff: { full_name: string } | null };
 /** Bands inside a drifter's free allowance are handed over, not sold. */
 const tapAmount = (w: WalkinRow) => (w.qty - w.free_qty) * w.unit_price_centavos;
 type AvailRow = { ticket_type_id: string; pool_total: number; pool_available: number; voided: number; online_sold: number; walkin_sold: number; reserved: number; sellable: number; online_revenue_centavos: number; walkin_revenue_centavos: number; redeemed: number };
@@ -73,7 +73,7 @@ export async function buildTicketsWorkbook(): Promise<Buffer> {
       )
       .order("number")
       .limit(50000),
-    admin.from("walkin_sales").select("created_at, qty, free_qty, drifter_name, unit_price_centavos, payment_method, ticket_type_id, staff:staff(full_name)").order("created_at").limit(50000),
+    admin.from("walkin_sales").select("created_at, qty, free_qty, drifter_name, unit_price_centavos, payment_method, shirt_size, ticket_type_id, staff:staff(full_name)").order("created_at").limit(50000),
     admin.from("v_ticket_type_availability").select("ticket_type_id, pool_total, pool_available, voided, online_sold, walkin_sold, reserved, sellable, online_revenue_centavos, walkin_revenue_centavos, redeemed"),
     admin.from("events").select("name").limit(1).maybeSingle(),
   ]);
@@ -120,7 +120,8 @@ export async function buildTicketsWorkbook(): Promise<Buffer> {
 
   // ------------------------------------------------------ per label sheets
   const ticketHeader = ["Wristband no.", "Status", "Holder", "Shirt", "Plate", "Vehicle", "Car photo", "Companion of car", "Scanned at gate", "Void reason", "Order #", "Receipt #", "Order status", "Channel", "Buyer", "Email", "Mobile", "Order total (PHP)", "Payment", "Reference", "Paid at", "Issued at"];
-  const walkinHeader = ["Time (Manila)", "Bands", "Price each (PHP)", "Amount (PHP)", "Payment", "Staff"];
+  // A package sale (VIP Car with shirt) is one sale of two bands: the passenger's is included.
+  const walkinHeader = ["Time (Manila)", "Sales", "Bands", "Price each (PHP)", "Amount (PHP)", "Shirt", "Payment", "Staff"];
   const drifterHeader = ["Time (Manila)", "Drifter", "Bands", "Free", "Charged", "Price each (PHP)", "Amount (PHP)", "Payment", "Staff"];
 
   for (const t of T) {
@@ -185,16 +186,19 @@ export async function buildTicketsWorkbook(): Promise<Buffer> {
       for (const w of taps) {
         row += 1;
         const r = ws.getRow(row);
-        r.values = [manila(w.created_at), w.qty, php(w.unit_price_centavos), php(tapAmount(w)), w.payment_method, w.staff?.full_name ?? ""];
-        r.getCell(3).numFmt = "#,##0.00";
+        r.values = [manila(w.created_at), w.qty - w.free_qty, w.qty, php(w.unit_price_centavos), php(tapAmount(w)), w.shirt_size ?? "", w.payment_method, w.staff?.full_name ?? ""];
         r.getCell(4).numFmt = "#,##0.00";
+        r.getCell(5).numFmt = "#,##0.00";
       }
       if (taps.length === 0) { row += 1; ws.getCell(`A${row}`).value = "No walk-in bands recorded yet."; ws.getCell(`A${row}`).font = { italic: true, color: { argb: "FF888888" } }; }
     }
 
+    // A gate-only label has just the walk-in table, so it gets that table's widths.
     const widths = t.drifter_family
       ? [19, 26, 8, 8, 10, 16, 14, 10, 20]
-      : [14, 10, 22, 6, 11, 22, 9, 16, 19, 28, 8, 9, 13, 8, 22, 28, 13, 16, 9, 20, 19, 19];
+      : !t.sell_online && mine.length === 0
+        ? [22, 8, 8, 16, 14, 8, 10, 20]
+        : [14, 10, 22, 6, 11, 22, 9, 16, 19, 28, 8, 9, 13, 8, 22, 28, 13, 16, 9, 20, 19, 19];
     ws.columns.forEach((c, i) => { c.width = widths[i] ?? 12; });
   }
 

@@ -4,11 +4,13 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { recordWalkin, setWalkinPrice } from "@/app/actions/walkin";
 import { php } from "@/lib/money";
+import { SHIRT_SIZES, type ShirtSize } from "@/config/event";
 import type { AvailabilityRow, PaymentMethod, TicketTypeRow } from "@/lib/supabase/types";
 import { BandSwatch } from "@/components/BandSwatch";
 
 export interface TallyToday {
-  byType: Record<string, { qty: number; centavos: number }>;
+  /** Sales today per label: bands, or cars for a label with included passengers. */
+  byType: Record<string, { sales: number; centavos: number }>;
   byMethod: Record<PaymentMethod, number>;
   total_centavos: number;
   entries: number;
@@ -17,8 +19,10 @@ export interface TallyEntry {
   id: string;
   created_at: string;
   qty: number;
+  free_qty: number;
   unit_price_centavos: number;
   payment_method: PaymentMethod;
+  shirt_size: string | null;
   type_name: string;
   code: string;
   band_color: string | null;
@@ -34,6 +38,22 @@ const METHODS: { key: PaymentMethod; label: string }[] = [
 
 function gatePrice(t: TicketTypeRow) {
   return t.walkin_price_centavos ?? t.price_centavos;
+}
+
+/** What the gate desk calls the label. */
+const gateName = (t: TicketTypeRow) => t.walkin_name ?? t.name;
+
+/** Bands in one sale: the buyer plus any passengers the label includes. */
+const bandsPerSale = (t: TicketTypeRow) => 1 + Math.max(0, t.included_companions ?? 0);
+
+/**
+ * Sales still possible at the gate: the bands left, divided into whole sales, and
+ * never past the label's limit (40 cars for VIP Car Display), which online and gate share.
+ */
+function salesLeft(t: TicketTypeRow, a: AvailabilityRow | undefined) {
+  if (!a) return 0;
+  const byBands = Math.floor(Number(a.pool_sellable ?? 0) / bandsPerSale(t));
+  return a.online_cap == null ? byBands : Math.min(byBands, Number(a.online_cap) - Number(a.cap_used ?? 0));
 }
 
 function PriceEditor({ t, onSaved }: { t: TicketTypeRow; onSaved: () => void }) {
@@ -66,12 +86,15 @@ export function WalkinTally({
   availability,
   today,
   recent,
+  shirts,
   isAdmin,
 }: {
   types: TicketTypeRow[];
   availability: AvailabilityRow[];
   today: TallyToday;
   recent: TallyEntry[];
+  /** Shirts handed over at the gate so far: typeId -> size -> count. */
+  shirts: Record<string, Record<string, number>>;
   isAdmin: boolean;
 }) {
   const router = useRouter();
@@ -80,23 +103,31 @@ export function WalkinTally({
   const [error, setError] = useState<string | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
-  // Optimistic adjustments until the server refresh lands: typeId -> delta
+  // Optimistic adjustments until the server refresh lands: typeId -> sales
   const [pendingDelta, setPendingDelta] = useState<Record<string, number>>({});
+  // The shirt size picked for the next tap on a label with a shirt. Cleared after
+  // every tap, so each sale is a deliberate choice rather than the last one's size.
+  const [sizeFor, setSizeFor] = useState<Record<string, ShirtSize | null>>({});
   const [, start] = useTransition();
 
   const avail = (id: string) => availability.find((a) => a.ticket_type_id === id);
 
   function tap(t: TicketTypeRow, delta: number) {
+    const size = t.includes_shirt ? sizeFor[t.id] ?? null : null;
+    if (t.includes_shirt && !size) { setError(`Pick the shirt size for ${gateName(t)} first.`); return; }
     setError(null);
     setBusy(t.id);
     setPendingDelta((d) => ({ ...d, [t.id]: (d[t.id] ?? 0) + delta }));
     start(async () => {
-      const r = await recordWalkin({ ticketTypeId: t.id, delta, method });
+      const r = await recordWalkin({ ticketTypeId: t.id, delta, method, shirtSize: size });
       if (!r.ok) {
         setError(r.error);
         setPendingDelta((d) => ({ ...d, [t.id]: (d[t.id] ?? 0) - delta }));
       } else {
-        setFlash(`${delta > 0 ? "+" : ""}${delta} ${t.name} (${t.band_color}) · ${php(gatePrice(t) * Math.abs(delta))} ${method.toUpperCase()}`);
+        const n = Math.abs(delta);
+        const what = bandsPerSale(t) > 1 ? `${n} car${n === 1 ? "" : "s"} (${n * bandsPerSale(t)} bands)` : `${n} band${n === 1 ? "" : "s"}`;
+        setFlash(`${delta > 0 ? "+" : "−"}${what} · ${gateName(t)}${size ? ` · ${size} shirt` : ""} · ${php(gatePrice(t) * n)} ${method.toUpperCase()}`);
+        setSizeFor((s) => ({ ...s, [t.id]: null }));
       }
       setBusy(null);
       router.refresh();
@@ -134,22 +165,36 @@ export function WalkinTally({
           const a = avail(t.id);
           const price = gatePrice(t);
           const noPrice = price <= 0;
+          const perSale = bandsPerSale(t);
+          const unit = perSale > 1 ? "cars" : "bands";
           const delta = pendingDelta[t.id] ?? 0;
-          const total = Number(a?.walkin_sold ?? 0) + delta;
-          const todayQty = (today.byType[t.id]?.qty ?? 0) + delta;
-          const left = Number(a?.sellable ?? 0) - delta;
+          // walk-in sales so far: bands minus the free passenger bands inside packages
+          const total = Number(a?.walkin_sold ?? 0) - Number(a?.free_bands ?? 0) + delta;
+          const todayQty = (today.byType[t.id]?.sales ?? 0) + delta;
+          const left = salesLeft(t, a) - delta;
           const isBusy = busy === t.id;
+          const size = sizeFor[t.id] ?? null;
+          const needSize = t.includes_shirt && !size;
+          const given = Object.entries(shirts[t.id] ?? {}).filter(([, n]) => n > 0)
+            .sort(([x], [y]) => SHIRT_SIZES.indexOf(x as ShirtSize) - SHIRT_SIZES.indexOf(y as ShirtSize));
           return (
             <div key={t.id} className="card relative flex flex-col gap-3 p-4">
               <div className="flex items-start justify-between gap-2">
-                <div>
+                <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="grid h-8 w-8 place-items-center rounded-md bg-white/10 text-base font-black">{t.code}</span>
-                    <div>
-                      <div className="font-semibold leading-tight">{t.name}</div>
+                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-white/10 text-base font-black">{t.code}</span>
+                    <div className="min-w-0">
+                      <div className="font-semibold leading-tight">{gateName(t)}</div>
                       <BandSwatch color={t.band_color} className="text-xs text-zinc-400" />
                     </div>
                   </div>
+                  {(perSale > 1 || t.includes_shirt) && (
+                    <p className="mt-1.5 text-xs text-zinc-400">
+                      {perSale > 1
+                        ? <>1 tap = 1 car: driver + {perSale - 1} passenger, {perSale} {t.band_color?.toLowerCase() ?? ""} bands{t.includes_shirt ? ", 1 shirt (driver)" : ""}.</>
+                        : <>Includes 1 shirt.</>}
+                    </p>
+                  )}
                 </div>
                 <div className="text-right">
                   {editing === t.id ? (
@@ -164,24 +209,62 @@ export function WalkinTally({
               </div>
 
               <div className="grid grid-cols-3 gap-2 rounded-lg bg-black/30 p-2 text-center">
-                <div><div className="text-2xl font-black tabular-nums">{todayQty}</div><div className="text-[10px] uppercase tracking-wide text-zinc-500">today</div></div>
+                <div><div className="text-2xl font-black tabular-nums">{todayQty}</div><div className="text-[10px] uppercase tracking-wide text-zinc-500">{unit} today</div></div>
                 <div><div className="text-2xl font-black tabular-nums">{total}</div><div className="text-[10px] uppercase tracking-wide text-zinc-500">total walk-in</div></div>
-                <div><div className={`text-2xl font-black tabular-nums ${left <= 20 ? "text-rose-400" : ""}`}>{left}</div><div className="text-[10px] uppercase tracking-wide text-zinc-500">bands left</div></div>
+                <div><div className={`text-2xl font-black tabular-nums ${left <= 20 ? "text-rose-400" : ""}`}>{left}</div><div className="text-[10px] uppercase tracking-wide text-zinc-500">{unit} left</div></div>
               </div>
 
+              {/* the shirt handed over with this sale; required before + or − */}
+              {t.includes_shirt && (
+                <div>
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Shirt size handed over</div>
+                  <div className="mt-1 flex flex-wrap gap-1" role="radiogroup" aria-label={`Shirt size for ${gateName(t)}`}>
+                    {SHIRT_SIZES.map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        role="radio"
+                        aria-checked={size === s}
+                        onClick={() => { setSizeFor((cur) => ({ ...cur, [t.id]: cur[t.id] === s ? null : s })); setError(null); }}
+                        className={`min-w-10 rounded-md border px-2 py-1 text-xs font-semibold transition ${size === s ? "border-transparent bg-gradient-to-r from-cyan-300 to-green-300 text-zinc-950" : "border-white/15 text-zinc-300 hover:bg-white/10"}`}
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="flex items-stretch gap-2">
-                <button type="button" className="btn-secondary h-14 w-16 shrink-0 text-2xl font-black" disabled={isBusy || total <= 0} onClick={() => tap(t, -1)} aria-label={`Subtract one ${t.name} ${t.band_color ?? ""}`}>−</button>
+                <button
+                  type="button"
+                  className="btn-secondary h-14 w-16 shrink-0 text-2xl font-black"
+                  disabled={isBusy || total <= 0 || needSize}
+                  title={needSize ? "Pick the shirt size to take back first" : undefined}
+                  onClick={() => tap(t, -1)}
+                  aria-label={`Take back one ${gateName(t)}${size ? `, ${size} shirt` : ""}`}
+                >
+                  −
+                </button>
                 <button
                   type="button"
                   className="btn-primary h-14 flex-1 text-2xl font-black"
-                  disabled={isBusy || noPrice || left <= 0}
+                  disabled={isBusy || noPrice || left <= 0 || needSize}
                   onClick={() => tap(t, 1)}
-                  aria-label={`Add one ${t.name} ${t.band_color ?? ""}`}
+                  aria-label={`Add one ${gateName(t)}${size ? `, ${size} shirt` : ""}`}
                 >
-                  {isBusy ? "…" : "+1"}
+                  {isBusy ? "…" : needSize ? <span className="text-sm font-bold">Pick a size</span> : perSale > 1 ? "+1 car" : "+1"}
                 </button>
-                <button type="button" className="btn-secondary h-14 w-16 shrink-0 text-base font-bold" disabled={isBusy || noPrice || left < 5} onClick={() => tap(t, 5)} aria-label={`Add five ${t.name} ${t.band_color ?? ""}`}>+5</button>
+                {/* five at once only where every sale is the same: no package, no shirt size */}
+                {perSale === 1 && !t.includes_shirt && (
+                  <button type="button" className="btn-secondary h-14 w-16 shrink-0 text-base font-bold" disabled={isBusy || noPrice || left < 5} onClick={() => tap(t, 5)} aria-label={`Add five ${gateName(t)}`}>+5</button>
+                )}
               </div>
+              {given.length > 0 && (
+                <p className="text-xs text-zinc-500">
+                  Shirts given at the gate: {given.map(([s, n]) => `${s} ${n}`).join(" · ")}
+                </p>
+              )}
               {noPrice && <p className="text-xs text-amber-300">Adding is blocked until an admin sets the gate price.</p>}
             </div>
           );
@@ -211,17 +294,26 @@ export function WalkinTally({
           ) : (
             <table className="mt-2 w-full text-sm">
               <tbody>
-                {recent.map((e) => (
+                {recent.map((e) => {
+                  const sales = e.qty - e.free_qty;
+                  return (
                   <tr key={e.id} className="border-t">
-                    <td className="py-1.5 text-xs text-zinc-500">{new Date(e.created_at).toLocaleTimeString("en-PH", { timeZone: "Asia/Manila", hour: "2-digit", minute: "2-digit" })}</td>
-                    <td className={`font-bold tabular-nums ${e.qty < 0 ? "text-rose-400" : "text-emerald-300"}`}>{e.qty > 0 ? `+${e.qty}` : e.qty}</td>
-                    <td><span className="mr-1 rounded bg-white/10 px-1 font-black">{e.code}</span>{e.type_name}</td>
+                    <td className="whitespace-nowrap py-1.5 text-xs text-zinc-500">{new Date(e.created_at).toLocaleTimeString("en-PH", { timeZone: "Asia/Manila", hour: "numeric", minute: "2-digit" })}</td>
+                    <td className={`whitespace-nowrap font-bold tabular-nums ${e.qty < 0 ? "text-rose-400" : "text-emerald-300"}`}>
+                      {sales > 0 ? `+${sales}` : sales}
+                      {e.free_qty !== 0 && <span className="ml-1 text-[10px] font-normal text-zinc-500">car ({Math.abs(e.qty)} bands)</span>}
+                    </td>
+                    <td>
+                      <span className="mr-1 rounded bg-white/10 px-1 font-black">{e.code}</span>{e.type_name}
+                      {e.shirt_size && <span className="ml-1 rounded border border-white/15 px-1 text-[10px] font-semibold text-zinc-300">{e.shirt_size}</span>}
+                    </td>
                     <td className="text-zinc-500"><BandSwatch color={e.band_color} label={false} size={10} /> {e.band_color}</td>
-                    <td className="text-right">{php(e.qty * e.unit_price_centavos)}</td>
+                    <td className="text-right">{php(sales * e.unit_price_centavos)}</td>
                     <td className="text-right text-xs uppercase text-zinc-500">{e.payment_method}</td>
                     <td className="text-right text-xs text-zinc-500">{e.staff ?? ""}</td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           )}
