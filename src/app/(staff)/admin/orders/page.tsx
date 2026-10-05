@@ -1,8 +1,10 @@
+import Link from "next/link";
 import { requireStaff } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { LiveOrders } from "@/components/LiveOrders";
 import { OrdersTable, type OrderRow } from "@/components/OrdersTable";
 import { php } from "@/lib/money";
+import { getActiveEvent, getTicketTypes } from "@/lib/queries";
 import type { OrderStatus } from "@/lib/supabase/types";
 
 const STATUSES: OrderStatus[] = ["awaiting_verification", "paid", "voided", "pending_payment", "rejected", "expired", "cancelled"];
@@ -17,11 +19,18 @@ const DROPPED: OrderStatus[] = ["expired", "rejected", "cancelled"];
 const LIST_LIMIT = 200;
 const PAGE = 1000;
 
-export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ q?: string; status?: string }> }) {
+export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ q?: string; status?: string; type?: string }> }) {
   const session = await requireStaff("staff");
   const isAdmin = session.staff.role === "admin";
-  const { q = "", status = "" } = await searchParams;
+  const { q = "", status = "", type: typeParam = "" } = await searchParams;
   const admin = createAdminClient();
+
+  // Wristband filter: the labels an order can hold (sold online, or reached through a
+  // converted order like Drifter Family). Gate-only labels never appear in orders.
+  const event = await getActiveEvent();
+  const wristbands = event ? (await getTicketTypes(event.id)).filter((t) => t.sell_online || t.drifter_family) : [];
+  const typeRow = wristbands.find((t) => t.id === typeParam) ?? null;
+  const type = typeRow?.id ?? "";
 
   // Ticket-number search runs once and feeds both queries below.
   const s = q.trim();
@@ -41,11 +50,16 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
       ].join(",")
     : null;
 
-  /** The search and status filter, applied identically to the list and to the totals. */
+  /**
+   * The search, status and wristband filters, applied identically to the list and to
+   * the totals. The wristband filter is an inner join: only orders holding that label
+   * come back, each with just its lines of that label.
+   */
   const filtered = (columns: string) => {
-    let qb = admin.from("orders").select(columns);
+    let qb = admin.from("orders").select(type ? `${columns}, order_items!inner(ticket_type_id, qty, unit_price_centavos)` : columns);
     if (status) qb = qb.eq("status", status as OrderStatus);
     if (orFilter) qb = qb.or(orFilter);
+    if (type) qb = qb.eq("order_items.ticket_type_id", type);
     return qb;
   };
 
@@ -58,7 +72,11 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
     .limit(LIST_LIMIT);
 
   async function fetchAllForTotals() {
-    const rows: { id: string; status: OrderStatus; total_centavos: number }[] = [];
+    const rows: {
+      id: string; status: OrderStatus; total_centavos: number;
+      /** Only with the wristband filter: this order's lines of that label. */
+      order_items?: { qty: number; unit_price_centavos: number }[];
+    }[] = [];
     for (let from = 0; ; from += PAGE) {
       const { data } = await filtered("id, status, total_centavos")
         .order("created_at", { ascending: false })
@@ -94,9 +112,21 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   const awaitingPayment = group(["pending_payment"]);
   const voided = group(["voided"]);
 
-  const filtering = Boolean(status || s);
+  // The tiles total whole orders. With a wristband filter, also show that label's own
+  // share of the paid ones: an order often holds other labels too.
+  const typeShare = typeRow
+    ? totalRows.filter((o) => o.status === "paid").reduce(
+        (acc, o) => {
+          for (const it of o.order_items ?? []) { acc.bands += it.qty; acc.centavos += it.qty * it.unit_price_centavos; }
+          return acc;
+        },
+        { bands: 0, centavos: 0 },
+      )
+    : null;
+
+  const filtering = Boolean(status || s || type);
   const scopeNote = filtering
-    ? `Across the ${totalRows.length} order${totalRows.length === 1 ? "" : "s"} matching this search`
+    ? `Across the ${totalRows.length} order${totalRows.length === 1 ? "" : "s"} matching this search${typeRow ? ` (whole-order totals for orders with ${typeRow.name})` : ""}`
     : `Across all ${totalRows.length} orders`;
   const truncated = (orders?.length ?? 0) >= LIST_LIMIT && totalRows.length > LIST_LIMIT;
 
@@ -133,15 +163,25 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
       </div>
       <p className="mt-2 text-xs text-zinc-500">
         {scopeNote}.{voided.count ? ` ${voided.count} voided order${voided.count === 1 ? "" : "s"} (${php(voided.centavos)}) are counted in none of the three.` : ""}
+        {typeRow && typeShare && (
+          <> {typeRow.name} itself in the paid ones: <b className="text-zinc-300">{typeShare.bands} band{typeShare.bands === 1 ? "" : "s"} · {php(typeShare.centavos)}</b>.</>
+        )}
       </p>
 
       <form className="mt-4 flex flex-wrap gap-2">
         <input name="q" defaultValue={q} className="input max-w-xs" placeholder="Name, email, mobile, reference, order #, ticket #" />
-        <select name="status" defaultValue={status} className="input w-auto">
+        <select name="status" defaultValue={status} className="input w-auto" aria-label="Order status">
           <option value="">All statuses</option>
           {STATUSES.map((st) => <option key={st} value={st}>{st.replace("_", " ")}</option>)}
         </select>
+        <select name="type" defaultValue={type} className="input w-auto" aria-label="Wristband">
+          <option value="">All wristbands</option>
+          {wristbands.map((t) => (
+            <option key={t.id} value={t.id}>{t.code} · {t.name}{t.band_color ? ` (${t.band_color})` : ""}</option>
+          ))}
+        </select>
         <button className="btn-primary">Search</button>
+        {filtering && <Link prefetch={false} href="/admin/orders" className="btn-secondary">Clear</Link>}
       </form>
 
       <p className="mt-3 text-xs text-zinc-500">
