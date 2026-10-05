@@ -347,11 +347,13 @@ export function WalkinTally({
                       <BandSwatch color={t.band_color} className="text-xs text-zinc-400" />
                     </div>
                   </div>
-                  {(perSale > 1 || t.includes_shirt) && (
+                  {(perSale > 1 || t.includes_shirt || t.requires_vehicle) && (
                     <p className="mt-1.5 text-xs text-zinc-400">
                       {perSale > 1
                         ? <>1 tap = 1 car: driver + {perSale - 1} passenger, {perSale} {t.band_color?.toLowerCase() ?? ""} bands{t.includes_shirt ? ", 1 shirt (driver)" : ""}.</>
-                        : <>Includes 1 shirt.</>}
+                        : t.requires_vehicle
+                          ? <>1 tap = 1 car, driver only{t.includes_shirt ? ", 1 shirt" : ", no shirt"}.</>
+                          : <>Includes 1 shirt.</>}
                     </p>
                   )}
                 </div>
@@ -453,10 +455,10 @@ export function WalkinTally({
                   {isBusy ? "…"
                     : !nameOk || !plateOk ? <span className="text-sm font-bold">{car ? <>Name &amp; plate first</> : "Name first"}</span>
                     : needSize ? <span className="text-sm font-bold">Pick a size</span>
-                    : perSale > 1 ? "+1 car" : "+1"}
+                    : perSale > 1 || car ? "+1 car" : "+1"}
                 </button>
-                {/* five at once only where every sale is the same: no package, no shirt size */}
-                {perSale === 1 && !t.includes_shirt && (
+                {/* five at once only where every sale is the same: no package, no shirt size, no name */}
+                {perSale === 1 && !t.includes_shirt && !isNamed && (
                   <button type="button" className="btn-secondary h-14 w-16 shrink-0 text-base font-bold" disabled={isBusy || noPrice || left < 5} onClick={() => tap(t, 5)} aria-label={`Add five ${gateName(t)}`}>+5</button>
                 )}
               </div>
