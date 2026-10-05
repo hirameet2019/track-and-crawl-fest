@@ -1,9 +1,15 @@
 import Link from "next/link";
+import { HERO_SLIDES } from "@/config/event";
+import { HeroSlides } from "@/components/HeroSlides";
 import type { EventRow } from "@/lib/supabase/types";
 
 /** Poster placed at public/poster.jpg. A neon gradient shows until the file exists. */
 const POSTER_BG =
   "url(/poster.jpg), radial-gradient(1200px 600px at 20% 0%, rgba(255,63,209,0.35), transparent 60%), radial-gradient(900px 500px at 90% 20%, rgba(47,216,255,0.35), transparent 60%), linear-gradient(180deg, #14061f 0%, #0a0a0c 100%)";
+
+/** Shows through wherever a slide is still loading, or does not cover the frame. */
+const HERO_FALLBACK =
+  "radial-gradient(1200px 600px at 20% 0%, rgba(255,63,209,0.35), transparent 60%), radial-gradient(900px 500px at 90% 20%, rgba(47,216,255,0.35), transparent 60%), linear-gradient(180deg, #14061f 0%, #0a0a0c 100%)";
 
 function fmtDate(iso: string | null) {
   if (!iso) return { day: "Date TBA", time: "" };
@@ -19,12 +25,9 @@ export function EventHero({ event, prices }: { event: EventRow; prices: { label:
   const { day, time } = fmtDate(event.starts_at);
   return (
     <section className="relative isolate overflow-hidden bg-[#0a0a0c] text-white">
-      {/* Landscape crowd-and-cars artwork from the poster, slow zoom/pan */}
-      <div
-        className="hero-bg absolute inset-0 -z-20 bg-cover bg-[position:center_35%]"
-        style={{ backgroundImage: POSTER_BG }}
-        aria-hidden
-      />
+      {/* Poster and sponsor banner, cross-fading, each with the same slow zoom/pan */}
+      <div className="absolute inset-0 -z-30" style={{ backgroundImage: HERO_FALLBACK }} aria-hidden />
+      <HeroSlides slides={HERO_SLIDES} />
       {/* drifting neon light */}
       <div className="hero-glow-a absolute -left-1/4 -top-1/4 -z-10 h-[70vh] w-[70vw] rounded-full bg-[radial-gradient(closest-side,rgba(255,63,209,0.55),transparent_70%)] mix-blend-screen blur-2xl" aria-hidden />
       <div className="hero-glow-b absolute -right-1/4 top-0 -z-10 h-[60vh] w-[60vw] rounded-full bg-[radial-gradient(closest-side,rgba(47,216,255,0.5),transparent_70%)] mix-blend-screen blur-2xl" aria-hidden />

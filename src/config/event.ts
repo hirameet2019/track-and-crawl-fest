@@ -68,6 +68,36 @@ export function shirtSizeSummary(size: ShirtSize): string {
   return `Width ${m.width} in · Length ${m.length} in · Sleeve ${m.sleeve} in`;
 }
 
+/**
+ * Artwork behind the sales hero, shown as a slideshow in this order. Drop a file
+ * in /public and add a line here; nothing else needs to change. `label` is what a
+ * screen reader announces on that slide's dot.
+ */
+export interface HeroSlide {
+  src: string;
+  label: string;
+  /** CSS background-position. Pick the part that must stay in frame when cropped. */
+  position?: string;
+  /** "cover" fills and crops; "contain" fits the whole image in, letterboxed. */
+  size?: "cover" | "contain";
+  /**
+   * Muted looping clip played instead of the still. `src` is then its poster
+   * frame, which is what shows while it buffers and for anyone who asked for
+   * reduced motion. Keep clips short and silent: this is wallpaper, not a player.
+   */
+  video?: string;
+}
+
+export const HERO_SLIDES: readonly HeroSlide[] = [
+  { src: "/poster.jpg", label: "event poster", position: "center 35%" },
+  // 4.6s cut from the event reel, silent and looping. Taken from the stretch with
+  // no burned-in titles, so it does not fight the headline sitting on top of it.
+  { src: "/hero-drift.jpg", label: "drift reel", video: "/hero-drift.mp4", position: "center 45%" },
+  // Wide sponsor banner: centred, so the logos along the top and bottom edges
+  // survive the crop on a tall screen.
+  { src: "/poster-sponsors.jpg", label: "sponsors", position: "center center" },
+];
+
 /** Maximum tickets per online order. */
 export const MAX_QTY_PER_TYPE = 10;
 /** Passengers that can be added inside one VIP Car Display ticket. */
