@@ -3,8 +3,7 @@ import { hasRole } from "@/lib/roles";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getActiveEvent, getAvailability, getTicketTypes } from "@/lib/queries";
 import { WalkinTally, type GateSale, type TallyEntry, type TallyToday } from "@/components/WalkinTally";
-import { GateShift, type AdminShift, type ClosedShift, type OpenShift } from "@/components/GateShift";
-import type { GateShiftResult, PaymentMethod } from "@/lib/supabase/types";
+import type { PaymentMethod } from "@/lib/supabase/types";
 
 export const dynamic = "force-dynamic";
 
@@ -24,28 +23,6 @@ export default async function WalkinPage() {
   const admin = createAdminClient();
   const dayStart = manilaDayStart();
   const isAdmin = session.staff.role === "admin";
-
-  // Shifts: mine (open, or the last one closed today) and, for admins, everyone's today.
-  const [{ data: myOpen }, { data: myLast }, { data: todayShifts }] = await Promise.all([
-    admin.from("gate_shifts").select("id, opened_at").eq("staff_id", session.userId).is("closed_at", null).maybeSingle(),
-    admin.from("gate_shifts").select("id, closed_at, result, note").eq("staff_id", session.userId).not("closed_at", "is", null)
-      .gte("opened_at", dayStart).order("closed_at", { ascending: false }).limit(1).maybeSingle(),
-    isAdmin
-      ? admin.from("gate_shifts").select("id, opened_at, closed_at, result, note, staff:staff!gate_shifts_staff_id_fkey(full_name)")
-          .eq("event_id", event.id).gte("opened_at", dayStart).order("opened_at", { ascending: false })
-      : Promise.resolve({ data: [] as unknown[] }),
-  ]);
-  const figuresOf = async (id: string) => ((await admin.rpc("gate_shift_figures", { p_shift_id: id })).data ?? null) as GateShiftResult | null;
-  const myFigures = myOpen ? await figuresOf(myOpen.id) : null;
-  const myShift: OpenShift | null = myOpen && myFigures ? { id: myOpen.id, opened_at: myOpen.opened_at, figures: myFigures } : null;
-  const lastClosed: ClosedShift | null = myLast?.closed_at && myLast.result
-    ? { id: myLast.id, closed_at: myLast.closed_at, result: myLast.result as GateShiftResult, note: myLast.note } : null;
-  type ShiftQ = { id: string; opened_at: string; closed_at: string | null; result: GateShiftResult | null; note: string | null; staff: { full_name: string } | null };
-  const shifts: AdminShift[] = [];
-  for (const s of (todayShifts ?? []) as unknown as ShiftQ[]) {
-    const figures = s.closed_at && s.result ? s.result : await figuresOf(s.id);
-    if (figures) shifts.push({ id: s.id, staff: s.staff?.full_name ?? "?", opened_at: s.opened_at, closed_at: s.closed_at, figures, note: s.note });
-  }
 
   // Drifter family bands share the table but never the gate tally: they have their own tab.
   const [types, availability, { data: todayRows }, { data: recentRows }, { data: shirtRows }, { data: carRows }] = await Promise.all([
@@ -148,13 +125,6 @@ export default async function WalkinPage() {
             : <>A competing drifter&apos;s family does not buy here: send them to the registration desk.</>}
         </p>
       </div>
-      <GateShift
-        labels={gateTypes.map((t) => ({ id: t.id, code: t.code, name: t.walkin_name ?? t.name, band_color: t.band_color }))}
-        myShift={myShift}
-        lastClosed={lastClosed}
-        isAdmin={isAdmin}
-        shifts={shifts}
-      />
       <WalkinTally
         types={gateTypes}
         availability={availability}
@@ -162,7 +132,6 @@ export default async function WalkinPage() {
         recent={recent}
         shirts={shirts}
         gateSales={named}
-        shiftOpen={!!myShift}
         isAdmin={isAdmin}
       />
     </div>

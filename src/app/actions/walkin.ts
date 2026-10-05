@@ -5,8 +5,7 @@ import { z } from "zod";
 import { assertStaff } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SHIRT_SIZES } from "@/config/event";
-import { getActiveEvent } from "@/lib/queries";
-import type { GateShiftResult, PaymentMethod } from "@/lib/supabase/types";
+import type { PaymentMethod } from "@/lib/supabase/types";
 import type { ActionResult } from "./orders";
 
 function fail(e: unknown): ActionResult {
@@ -32,8 +31,8 @@ export interface RecordWalkinInput {
  * Walk-in tally: +N sales at the gate (or -N to correct a mistake). A sale is one
  * band, or for a label with included passengers one car with all its bands. A label
  * that includes a shirt needs the size handed over, a label with gate_needs_name the
- * person's name, and a car label the plate too. The seller needs an open shift. A
- * retry with the same clientRef records nothing new. No tickets, no email.
+ * person's name, and a car label the plate too. A retry with the same clientRef
+ * records nothing new. No tickets, no email.
  */
 export async function recordWalkin(input: RecordWalkinInput): Promise<ActionResult & { count?: number; saleId?: string; duplicate?: boolean }> {
   try {
@@ -72,48 +71,6 @@ export async function undoWalkinSale(saleId: string): Promise<ActionResult> {
     revalidatePath("/admin");
     revalidatePath("/admin/walkin");
     return { ok: true };
-  } catch (e) {
-    return fail(e);
-  }
-}
-
-const bandCounts = z.record(z.string().uuid(), z.number().int().min(0).max(100000));
-
-/** Start a gate shift: the cash in the drawer and the bands handed over, per label. */
-export async function openGateShift(input: { openingCash: number; bands: Record<string, number> }): Promise<ActionResult> {
-  try {
-    const { userId } = await assertStaff("gate");
-    const pesos = z.number().min(0).max(1000000).parse(input.openingCash);
-    const bands = bandCounts.parse(input.bands);
-    const event = await getActiveEvent();
-    if (!event) return { ok: false, error: "No active event" };
-    const { error } = await createAdminClient().rpc("open_gate_shift", {
-      p_actor: userId, p_event_id: event.id, p_opening_cash: Math.round(pesos * 100), p_opening_bands: bands,
-    });
-    if (error) return { ok: false, error: error.message };
-    revalidatePath("/admin/walkin");
-    return { ok: true };
-  } catch (e) {
-    return fail(e);
-  }
-}
-
-/** Close a gate shift with what was counted; returns the reconciliation. */
-export async function closeGateShift(input: {
-  shiftId: string; countedCash: number; bands: Record<string, number>; note?: string;
-}): Promise<ActionResult & { result?: GateShiftResult }> {
-  try {
-    const { userId } = await assertStaff("gate");
-    const shiftId = z.string().uuid().parse(input.shiftId);
-    const pesos = z.number().min(0).max(1000000).parse(input.countedCash);
-    const bands = bandCounts.parse(input.bands);
-    const note = z.string().trim().max(500).optional().parse(input.note) || null;
-    const { data, error } = await createAdminClient().rpc("close_gate_shift", {
-      p_actor: userId, p_shift_id: shiftId, p_counted_cash: Math.round(pesos * 100), p_counted_bands: bands, p_note: note,
-    });
-    if (error) return { ok: false, error: error.message };
-    revalidatePath("/admin/walkin");
-    return { ok: true, result: data as GateShiftResult };
   } catch (e) {
     return fail(e);
   }

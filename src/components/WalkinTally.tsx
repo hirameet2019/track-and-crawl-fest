@@ -110,7 +110,6 @@ export function WalkinTally({
   recent,
   shirts,
   gateSales,
-  shiftOpen,
   isAdmin,
 }: {
   types: TicketTypeRow[];
@@ -121,8 +120,6 @@ export function WalkinTally({
   shirts: Record<string, Record<string, number>>;
   /** Named gate sales per label (cars, VIP Pass holders), newest first. */
   gateSales: Record<string, GateSale[]>;
-  /** Selling needs the staff member's shift to be open. */
-  shiftOpen: boolean;
   isAdmin: boolean;
 }) {
   const router = useRouter();
@@ -166,7 +163,6 @@ export function WalkinTally({
   };
 
   function tap(t: TicketTypeRow, delta: number) {
-    if (!shiftOpen) { setError("Open your shift first, at the top of this page."); return; }
     const car = t.requires_vehicle;
     const isNamed = car || t.gate_needs_name;
     const who = whoOf(t.id);
@@ -290,9 +286,6 @@ export function WalkinTally({
         )}
       </div>
 
-      {!shiftOpen && (
-        <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-200">Open your shift above before selling.</p>
-      )}
       {unconfirmed && (
         <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-100">
           <b>No answer from the server.</b> This sale may or may not be in: {unconfirmed.label}.
@@ -439,7 +432,7 @@ export function WalkinTally({
                 <button
                   type="button"
                   className="btn-secondary h-14 w-16 shrink-0 text-2xl font-black"
-                  disabled={isBusy || !shiftOpen || total <= 0 || !canTakeBack}
+                  disabled={isBusy || total <= 0 || !canTakeBack}
                   title={!canTakeBack
                     ? car ? "Type or tap the plate of the car to take back"
                       : isNamed ? "Type or tap the name to take back"
@@ -453,7 +446,7 @@ export function WalkinTally({
                 <button
                   type="button"
                   className="btn-primary h-14 flex-1 text-2xl font-black"
-                  disabled={isBusy || !shiftOpen || noPrice || left <= 0 || !canAdd}
+                  disabled={isBusy || noPrice || left <= 0 || !canAdd}
                   onClick={() => tap(t, 1)}
                   aria-label={`Add one ${gateName(t)}${size ? `, ${size} shirt` : ""}`}
                 >
@@ -464,7 +457,7 @@ export function WalkinTally({
                 </button>
                 {/* five at once only where every sale is the same: no package, no shirt size */}
                 {perSale === 1 && !t.includes_shirt && (
-                  <button type="button" className="btn-secondary h-14 w-16 shrink-0 text-base font-bold" disabled={isBusy || !shiftOpen || noPrice || left < 5} onClick={() => tap(t, 5)} aria-label={`Add five ${gateName(t)}`}>+5</button>
+                  <button type="button" className="btn-secondary h-14 w-16 shrink-0 text-base font-bold" disabled={isBusy || noPrice || left < 5} onClick={() => tap(t, 5)} aria-label={`Add five ${gateName(t)}`}>+5</button>
                 )}
               </div>
               {given.length > 0 && (
