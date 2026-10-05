@@ -88,21 +88,61 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
     return rows;
   }
 
-  const [{ data: orders }, totalRows, { data: voidRows }] = await Promise.all([
+  const [{ data: orders }, totalRows, { data: voidRows }, { data: typeVoids }] = await Promise.all([
     listPromise,
     fetchAllForTotals(),
     admin.from("v_order_void_deductions").select("order_id, void_centavos"),
+    // With the wristband filter: that label's voided tickets, netted against its own lines below.
+    type
+      ? admin.from("tickets").select("order_id, included").eq("ticket_type_id", type).eq("status", "void")
+      : Promise.resolve({ data: [] as { order_id: string; included: boolean }[] }),
   ]);
 
   // A paid order with some tickets voided is worth less than its original total.
   // The dashboard nets the same way, so the two pages agree.
   const voidByOrder = new Map((voidRows ?? []).map((v) => [v.order_id as string, Number(v.void_centavos)]));
 
-  const group = (statuses: OrderStatus[]) => {
-    const rows = totalRows.filter((o) => statuses.includes(o.status));
+  // A voided ticket of the filtered label, priced from its own line the way the
+  // database view does it: the free passenger band at PHP 0, anything else at the
+  // label's price in that order. Only orders that still hold the label count.
+  const linesByOrder = new Map(totalRows.map((o) => [o.id, o.order_items ?? []]));
+  const typeVoidByOrder = new Map<string, { centavos: number; bands: number }>();
+  for (const v of typeVoids ?? []) {
+    const lines = linesByOrder.get(v.order_id);
+    if (!lines || lines.length === 0) continue;
+    const priced = Math.max(0, ...lines.map((l) => l.unit_price_centavos));
+    const hasFree = lines.some((l) => l.unit_price_centavos === 0);
+    const price = v.included ? (hasFree ? 0 : priced) : priced;
+    const cur = typeVoidByOrder.get(v.order_id) ?? { centavos: 0, bands: 0 };
+    typeVoidByOrder.set(v.order_id, { centavos: cur.centavos + price, bands: cur.bands + 1 });
+  }
+
+  /** Whole orders, voided tickets netted out. */
+  const wholeOf = (rows: typeof totalRows) => {
     const gross = rows.reduce((sum, o) => sum + o.total_centavos, 0);
     const deducted = rows.reduce((sum, o) => sum + Math.min(o.total_centavos, voidByOrder.get(o.id) ?? 0), 0);
-    return { count: rows.length, centavos: gross - deducted, deducted };
+    return { gross, deducted };
+  };
+
+  /**
+   * One tile. Without a wristband filter it totals whole orders. With one it counts
+   * only that wristband (its own lines, less its own voided tickets), so the figure
+   * matches that label's revenue on the Dashboard and in the export; an order often
+   * holds other wristbands too.
+   */
+  const group = (statuses: OrderStatus[]) => {
+    const rows = totalRows.filter((o) => statuses.includes(o.status));
+    if (!typeRow) {
+      const { gross, deducted } = wholeOf(rows);
+      return { count: rows.length, centavos: gross - deducted, deducted, bands: 0 };
+    }
+    let gross = 0, bands = 0, deducted = 0;
+    for (const o of rows) {
+      for (const it of o.order_items ?? []) { gross += it.qty * it.unit_price_centavos; bands += it.qty; }
+      const v = typeVoidByOrder.get(o.id);
+      if (v) { deducted += v.centavos; bands -= v.bands; }
+    }
+    return { count: rows.length, centavos: gross - deducted, deducted, bands };
   };
 
   const paid = group(PAID);
@@ -112,22 +152,15 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   const awaitingPayment = group(["pending_payment"]);
   const voided = group(["voided"]);
 
-  // The tiles total whole orders. With a wristband filter, also show that label's own
-  // share of the paid ones: an order often holds other labels too.
-  const typeShare = typeRow
-    ? totalRows.filter((o) => o.status === "paid").reduce(
-        (acc, o) => {
-          for (const it of o.order_items ?? []) { acc.bands += it.qty; acc.centavos += it.qty * it.unit_price_centavos; }
-          return acc;
-        },
-        { bands: 0, centavos: 0 },
-      )
-    : null;
+  // With a wristband filter, say what the same paid orders come to as a whole.
+  const wholePaid = typeRow ? (() => { const w = wholeOf(totalRows.filter((o) => o.status === "paid")); return w.gross - w.deducted; })() : 0;
 
   const filtering = Boolean(status || s || type);
-  const scopeNote = filtering
-    ? `Across the ${totalRows.length} order${totalRows.length === 1 ? "" : "s"} matching this search${typeRow ? ` (whole-order totals for orders with ${typeRow.name})` : ""}`
-    : `Across all ${totalRows.length} orders`;
+  const scopeNote = typeRow
+    ? `Only ${typeRow.name}, in the ${totalRows.length} order${totalRows.length === 1 ? "" : "s"} that hold it`
+    : filtering
+      ? `Across the ${totalRows.length} order${totalRows.length === 1 ? "" : "s"} matching this search`
+      : `Across all ${totalRows.length} orders`;
   const truncated = (orders?.length ?? 0) >= LIST_LIMIT && totalRows.length > LIST_LIMIT;
 
   return (
@@ -145,7 +178,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
         <Total
           label="Paid"
           value={php(paid.centavos)}
-          sub={`${paid.count} order${paid.count === 1 ? "" : "s"}${paid.deducted ? ` · ${php(paid.deducted)} in voided tickets taken out` : ""}`}
+          sub={`${paid.count} order${paid.count === 1 ? "" : "s"}${typeRow ? ` · ${paid.bands} band${paid.bands === 1 ? "" : "s"}` : ""}${paid.deducted ? ` · ${php(paid.deducted)} in voided tickets taken out` : ""}`}
           tone="paid"
         />
         <Total
@@ -163,8 +196,8 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
       </div>
       <p className="mt-2 text-xs text-zinc-500">
         {scopeNote}.{voided.count ? ` ${voided.count} voided order${voided.count === 1 ? "" : "s"} (${php(voided.centavos)}) are counted in none of the three.` : ""}
-        {typeRow && typeShare && (
-          <> {typeRow.name} itself in the paid ones: <b className="text-zinc-300">{typeShare.bands} band{typeShare.bands === 1 ? "" : "s"} · {php(typeShare.centavos)}</b>.</>
+        {typeRow && wholePaid !== paid.centavos && (
+          <> With their other wristbands, the paid ones come to {php(wholePaid)}.</>
         )}
       </p>
 
