@@ -27,7 +27,7 @@ export default async function NumbersPage({ searchParams }: { searchParams: Prom
         {availability.map((a) => (
           <a key={a.ticket_type_id} href={`?type=${a.ticket_type_id}`} className={`card block ${selected?.id === a.ticket_type_id ? "ring-2 ring-zinc-900" : ""}`}>
             <div className="font-semibold">{a.name}</div>
-            <div className="mt-1 text-xs text-zinc-500">{a.band_color} band</div>
+            <div className="mt-1 text-xs text-zinc-500">{a.band_color} band{a.pool_type_id && <> · uses the {availability.find((x) => x.ticket_type_id === a.pool_type_id)?.code} stack</>}</div>
             <div className="mt-2 grid grid-cols-3 text-center text-xs">
               <div><div className="text-lg font-bold">{a.pool_total}</div>pool</div>
               <div><div className="text-lg font-bold">{a.sold}</div>used</div>
@@ -37,7 +37,13 @@ export default async function NumbersPage({ searchParams }: { searchParams: Prom
         ))}
       </div>
 
-      {selected && <NumberForms ticketType={selected} numbers={numbers ?? []} />}
+      {selected?.pool_type_id ? (
+        <p className="card text-sm text-zinc-400">
+          {selected.name} has no serials of its own: it hands out the next free {types.find((t) => t.id === selected.pool_type_id)?.code} wristband, first come first served with {types.find((t) => t.id === selected.pool_type_id)?.name}. Import or void those numbers on {types.find((t) => t.id === selected.pool_type_id)?.name}.
+        </p>
+      ) : (
+        selected && <NumberForms ticketType={selected} numbers={numbers ?? []} />
+      )}
     </div>
   );
 }

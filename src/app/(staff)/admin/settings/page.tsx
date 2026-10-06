@@ -66,7 +66,11 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       body = event ? <EventDetailsForm event={event} /> : <NoEvent />;
       break;
     case "tickets": {
-      const stock: Record<string, TypeStock> = Object.fromEntries(availability.map((a) => [a.ticket_type_id, { pool_total: a.pool_total, sold: a.sold }]));
+      // A label on another label's stack has no serials of its own (its code stays free to change).
+      const codeOf = (id: string | null) => availability.find((x) => x.ticket_type_id === id)?.code;
+      const stock: Record<string, TypeStock> = Object.fromEntries(availability.map((a) => [a.ticket_type_id, a.pool_type_id
+        ? { pool_total: 0, sold: a.sold, shares: codeOf(a.pool_type_id) }
+        : { pool_total: a.pool_total, sold: a.sold }]));
       const site = await getSiteSettings();
       body = event ? (
         <div className="space-y-6">

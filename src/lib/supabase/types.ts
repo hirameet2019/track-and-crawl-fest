@@ -90,6 +90,8 @@ export interface TicketTypeRow {
   gate_needs_name: boolean;
   /** Online orders give a shipping address and the shirt ships instead of being handed over. */
   ships_shirt: boolean;
+  /** Takes its wristband numbers from this ticket type's stack (VIP Pass without shirt on the VIP Pass's bands). */
+  pool_type_id: string | null;
 }
 
 export interface TicketNumberRow {
@@ -227,6 +229,8 @@ export interface AvailabilityRow {
   free_allowance: number;
   /** Bands given away inside a drifter's free allowance (never counted as revenue). */
   free_bands: number;
+  /** Set when the label takes its wristbands from another label's stack; pool_* are then that stack's. */
+  pool_type_id: string | null;
   online_revenue_centavos: number;
   walkin_revenue_centavos: number;
   revenue_centavos: number;

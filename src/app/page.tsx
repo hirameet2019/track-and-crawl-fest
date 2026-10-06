@@ -39,7 +39,7 @@ export default async function HomePage() {
 
   // Admission summary: cheapest general tickets first (adult / child), then VIPs
   const prices = types
-    .filter((t) => !t.includes_shirt)
+    .filter((t) => !t.includes_shirt && !t.includes_lanyard && !t.requires_vehicle)
     .map((t) => ({ label: t.is_child ? "Children" : "Adult", price: php(t.price_centavos) }));
 
   // overflow-x-clip (not hidden): off-screen reveal transforms and hero glows

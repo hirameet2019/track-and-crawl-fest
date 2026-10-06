@@ -124,15 +124,16 @@ export function OrderForm({ types, availability, channel }: { types: TicketTypeR
     return Math.max(0, Math.min(byPool, byCap));
   };
 
-  // Passengers ride inside a VIP Car Display ticket. The free one wears a VIP Car Display
-  // wristband from the car pool; extra companions buy a VIP Pass (shirt, green band).
-  const carType = types.find((t) => t.requires_vehicle) ?? null;
+  // Passengers ride inside a car ticket (VIP Car Display, with or without shirt). A free
+  // one bundled with the package wears that car's own band; extra companions buy a VIP
+  // Pass (shirt, green band).
+  const carTypes = types.filter((t) => t.requires_vehicle);
   // Companions are only offered while VIP Pass is still on sale.
   const companionType = types.find((t) => t.includes_shirt && !t.requires_vehicle && !isTypeClosed(t)) ?? null;
-  const companionCount = carType ? (attendees[carType.id] ?? []).reduce((n, a) => n + a.companions.length, 0) : 0;
+  const carAttendees = carTypes.flatMap((t) => attendees[t.id] ?? []);
+  const companionCount = carAttendees.reduce((n, a) => n + a.companions.length, 0);
   /** Companions beyond the free ones bundled with the car package. */
-  const paidCompanionCount = carType ? (attendees[carType.id] ?? []).reduce((n, a) => n + a.companions.filter((c) => !c.included).length, 0) : 0;
-  const includedPerCar = carType?.included_companions ?? 0;
+  const paidCompanionCount = carAttendees.reduce((n, a) => n + a.companions.filter((c) => !c.included).length, 0);
   const companionPrice = companionType?.price_centavos ?? 0;
   /** VIP Pass wristbands still free after direct VIP Pass tickets and paid companions. */
   const companionsLeft = companionType ? poolSellable(companionType.id) - (qty[companionType.id] ?? 0) - paidCompanionCount : 0;
@@ -268,30 +269,32 @@ export function OrderForm({ types, availability, channel }: { types: TicketTypeR
     // Companions become VIP Pass attendees carrying the plate they ride with.
     // Paid companions join the direct VIP Pass line; the free ones bundled with the
     // car package go on their own line, which the server prices at zero.
-    if (carType && companionType && companionCount > 0) {
+    if (companionType && companionCount > 0) {
       type Att = CreateOrderInput["items"][number]["attendees"][number];
       const paid: Att[] = [];
-      const included: Att[] = [];
-      for (const a of attendees[carType.id] ?? []) {
-        const plate = a.vehicle_plate.trim().toUpperCase();
-        a.companions.forEach((c, k) => {
-          const name = c.holder_name.trim();
-          const att: Att = {
-            holder_name: name || `Passenger ${k + 1} (car ${plate})`,
-            shirt_size: (c.included ? undefined : c.shirt_size || undefined) as Att["shirt_size"],
-            companion_of: plate,
-          };
-          if (c.included) { att.included = true; included.push(att); } else paid.push(att);
-        });
+      for (const carType of carTypes) {
+        const included: Att[] = [];
+        for (const a of attendees[carType.id] ?? []) {
+          const plate = a.vehicle_plate.trim().toUpperCase();
+          a.companions.forEach((c, k) => {
+            const name = c.holder_name.trim();
+            const att: Att = {
+              holder_name: name || `Passenger ${k + 1} (car ${plate})`,
+              shirt_size: (c.included ? undefined : c.shirt_size || undefined) as Att["shirt_size"],
+              companion_of: plate,
+            };
+            if (c.included) { att.included = true; included.push(att); } else paid.push(att);
+          });
+        }
+        // The free passenger takes a wristband from the car pool, so it is a second line
+        // of that car label that the server prices at zero.
+        if (included.length) items.push({ ticket_type_id: carType.id, qty: included.length, attendees: included, unit_price_centavos: 0 });
       }
       if (paid.length) {
         const g = items.find((i) => i.ticket_type_id === companionType.id);
         if (g) { g.attendees.push(...paid); g.qty = g.attendees.length; }
         else items.push({ ticket_type_id: companionType.id, qty: paid.length, attendees: paid });
       }
-      // The free passenger takes a wristband from the car pool, so it is a second VIP Car
-      // Display line that the server prices at zero.
-      if (included.length) items.push({ ticket_type_id: carType.id, qty: included.length, attendees: included, unit_price_centavos: 0 });
     }
     start(async () => {
       const fd = new FormData();
@@ -374,7 +377,7 @@ export function OrderForm({ types, availability, channel }: { types: TicketTypeR
               <div className="flex items-center gap-2">
                 <button type="button" className="btn-secondary h-9 w-9 px-0" onClick={() => setQuantity(t, n - 1)} disabled={n === 0} aria-label="Decrease">-</button>
                 <input className="input w-14 text-center" inputMode="numeric" value={n} onChange={(e) => setQuantity(t, Number(e.target.value) || 0)} disabled={soldOut} aria-label={`${t.name} quantity`} />
-                <button type="button" className="btn-secondary h-9 w-9 px-0" onClick={() => setQuantity(t, n + 1)} disabled={soldOut || n >= Math.min(MAX_QTY_PER_TYPE, left - (t.id === companionType?.id ? companionCount : 0))} aria-label="Increase">+</button>
+                <button type="button" className="btn-secondary h-9 w-9 px-0" onClick={() => setQuantity(t, n + 1)} disabled={soldOut || n >= Math.min(MAX_QTY_PER_TYPE, left - (t.id === companionType?.id ? paidCompanionCount : 0))} aria-label="Increase">+</button>
               </div>
             </Reveal>
           );
@@ -435,8 +438,8 @@ export function OrderForm({ types, availability, channel }: { types: TicketTypeR
                             <div>
                               <div className="text-xs font-semibold uppercase tracking-wide text-emerald-300">Passengers riding with this car</div>
                               <p className="mt-0.5 text-xs text-zinc-400">
-                                {includedPerCar > 0 && <>This package includes a wristband for <b>{includedPerCar} passenger{includedPerCar === 1 ? "" : "s"}</b> at no extra cost: the same <b>{t.band_color}</b> band as the car, no shirt, since the package has one t-shirt for the driver. The name can be left blank for now. </>}
-                                {includedPerCar > 0 ? "Extra" : "Each"} companion{includedPerCar > 0 ? "s" : ""}: <b>{php(companionPrice)}</b> per person, a <b>{companionType.name}</b> wristband with event t-shirt, added to your total. Wristbands are linked to plate <b>{a.vehicle_plate.trim() || "…"}</b>. Up to {MAX_COMPANIONS_PER_CAR} passengers per car.
+                                {t.included_companions > 0 && <>This package includes a wristband for <b>{t.included_companions} passenger{t.included_companions === 1 ? "" : "s"}</b> at no extra cost: the same <b>{t.band_color}</b> band as the car, no shirt, since the package has one t-shirt for the driver. The name can be left blank for now. </>}
+                                {t.included_companions > 0 ? "Extra" : "Each"} companion{t.included_companions > 0 ? "s" : ""}: <b>{php(companionPrice)}</b> per person, a <b>{companionType.name}</b> wristband with event t-shirt, added to your total. Wristbands are linked to plate <b>{a.vehicle_plate.trim() || "…"}</b>. Up to {MAX_COMPANIONS_PER_CAR} passengers per car.
                               </p>
                             </div>
                             <button

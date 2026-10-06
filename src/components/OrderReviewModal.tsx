@@ -140,7 +140,7 @@ export function OrderReviewModal({
                         <div className="min-w-0 flex-1">
                           <div className="truncate font-medium">{a.holder_name || <span className="text-rose-300">No name</span>}</div>
                           <div className="truncate text-xs text-zinc-400">
-                            {[t.includes_shirt ? `Shirt ${a.shirt_size || "?"}` : null, t.requires_vehicle ? `${a.vehicle_plate || "no plate"} · ${a.vehicle_model || "no model"}` : null].filter(Boolean).join(" · ") || "General admission"}
+                            {[t.includes_shirt ? `Shirt ${a.shirt_size || "?"}` : null, t.requires_vehicle ? `${a.vehicle_plate || "no plate"} · ${a.vehicle_model || "no model"}` : null].filter(Boolean).join(" · ") || (t.includes_lanyard ? "No shirt" : "General admission")}
                           </div>
                           {(a.companions?.length ?? 0) > 0 && (
                             <ul className="mt-1.5 space-y-1 border-l-2 border-emerald-400/40 pl-2">

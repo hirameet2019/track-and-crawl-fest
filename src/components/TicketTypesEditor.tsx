@@ -11,6 +11,8 @@ import type { TicketTypeRow } from "@/lib/supabase/types";
 export interface TypeStock {
   pool_total: number;
   sold: number;
+  /** Code of the label whose wristbands this one uses, when it has none of its own. */
+  shares?: string;
 }
 
 const toForm = (t: TicketTypeRow): TicketTypeInput => ({
@@ -193,7 +195,7 @@ export function TicketTypesEditor({ types, stock }: { types: TicketTypeRow[]; st
                   <BandSwatch color={t.band_color} className="text-xs text-zinc-400" />
                   <span className="text-sm">{t.sell_online ? php(t.price_centavos) : t.sell_at_gate ? "gate only" : t.drifter_family ? "Drifters tab only" : "not on sale"}</span>
                   {!t.active && <span className="rounded-full bg-zinc-700 px-2 py-0.5 text-[11px]">hidden</span>}
-                  {st && <span className="text-xs text-zinc-500">{st.sold} sold of {st.pool_total} bands</span>}
+                  {st && <span className="text-xs text-zinc-500">{st.shares ? `${st.sold} sold · uses the ${st.shares} wristbands` : `${st.sold} sold of ${st.pool_total} bands`}</span>}
                   <button type="button" className="btn-secondary ml-auto px-3 py-1 text-xs" disabled={open !== null} onClick={() => setOpen(t.id)}>Edit</button>
                 </div>
               )}

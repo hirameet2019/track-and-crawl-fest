@@ -62,7 +62,8 @@ export async function getTicketTypes(eventId: string, opts: { onlineOnly?: boole
 
 /** Order used on the public form: adult early bird, child, then the VIP tiers. */
 export function publicOrder(types: TicketTypeRow[]): TicketTypeRow[] {
-  const rank = (t: TicketTypeRow) => (t.requires_vehicle ? 3 : t.includes_shirt ? 2 : t.is_child ? 1 : 0);
+  // VIP labels carry a shirt or a lanyard (the VIP Pass without shirt keeps the lanyard).
+  const rank = (t: TicketTypeRow) => (t.requires_vehicle ? 3 : t.includes_shirt || t.includes_lanyard ? 2 : t.is_child ? 1 : 0);
   return [...types].sort((a, b) => rank(a) - rank(b) || a.sort_order - b.sort_order);
 }
 

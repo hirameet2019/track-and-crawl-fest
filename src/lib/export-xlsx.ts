@@ -20,7 +20,7 @@ type TicketRow = {
 type WalkinRow = { created_at: string; qty: number; free_qty: number; drifter_name: string | null; unit_price_centavos: number; payment_method: string; payment_ref: string | null; shirt_size: string | null; holder_name: string | null; vehicle_plate: string | null; ticket_type_id: string; staff: { full_name: string } | null };
 /** Bands inside a drifter's free allowance are handed over, not sold. */
 const tapAmount = (w: WalkinRow) => (w.qty - w.free_qty) * w.unit_price_centavos;
-type AvailRow = { ticket_type_id: string; pool_total: number; pool_available: number; voided: number; online_sold: number; walkin_sold: number; reserved: number; sellable: number; online_revenue_centavos: number; walkin_revenue_centavos: number; redeemed: number };
+type AvailRow = { ticket_type_id: string; pool_type_id: string | null; pool_total: number; pool_available: number; voided: number; online_sold: number; walkin_sold: number; reserved: number; sellable: number; online_revenue_centavos: number; walkin_revenue_centavos: number; redeemed: number };
 
 const manila = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleString(LOCALE.locale, { timeZone: LOCALE.timeZone }) : "");
 const php = (c: number | null | undefined) => (typeof c === "number" ? c / 100 : null);
@@ -76,7 +76,7 @@ export async function buildTicketsWorkbook(): Promise<Buffer> {
       .order("number")
       .limit(50000),
     admin.from("walkin_sales").select("created_at, qty, free_qty, drifter_name, unit_price_centavos, payment_method, payment_ref, shirt_size, holder_name, vehicle_plate, ticket_type_id, staff:staff(full_name)").order("created_at").limit(50000),
-    admin.from("v_ticket_type_availability").select("ticket_type_id, pool_total, pool_available, voided, online_sold, walkin_sold, reserved, sellable, online_revenue_centavos, walkin_revenue_centavos, redeemed"),
+    admin.from("v_ticket_type_availability").select("ticket_type_id, pool_type_id, pool_total, pool_available, voided, online_sold, walkin_sold, reserved, sellable, online_revenue_centavos, walkin_revenue_centavos, redeemed"),
     admin.from("events").select("name").limit(1).maybeSingle(),
   ]);
 
@@ -102,9 +102,12 @@ export async function buildTicketsWorkbook(): Promise<Buffer> {
   for (const t of T) {
     const a = availBy.get(t.id);
     const hex = bandHex(t.band_color);
+    // A label on another label's stack: its pool and "left" are that stack's, so they
+    // go in as text and stay out of the totals.
+    const lender = a?.pool_type_id ? T.find((x) => x.id === a.pool_type_id)?.code ?? "another label" : null;
     const r = sum.addRow([
-      t.code, t.name, t.band_color ?? "", php(t.price_centavos), Number(a?.pool_total ?? 0), Number(a?.online_sold ?? 0), Number(a?.walkin_sold ?? 0), Number(a?.reserved ?? 0),
-      Number(a?.voided ?? 0), Number(a?.sellable ?? 0), Number(a?.redeemed ?? 0), php(Number(a?.online_revenue_centavos ?? 0) + Number(a?.walkin_revenue_centavos ?? 0)),
+      t.code, t.name, t.band_color ?? "", php(t.price_centavos), lender ? `uses ${lender} bands` : Number(a?.pool_total ?? 0), Number(a?.online_sold ?? 0), Number(a?.walkin_sold ?? 0), Number(a?.reserved ?? 0),
+      Number(a?.voided ?? 0), lender ? `${Number(a?.sellable ?? 0)} (shared with ${lender})` : Number(a?.sellable ?? 0), Number(a?.redeemed ?? 0), php(Number(a?.online_revenue_centavos ?? 0) + Number(a?.walkin_revenue_centavos ?? 0)),
     ]);
     const argb = "FF" + hex.slice(1).toUpperCase();
     r.getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb } };

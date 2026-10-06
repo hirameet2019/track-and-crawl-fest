@@ -104,23 +104,26 @@ export async function createOnlineOrder(formData: FormData): Promise<ActionResul
   // Validate vehicle/shirt requirements against the ticket types sold online
   const types = await getTicketTypes(event.id, { onlineOnly: true });
   const photos: { item: number; index: number; file: File }[] = [];
-  // Plates of the cars in this order; a companion must ride with one of them.
-  const plates = new Set(
-    parsed.data.items
-      .filter((i) => types.find((t) => t.id === i.ticket_type_id)?.requires_vehicle)
-      .flatMap((i) => i.attendees.map((a) => plateKey(a.vehicle_plate)))
-      .filter(Boolean),
-  );
+  // The cars in this order by plate, with their label; a companion must ride with one of them.
+  const carOfPlate = new Map<string, (typeof types)[number]>();
+  for (const i of parsed.data.items) {
+    const t = types.find((x) => x.id === i.ticket_type_id);
+    if (!t?.requires_vehicle) continue;
+    for (const a of i.attendees) if (plateKey(a.vehicle_plate)) carOfPlate.set(plateKey(a.vehicle_plate), t);
+  }
+  const plates = new Set(carOfPlate.keys());
   let companions = 0;
   let includedTotal = 0;
   const companionsPerCar = new Map<string, number>();
   const includedPerCar = new Map<string, number>();
   const { maxQtyPerType: MAX_QTY_PER_TYPE, maxCompanionsPerCar: MAX_COMPANIONS_PER_CAR, paymentWindowMinutes: PAYMENT_WINDOW_MINUTES, shirtChart } = await getRules();
   const sizes = new Set(shirtChart.map((r) => r.size));
-  // Free companions come with the car package: included_companions per VIP Car Display ticket.
-  const carType = types.find((t) => t.requires_vehicle);
-  const carQty = parsed.data.items.filter((i) => i.ticket_type_id === carType?.id).reduce((n, i) => n + i.qty, 0);
-  const allowancePerCar = carType?.included_companions ?? 0;
+  // Free companions come with a car package: included_companions per car of that label
+  // (VIP Car Display with shirt has one; the no-shirt car has none).
+  const includedAllowance = parsed.data.items.reduce((n, i) => {
+    const t = types.find((x) => x.id === i.ticket_type_id);
+    return n + (t?.requires_vehicle ? i.attendees.filter((a) => !a.companion_of).length * t.included_companions : 0);
+  }, 0);
   for (const [ii, item] of parsed.data.items.entries()) {
     const tt = types.find((t) => t.id === item.ticket_type_id);
     if (!tt) return { ok: false, error: "Unknown ticket type" };
@@ -133,8 +136,9 @@ export async function createOnlineOrder(formData: FormData): Promise<ActionResul
       if (a.shirt_size && !sizes.has(a.shirt_size)) return { ok: false, error: `Size ${a.shirt_size} is not offered. Pick another size.` };
       if (a.companion_of) {
         // The free passenger wears a wristband from the car's own pool; paid companions buy a VIP Pass.
+        const car = carOfPlate.get(plateKey(a.companion_of));
         if (a.included) {
-          if (tt.id !== carType?.id) return { ok: false, error: `The included passenger belongs on the ${carType?.name ?? "car"} line` };
+          if (car && (tt.id !== car.id || car.included_companions < 1)) return { ok: false, error: `${car.name} has no included passenger on this line` };
         } else if (!tt.includes_shirt || tt.requires_vehicle) {
           return { ok: false, error: "Companions must be VIP Pass tickets" };
         }
@@ -147,7 +151,7 @@ export async function createOnlineOrder(formData: FormData): Promise<ActionResul
         if (a.included) {
           const inc = (includedPerCar.get(plateKey(a.companion_of)) ?? 0) + 1;
           includedPerCar.set(plateKey(a.companion_of), inc);
-          if (inc > allowancePerCar) return { ok: false, error: `Only ${allowancePerCar} passenger wristband(s) are included per car (${a.companion_of})` };
+          if (inc > (car?.included_companions ?? 0)) return { ok: false, error: `Only ${car?.included_companions ?? 0} passenger wristband(s) are included per car (${a.companion_of})` };
           includedTotal += 1;
         }
       } else if (a.included) {
@@ -167,7 +171,7 @@ export async function createOnlineOrder(formData: FormData): Promise<ActionResul
     }
   }
 
-  if (includedTotal > carQty * allowancePerCar) return { ok: false, error: "More included companions than the car package allows" };
+  if (includedTotal > includedAllowance) return { ok: false, error: "More included companions than the car package allows" };
 
   // A shirt that ships needs somewhere to go. The included passenger has no shirt.
   const shipsShirt = parsed.data.items.some(

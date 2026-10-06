@@ -135,7 +135,7 @@ export default async function DashboardPage() {
               return (
                 <tr key={a.ticket_type_id} className="border-t">
                   <td className="py-2"><span className="rounded bg-white/10 px-1.5 py-0.5 font-black">{a.code}</span></td>
-                  <td className="font-medium">{a.name}{a.drifter_family ? <span className="ml-1 text-[10px] uppercase text-zinc-500">drifters</span> : !a.sell_online && <span className="ml-1 text-[10px] uppercase text-zinc-500">gate only</span>}</td>
+                  <td className="font-medium">{a.name}{a.pool_type_id && <span className="ml-1 text-[10px] uppercase text-zinc-500">{availability.find((x) => x.ticket_type_id === a.pool_type_id)?.code} bands</span>}{a.drifter_family ? <span className="ml-1 text-[10px] uppercase text-zinc-500">drifters</span> : !a.sell_online && <span className="ml-1 text-[10px] uppercase text-zinc-500">gate only</span>}</td>
                   <td className="text-zinc-500"><BandSwatch color={a.band_color} size={12} label={false} /> {a.band_color}</td>
                   <td className="text-right">{a.online_sold}</td>
                   <td className="text-right">{a.walkin_sold}</td>
