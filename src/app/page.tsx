@@ -4,7 +4,7 @@ import { OrderForm } from "@/components/OrderForm";
 import { EventHero } from "@/components/EventHero";
 import { Reveal } from "@/components/Reveal";
 import { SupportContact } from "@/components/SupportContact";
-import { getActiveEvent, getAvailability, getTicketTypes, isSalesOpen, publicOrder } from "@/lib/queries";
+import { getActiveEvent, getAvailability, getTicketTypes, isSalesOpen, publicAvailability, publicOrder } from "@/lib/queries";
 import { fmtCutoff, isTypeClosed } from "@/lib/cutoff";
 import { php } from "@/lib/money";
 
@@ -57,7 +57,7 @@ export default async function HomePage() {
         </Reveal>
 
         {open ? (
-          <OrderForm types={types} availability={availability} />
+          <OrderForm types={types} availability={publicAvailability(availability, types)} />
         ) : (
           <Reveal from="zoom" className="card text-center">
             <h2 className="text-xl font-bold">Online ticket sales are closed</h2>

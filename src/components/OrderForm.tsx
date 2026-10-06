@@ -6,7 +6,8 @@ import { MAX_COMPANIONS_PER_CAR, MAX_QTY_PER_TYPE, PAYMENT_WINDOW_MINUTES, SHIRT
 import { shrinkImage } from "@/lib/image";
 import { php } from "@/lib/money";
 import { fmtCutoff, hoursUntilCutoff, isTypeClosed } from "@/lib/cutoff";
-import type { AvailabilityRow, TicketTypeRow } from "@/lib/supabase/types";
+import type { TicketTypeRow } from "@/lib/supabase/types";
+import type { PublicAvailability } from "@/lib/queries";
 import { BandSwatch } from "@/components/BandSwatch";
 import { Reveal } from "@/components/Reveal";
 import { ShirtSizeChartButton, ShirtSizeHint } from "@/components/ShirtSizeChart";
@@ -88,7 +89,7 @@ function CarPhotoField({ preview, fileName, onPick }: { preview: string | null; 
   );
 }
 
-export function OrderForm({ types, availability }: { types: TicketTypeRow[]; availability: AvailabilityRow[] }) {
+export function OrderForm({ types, availability }: { types: TicketTypeRow[]; availability: PublicAvailability[] }) {
   const [qty, setQty] = useState<Record<string, number>>({});
   const [attendees, setAttendees] = useState<Record<string, Attendee[]>>({});
   const [buyer, setBuyer] = useState({ buyer_name: "", buyer_email: "", buyer_mobile: "" });

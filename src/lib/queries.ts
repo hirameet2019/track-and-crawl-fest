@@ -46,6 +46,22 @@ export function publicOrder(types: TicketTypeRow[]): TicketTypeRow[] {
   return [...types].sort((a, b) => rank(a) - rank(b) || a.sort_order - b.sort_order);
 }
 
+/**
+ * What the public order form needs to know about stock: how many it may still
+ * sell. Nothing else from the availability view (sold counts, revenue, scans)
+ * may reach the browser, because the sales page is public and its props are
+ * readable in the page source.
+ */
+export type PublicAvailability = Pick<AvailabilityRow, "ticket_type_id" | "sellable" | "pool_sellable" | "online_cap" | "cap_used">;
+
+/** Trim availability to the stock fields, for the types on the public page only. */
+export function publicAvailability(rows: AvailabilityRow[], types: Pick<TicketTypeRow, "id">[]): PublicAvailability[] {
+  const onPage = new Set(types.map((t) => t.id));
+  return rows
+    .filter((r) => onPage.has(r.ticket_type_id))
+    .map(({ ticket_type_id, sellable, pool_sellable, online_cap, cap_used }) => ({ ticket_type_id, sellable, pool_sellable, online_cap, cap_used }));
+}
+
 export async function getAvailability(eventId: string): Promise<AvailabilityRow[]> {
   const admin = createAdminClient();
   await admin.rpc("expire_stale_orders", {});
