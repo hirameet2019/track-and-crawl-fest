@@ -308,7 +308,12 @@ function artBytes(source: string): Promise<Uint8Array | null> {
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           return new Uint8Array(await res.arrayBuffer());
         }
-        const file = source.startsWith("/") ? path.join(process.cwd(), "public", source) : path.join(process.cwd(), source);
+        // The built-in files ship via outputFileTracingIncludes (next.config.ts). Without the
+        // ignore hints, this runtime path makes Turbopack trace the whole project, public
+        // folder and hero video included, into every server function.
+        const file = source.startsWith("/")
+          ? path.join(/*turbopackIgnore: true*/ process.cwd(), "public", source)
+          : path.join(/*turbopackIgnore: true*/ process.cwd(), source);
         return new Uint8Array(await readFile(file));
       } catch (e) {
         console.warn(`[pdf] artwork skipped (${source}):`, e instanceof Error ? e.message : e);
