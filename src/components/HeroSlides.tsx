@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { HeroSlide } from "@/config/event";
+import type { HeroSlide } from "@/config/site";
 
 const prefersReducedMotion = () =>
   typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
@@ -13,7 +13,7 @@ const prefersReducedMotion = () =>
  * reachable when the slideshow is not moving (someone who asked for reduced
  * motion, or who wants to stop on one).
  */
-export function HeroSlides({ slides, intervalMs = 7000 }: { slides: readonly HeroSlide[]; intervalMs?: number }) {
+export function HeroSlides({ slides, intervalMs }: { slides: readonly HeroSlide[]; intervalMs: number }) {
   const [current, setCurrent] = useState(0);
   // Auto-advance stops for good once someone picks a slide themselves, so the
   // one they wanted to look at does not slide away under them.

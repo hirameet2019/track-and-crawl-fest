@@ -1,5 +1,6 @@
 "use client";
 
+import { LOCALE } from "@/config/site";
 import { useEffect, useState, useTransition } from "react";
 import { approveOrder, getProofUrl, rejectOrder } from "@/app/actions/admin";
 import { php } from "@/lib/money";
@@ -27,7 +28,7 @@ function ProofImage({ path, submittedAt }: { path: string | null; submittedAt: s
   useEffect(() => {
     if (path) getProofUrl(path).then(setUrl);
   }, [path]);
-  const when = submittedAt ? new Date(submittedAt).toLocaleString("en-PH", { timeZone: "Asia/Manila", dateStyle: "medium", timeStyle: "short" }) : null;
+  const when = submittedAt ? new Date(submittedAt).toLocaleString(LOCALE.locale, { timeZone: LOCALE.timeZone, dateStyle: "medium", timeStyle: "short" }) : null;
   return (
     <div className="flex flex-col overflow-hidden rounded-xl border border-white/10 bg-black/40">
       <div className="flex items-center justify-between border-b border-white/10 px-3 py-2">

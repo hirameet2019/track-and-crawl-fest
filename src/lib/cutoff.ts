@@ -1,3 +1,4 @@
+import { LOCALE } from "@/config/site";
 import type { TicketTypeRow } from "@/lib/supabase/types";
 
 /**
@@ -13,9 +14,9 @@ export function isTypeClosed(t: Pick<TicketTypeRow, "sales_close_at">, now: Date
 /** "Oct 4, 11:59 PM" in Manila time. */
 export function fmtCutoff(iso: string, opts: { withTime?: boolean } = {}): string {
   const d = new Date(iso);
-  const date = d.toLocaleDateString("en-PH", { timeZone: "Asia/Manila", month: "short", day: "numeric" });
+  const date = d.toLocaleDateString(LOCALE.locale, { timeZone: LOCALE.timeZone, month: "short", day: "numeric" });
   if (opts.withTime === false) return date;
-  const time = d.toLocaleTimeString("en-PH", { timeZone: "Asia/Manila", hour: "numeric", minute: "2-digit" });
+  const time = d.toLocaleTimeString(LOCALE.locale, { timeZone: LOCALE.timeZone, hour: "numeric", minute: "2-digit" });
   return `${date}, ${time}`;
 }
 
@@ -28,7 +29,7 @@ export function hoursUntilCutoff(t: Pick<TicketTypeRow, "sales_close_at">, now: 
 /** "YYYY-MM-DDTHH:mm" in Manila time, for a <input type="datetime-local">. */
 export function toManilaLocalInput(iso: string | null): string {
   if (!iso) return "";
-  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).formatToParts(new Date(iso));
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: LOCALE.timeZone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).formatToParts(new Date(iso));
   const g = (type: string) => parts.find((p) => p.type === type)?.value ?? "00";
   return `${g("year")}-${g("month")}-${g("day")}T${g("hour") === "24" ? "00" : g("hour")}:${g("minute")}`;
 }
@@ -37,7 +38,7 @@ export function toManilaLocalInput(iso: string | null): string {
 export function fromManilaLocalInput(value: string): string | null {
   const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value.trim());
   if (!m) return null;
-  const iso = `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:59+08:00`;
+  const iso = `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:59${LOCALE.utcOffset}`;
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }

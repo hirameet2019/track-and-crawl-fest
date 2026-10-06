@@ -1,10 +1,12 @@
 "use client";
 
+import { LOCALE } from "@/config/site";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { recordWalkin, setWalkinPrice, undoWalkinSale, type RecordWalkinInput } from "@/app/actions/walkin";
 import { php } from "@/lib/money";
-import { SHIRT_SIZES, type ShirtSize } from "@/config/event";
+import { useRules } from "@/components/RulesProvider";
+import { staffMethods } from "@/lib/rules-types";
 import type { AvailabilityRow, PaymentMethod, TicketTypeRow } from "@/lib/supabase/types";
 import { BandSwatch } from "@/components/BandSwatch";
 
@@ -44,12 +46,6 @@ export interface GateSale {
 /** Plates compare on letters and digits only, as the database does. */
 const plateKey = (p: string) => p.toUpperCase().replace(/[^A-Z0-9]/g, "");
 
-const METHODS: { key: PaymentMethod; label: string }[] = [
-  { key: "cash", label: "Cash" },
-  { key: "gotyme", label: "GoTyme" },
-  { key: "gcash", label: "GCash" },
-  { key: "maya", label: "Maya" },
-];
 
 function gatePrice(t: TicketTypeRow) {
   return t.walkin_price_centavos ?? t.price_centavos;
@@ -122,6 +118,9 @@ export function WalkinTally({
   gateSales: Record<string, GateSale[]>;
   isAdmin: boolean;
 }) {
+  const rules = useRules();
+  const METHODS = staffMethods(rules.channels);
+  const SHIRT_SIZES = rules.shirtChart.map((r) => r.size);
   const router = useRouter();
   // Back to Cash after every sale, so one GCash buyer does not turn the next ten into GCash.
   const [method, setMethod] = useState<PaymentMethod>("cash");
@@ -149,7 +148,7 @@ export function WalkinTally({
   const [pendingDelta, setPendingDelta] = useState<Record<string, number>>({});
   // The shirt size picked for the next tap on a label with a shirt. Cleared after
   // every tap, so each sale is a deliberate choice rather than the last one's size.
-  const [sizeFor, setSizeFor] = useState<Record<string, ShirtSize | null>>({});
+  const [sizeFor, setSizeFor] = useState<Record<string, string | null>>({});
   // Labels that take a name (and a plate, for cars): the details for the next sale, or
   // the plate / name of the sale to take back.
   const [whoFor, setWhoFor] = useState<Record<string, { name: string; plate: string }>>({});
@@ -335,7 +334,7 @@ export function WalkinTally({
           const sold = gateSales[t.id] ?? [];
           const soldCount = sold.reduce((n, x) => n + x.count, 0);
           const given = Object.entries(shirts[t.id] ?? {}).filter(([, n]) => n > 0)
-            .sort(([x], [y]) => SHIRT_SIZES.indexOf(x as ShirtSize) - SHIRT_SIZES.indexOf(y as ShirtSize));
+            .sort(([x], [y]) => SHIRT_SIZES.indexOf(x) - SHIRT_SIZES.indexOf(y));
           return (
             <div key={t.id} className="card relative flex flex-col gap-3 p-4">
               <div className="flex items-start justify-between gap-2">
@@ -513,18 +512,20 @@ export function WalkinTally({
           </dl>
           <a href="/api/admin/export?type=walkin" className="btn-secondary mt-4 w-full">Export walk-in tally (CSV)</a>
         </div>
-        <div className="card overflow-x-auto">
+        <div className="card">
           <h2 className="font-semibold">Recent entries</h2>
           {recent.length === 0 ? (
             <p className="mt-2 text-sm text-zinc-500">Nothing recorded yet. Tap + when you hand over a wristband.</p>
           ) : (
-            <table className="mt-2 w-full text-sm">
+            // Scrolls inside the card so a busy gate day does not push the page down.
+            <div className="mt-2 max-h-[min(28rem,60vh)] overflow-auto overscroll-contain">
+            <table className="w-full text-sm">
               <tbody>
                 {recent.map((e) => {
                   const sales = e.qty - e.free_qty;
                   return (
                   <tr key={e.id} className="border-t">
-                    <td className="whitespace-nowrap py-1.5 text-xs text-zinc-500">{new Date(e.created_at).toLocaleTimeString("en-PH", { timeZone: "Asia/Manila", hour: "numeric", minute: "2-digit" })}</td>
+                    <td className="whitespace-nowrap py-1.5 text-xs text-zinc-500">{new Date(e.created_at).toLocaleTimeString(LOCALE.locale, { timeZone: LOCALE.timeZone, hour: "numeric", minute: "2-digit" })}</td>
                     <td className={`whitespace-nowrap font-bold tabular-nums ${e.qty < 0 ? "text-rose-400" : "text-emerald-300"}`}>
                       {sales > 0 ? `+${sales}` : sales}
                       {e.free_qty !== 0 && <span className="ml-1 text-[10px] font-normal text-zinc-500">car ({Math.abs(e.qty)} bands)</span>}
@@ -552,6 +553,7 @@ export function WalkinTally({
                 })}
               </tbody>
             </table>
+            </div>
           )}
         </div>
       </div>

@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type {
   AvailabilityRow,
@@ -15,8 +16,13 @@ export interface OrderBundle {
   tickets: (TicketRow & { ticket_type: TicketTypeRow })[];
 }
 
-/** The single active event. The app currently supports one event at a time. */
-export async function getActiveEvent(): Promise<EventRow | null> {
+/**
+ * The single active event. The app currently supports one event at a time.
+ * Wrapped in React's cache so the root layout's metadata, a page's metadata and
+ * the page body share one query per request instead of each running their own.
+ * Outside a render (server actions, route handlers) it simply runs the query.
+ */
+export const getActiveEvent = cache(async (): Promise<EventRow | null> => {
   const admin = createAdminClient();
   const { data } = await admin
     .from("events")
@@ -26,7 +32,21 @@ export async function getActiveEvent(): Promise<EventRow | null> {
     .limit(1)
     .maybeSingle();
   return data ?? null;
-}
+});
+
+/**
+ * Whether this event sells drifter family bands. The Drifters tab and its
+ * dashboard shortcut only appear when it does, so an event without them (a
+ * concert, say) does not show staff a tab that leads to "not set up".
+ */
+export const hasDrifterLabel = cache(async (eventId: string): Promise<boolean> => {
+  const { count } = await createAdminClient()
+    .from("ticket_types")
+    .select("id", { count: "exact", head: true })
+    .eq("event_id", eventId)
+    .eq("drifter_family", true);
+  return (count ?? 0) > 0;
+});
 
 /**
  * Active ticket types in organizer order (B, Y, O, R, P, G).

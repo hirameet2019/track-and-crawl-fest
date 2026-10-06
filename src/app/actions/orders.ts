@@ -6,7 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getActiveEvent, getOrderBundle, getTicketTypes, isSalesOpen } from "@/lib/queries";
 import { fmtCutoff, isTypeClosed } from "@/lib/cutoff";
 import { sendOrderReceivedEmail } from "@/lib/email";
-import { MAX_COMPANIONS_PER_CAR, MAX_QTY_PER_TYPE, PAYMENT_WINDOW_MINUTES, SHIRT_SIZES } from "@/config/event";
+import { getRules } from "@/lib/rules";
 import { IMAGE_MIME, MAX_UPLOAD_BYTES } from "@/lib/image";
 import { MOBILE_RE, emailProblem, normalizeEmail, normalizeMobile } from "@/lib/contact";
 import { audit } from "@/lib/audit";
@@ -15,7 +15,8 @@ export type ActionResult = { ok: true; warning?: string } | { ok: false; error: 
 
 const attendeeSchema = z.object({
   holder_name: z.string().trim().min(2, "Enter the holder's full name for each ticket").max(80),
-  shirt_size: z.enum(SHIRT_SIZES).optional(),
+  // Checked against the sizes offered in Settings inside createOnlineOrder.
+  shirt_size: z.string().trim().max(8).optional(),
   vehicle_plate: z.string().trim().max(20).optional(),
   vehicle_model: z.string().trim().max(60).optional(),
   // Set server-side after upload; anything the client sends here is discarded.
@@ -97,6 +98,8 @@ export async function createOnlineOrder(formData: FormData): Promise<ActionResul
   let includedTotal = 0;
   const companionsPerCar = new Map<string, number>();
   const includedPerCar = new Map<string, number>();
+  const { maxQtyPerType: MAX_QTY_PER_TYPE, maxCompanionsPerCar: MAX_COMPANIONS_PER_CAR, paymentWindowMinutes: PAYMENT_WINDOW_MINUTES, shirtChart } = await getRules();
+  const sizes = new Set(shirtChart.map((r) => r.size));
   // Free companions come with the car package: included_companions per VIP Car Display ticket.
   const carType = types.find((t) => t.requires_vehicle);
   const carQty = parsed.data.items.filter((i) => i.ticket_type_id === carType?.id).reduce((n, i) => n + i.qty, 0);
@@ -110,10 +113,11 @@ export async function createOnlineOrder(formData: FormData): Promise<ActionResul
     if (direct > MAX_QTY_PER_TYPE) return { ok: false, error: `At most ${MAX_QTY_PER_TYPE} ${tt.name} tickets per order` };
     for (const [i, a] of item.attendees.entries()) {
       a.vehicle_photo_path = undefined;
+      if (a.shirt_size && !sizes.has(a.shirt_size)) return { ok: false, error: `Size ${a.shirt_size} is not offered. Pick another size.` };
       if (a.companion_of) {
         // The free passenger wears a wristband from the car's own pool; paid companions buy a VIP Pass.
         if (a.included) {
-          if (tt.id !== carType?.id) return { ok: false, error: "The included passenger belongs on the VIP Car Display line" };
+          if (tt.id !== carType?.id) return { ok: false, error: `The included passenger belongs on the ${carType?.name ?? "car"} line` };
         } else if (!tt.includes_shirt || tt.requires_vehicle) {
           return { ok: false, error: "Companions must be VIP Pass tickets" };
         }

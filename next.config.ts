@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { BRAND } from "./src/config/site";
 
 const nextConfig: NextConfig = {
   experimental: {
@@ -10,8 +11,9 @@ const nextConfig: NextConfig = {
   },
   // The PDF generator reads these from disk at runtime (fs.readFile), which the
   // bundler cannot see. Include them in every serverless function bundle.
+  // The logo and banner paths come from src/config/site.ts.
   outputFileTracingIncludes: {
-    "/**": ["./src/lib/pdf/fonts/**", "./src/lib/pdf/logo-pdf.png", "./public/poster-1x.jpg"],
+    "/**": ["./src/lib/pdf/fonts/**", `./${BRAND.pdf.logo}`, `./${BRAND.pdf.banner}`],
   },
 };
 

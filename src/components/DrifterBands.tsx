@@ -1,5 +1,6 @@
 "use client";
 
+import { LOCALE } from "@/config/site";
 import { useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -12,6 +13,8 @@ import { DrifterQueue } from "@/components/DrifterQueue";
 import { DrifterLinks } from "@/components/DrifterLinks";
 import { RuleLines, RulesHeading } from "@/components/RuleLines";
 import type { AvailabilityRow, DrifterBandRow, DrifterEntryRow, PaymentMethod, TicketTypeRow } from "@/lib/supabase/types";
+import { useRules } from "@/components/RulesProvider";
+import { staffMethods } from "@/lib/rules-types";
 
 export interface DrifterEntry {
   id: string;
@@ -37,12 +40,6 @@ export interface OrderBandRow {
   amount_centavos: number;
 }
 
-const METHODS: { key: PaymentMethod; label: string }[] = [
-  { key: "cash", label: "Cash" },
-  { key: "gotyme", label: "GoTyme" },
-  { key: "gcash", label: "GCash" },
-  { key: "maya", label: "Maya" },
-];
 
 const norm = (s: string) => s.trim().replace(/\s+/g, " ").toLowerCase();
 
@@ -135,6 +132,7 @@ export function DrifterBands({
   siteUrl: string;
   isAdmin: boolean;
 }) {
+  const METHODS = staffMethods(useRules().channels);
   const router = useRouter();
   const [name, setName] = useState("");
   const [team, setTeam] = useState("");
@@ -289,7 +287,7 @@ export function DrifterBands({
               {isAdmin && (
                 <InlineNumber
                   value={String(price / 100)}
-                  unit="PHP"
+                  unit={LOCALE.currencyCode}
                   label={`Price for extra ${type.name} bands`}
                   onSave={(raw) => setWalkinPrice(type.id, Number(raw))}
                 />
@@ -639,7 +637,7 @@ export function DrifterBands({
             <ul className="mt-2 text-sm">
               {recent.map((e) => {
                 const paid = e.qty - e.free_qty;
-                const time = new Date(e.created_at).toLocaleTimeString("en-PH", { timeZone: "Asia/Manila", hour: "numeric", minute: "2-digit" });
+                const time = new Date(e.created_at).toLocaleTimeString(LOCALE.locale, { timeZone: LOCALE.timeZone, hour: "numeric", minute: "2-digit" });
                 const method = METHODS.find((m) => m.key === e.payment_method)?.label ?? e.payment_method;
                 return (
                   <li key={e.id} className="grid grid-cols-[2.5rem_minmax(0,1fr)_auto] items-start gap-x-3 border-t border-white/10 py-2">

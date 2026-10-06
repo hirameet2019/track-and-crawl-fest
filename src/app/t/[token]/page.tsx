@@ -1,3 +1,4 @@
+import { LOCALE } from "@/config/site";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import QRCode from "qrcode";
@@ -43,7 +44,7 @@ export default async function TicketPage({ params }: { params: Promise<{ token: 
           <p className="mt-1 text-xs text-red-700">Not valid for entry{t.void_reason ? `: ${t.void_reason}` : ""}. Contact the organizer with order #{t.order.order_no} if this is unexpected.</p>
         )}
         {t.status === "redeemed" && t.redeemed_at && (
-          <p className="mt-1 text-xs text-zinc-500">Entered {new Date(t.redeemed_at).toLocaleString("en-PH", { timeZone: "Asia/Manila" })}</p>
+          <p className="mt-1 text-xs text-zinc-500">Entered {new Date(t.redeemed_at).toLocaleString(LOCALE.locale, { timeZone: LOCALE.timeZone })}</p>
         )}
       </div>
       <p className="mt-4 text-center text-xs text-zinc-400">

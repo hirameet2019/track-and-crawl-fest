@@ -1,3 +1,4 @@
+import { LOCALE } from "@/config/site";
 import ExcelJS from "exceljs";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { bandHex } from "@/lib/bands";
@@ -20,7 +21,7 @@ type WalkinRow = { created_at: string; qty: number; free_qty: number; drifter_na
 const tapAmount = (w: WalkinRow) => (w.qty - w.free_qty) * w.unit_price_centavos;
 type AvailRow = { ticket_type_id: string; pool_total: number; pool_available: number; voided: number; online_sold: number; walkin_sold: number; reserved: number; sellable: number; online_revenue_centavos: number; walkin_revenue_centavos: number; redeemed: number };
 
-const manila = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleString("en-PH", { timeZone: "Asia/Manila" }) : "");
+const manila = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleString(LOCALE.locale, { timeZone: LOCALE.timeZone }) : "");
 const php = (c: number | null | undefined) => (typeof c === "number" ? c / 100 : null);
 
 /** Sheet names may not contain []:*?/\ and are capped at 31 chars. */
@@ -90,7 +91,7 @@ export async function buildTicketsWorkbook(): Promise<Buffer> {
   // ------------------------------------------------------------ Summary
   const sum = wb.addWorksheet("Summary", { properties: { tabColor: { argb: "FF111111" } }, views: [{ state: "frozen", ySplit: 3 }] });
   sum.mergeCells("A1:L1");
-  sum.getCell("A1").value = `${event?.name ?? "Event"} - ticket export - ${new Date().toLocaleString("en-PH", { timeZone: "Asia/Manila" })} (Manila)`;
+  sum.getCell("A1").value = `${event?.name ?? "Event"} - ticket export - ${new Date().toLocaleString(LOCALE.locale, { timeZone: LOCALE.timeZone })} (Manila)`;
   sum.getCell("A1").font = { bold: true, size: 13 };
   sum.getCell("A2").value = "One sheet per wristband label follows; the tab colour is the wristband colour. Amounts in PHP.";
   sum.getCell("A2").font = { italic: true, color: { argb: "FF666666" } };

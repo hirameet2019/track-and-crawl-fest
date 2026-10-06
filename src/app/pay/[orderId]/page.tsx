@@ -7,7 +7,8 @@ import { Countdown } from "@/components/Countdown";
 import { getOrderBundle } from "@/lib/queries";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { php } from "@/lib/money";
-import { PAYMENT_CHANNELS, PAYMENT_WINDOW_MINUTES } from "@/config/event";
+import { primaryChannel } from "@/config/event";
+import { getRules } from "@/lib/rules";
 import { SupportContact } from "@/components/SupportContact";
 import type { OnlinePaymentMethod } from "@/lib/supabase/types";
 
@@ -23,6 +24,9 @@ export default async function PayPage({ params }: { params: Promise<{ orderId: s
   if (b.order.status !== "pending_payment") redirect(`/order/${orderId}`);
 
   const { event, order, items } = b;
+  const rules = await getRules();
+  const PAYMENT_WINDOW_MINUTES = rules.paymentWindowMinutes;
+  const pc = primaryChannel(event, rules.channels);
   // A channel is offered only when the organizer has set its QR image on the
   // events row. Right now that is GoTyme only; GCash / Maya come back the moment
   // their *_qr_url is filled in again, no deploy needed.
@@ -69,10 +73,10 @@ export default async function PayPage({ params }: { params: Promise<{ orderId: s
 
       <section className="mt-6">
         <h2 className="text-lg font-bold">Step 1. Scan and pay the exact amount</h2>
-        <p className="text-sm text-zinc-500">Open your GoTyme app (or any bank app with InstaPay QR), scan the code, and pay the exact amount. <span className="text-zinc-400">Buksan ang GoTyme app, i-scan ang QR, at bayaran ang eksaktong halaga.</span></p>
+        <p className="text-sm text-zinc-500">Open your {pc.app} app{pc.scanHint ? ` (${pc.scanHint})` : ""}, scan the code, and pay the exact amount. <span className="text-zinc-400">Buksan ang {pc.app} app, i-scan ang QR, at bayaran ang eksaktong halaga.</span></p>
         <div className={`mt-3 grid gap-4 ${channels.length > 1 ? "sm:grid-cols-2" : "mx-auto max-w-sm"}`}>
           {channels.map((c) => {
-            const ch = PAYMENT_CHANNELS[c.key];
+            const ch = rules.channels[c.key];
             return (
               <div key={c.key} className="card text-center">
                 <h3 className={`font-semibold ${ch.accent}`}>{ch.label}</h3>

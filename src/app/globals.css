@@ -1,5 +1,16 @@
 @import "tailwindcss";
 
+/* Brand tokens. Values come from src/config/site.ts via the root layout; `inline`
+   makes each utility read the variable directly, so the config can change them. */
+@theme inline {
+  --color-brand: var(--brand-bg);
+  --color-brand-deep: var(--brand-bg-deep);
+  --color-neon-pink: var(--neon-pink);
+  --color-neon-violet: var(--neon-violet);
+  --color-neon-cyan: var(--neon-cyan);
+  --color-neon-green: var(--neon-green);
+}
+
 :root {
   color-scheme: light;
 }
@@ -37,8 +48,8 @@ body {
   100% { transform: translate3d(140vw, 0, 0) skewX(-30deg); opacity: 0; }
 }
 @keyframes hero-pulse {
-  0%, 100% { box-shadow: 0 0 24px rgba(47, 216, 255, 0.35); }
-  50%      { box-shadow: 0 0 44px rgba(109, 255, 92, 0.6); }
+  0%, 100% { box-shadow: 0 0 24px color-mix(in srgb, var(--neon-cyan) 35%, transparent); }
+  50%      { box-shadow: 0 0 44px color-mix(in srgb, var(--neon-green) 60%, transparent); }
 }
 .hero-bg      { animation: hero-kenburns 28s ease-in-out infinite alternate; will-change: transform; }
 .hero-glow-a  { animation: hero-glow-a 18s ease-in-out infinite alternate; will-change: transform, opacity; }
@@ -84,20 +95,20 @@ body {
 
   /* ---------- Public event theme (dark, neon) ---------- */
   .neon-text {
-    background: linear-gradient(90deg, #ff3fd1 0%, #b34cff 30%, #2fd8ff 65%, #6dff5c 100%);
+    background: linear-gradient(90deg, var(--neon-pink) 0%, var(--neon-violet) 30%, var(--neon-cyan) 65%, var(--neon-green) 100%);
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
-    filter: drop-shadow(0 0 18px rgba(179, 76, 255, 0.45));
+    filter: drop-shadow(0 0 18px color-mix(in srgb, var(--neon-violet) 45%, transparent));
   }
   .btn-neon {
     @apply inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3 text-sm font-bold uppercase tracking-wide text-black transition disabled:cursor-not-allowed disabled:opacity-50;
-    background: linear-gradient(90deg, #2fd8ff, #6dff5c);
-    box-shadow: 0 0 24px rgba(47, 216, 255, 0.35);
+    background: linear-gradient(90deg, var(--neon-cyan), var(--neon-green));
+    box-shadow: 0 0 24px color-mix(in srgb, var(--neon-cyan) 35%, transparent);
   }
   .btn-neon:hover:not(:disabled) {
     filter: brightness(1.08);
-    box-shadow: 0 0 32px rgba(109, 255, 92, 0.45);
+    box-shadow: 0 0 32px color-mix(in srgb, var(--neon-green) 45%, transparent);
   }
   .glass {
     @apply rounded-2xl border border-white/10 bg-white/[0.06] backdrop-blur-md;
@@ -127,8 +138,8 @@ body {
   }
   .dark-zone .btn-primary {
     @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 text-black;
-    background: linear-gradient(90deg, #2fd8ff, #6dff5c);
-    box-shadow: 0 0 20px rgba(47, 216, 255, 0.3);
+    background: linear-gradient(90deg, var(--neon-cyan), var(--neon-green));
+    box-shadow: 0 0 20px color-mix(in srgb, var(--neon-cyan) 30%, transparent);
   }
   .dark-zone .text-amber-700 {
     @apply text-amber-300;
@@ -162,7 +173,7 @@ body {
 .staff-shell .hover\:bg-zinc-100:hover { background-color: rgba(255, 255, 255, 0.08); }
 .staff-shell .bg-zinc-200 { background-color: rgba(255, 255, 255, 0.14); }
 .staff-shell .bg-zinc-800,
-.staff-shell .bg-zinc-900 { background-color: #e4e4e7; color: #0a0a0c; }
+.staff-shell .bg-zinc-900 { background-color: #e4e4e7; color: var(--brand-bg); }
 .staff-shell .text-zinc-900,
 .staff-shell .text-zinc-800,
 .staff-shell .text-zinc-700 { color: #f4f4f5; }
@@ -194,12 +205,12 @@ body {
 .staff-shell .bg-emerald-50.text-emerald-800 { color: #6ee7b7; }
 /* number pool chips */
 .staff-shell .bg-emerald-50.text-emerald-800:hover, .staff-shell .hover\:bg-red-100:hover { background-color: rgba(244, 63, 94, 0.25); }
-.staff-shell .bg-zinc-800.text-white { background-color: #e4e4e7; color: #0a0a0c; }
+.staff-shell .bg-zinc-800.text-white { background-color: #e4e4e7; color: var(--brand-bg); }
 /* page titles get a subtle brand underline */
 .staff-shell h1 { position: relative; display: inline-block; padding-bottom: 10px; margin-bottom: 2px; line-height: 1.15; }
 .staff-shell h1::after {
   content: ""; position: absolute; left: 0; bottom: 0; height: 3px; width: 56px; border-radius: 2px;
-  background: linear-gradient(90deg, #ff3fd1, #b34cff 50%, #2fd8ff);
+  background: linear-gradient(90deg, var(--neon-pink), var(--neon-violet) 50%, var(--neon-cyan));
 }
 .staff-shell select.input option { background: #18181b; color: #f4f4f5; }
 .staff-shell input[type="file"].input::file-selector-button { background: rgba(255,255,255,0.1); color: #f4f4f5; border: 0; border-radius: 6px; padding: 2px 8px; margin-right: 8px; }
@@ -233,7 +244,7 @@ html { scroll-behavior: smooth; }
 .reveal-title { position: relative; display: inline-block; }
 .reveal-title::after {
   content: ""; position: absolute; left: 0; bottom: -6px; height: 3px; width: 100%; border-radius: 2px;
-  background: linear-gradient(90deg, #ff3fd1, #b34cff 40%, #2fd8ff 75%, #6dff5c);
+  background: linear-gradient(90deg, var(--neon-pink), var(--neon-violet) 40%, var(--neon-cyan) 75%, var(--neon-green));
   transform: scaleX(0); transform-origin: left; transition: transform 0.8s cubic-bezier(0.22, 1, 0.36, 1) 0.3s;
 }
 .reveal.in .reveal-title::after { transform: scaleX(1); }
@@ -247,7 +258,7 @@ html { scroll-behavior: smooth; }
     border-color 0.25s ease;
 }
 .ticket-card.settled { transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease; }
-.ticket-card.settled:hover { transform: translate3d(0, -3px, 0); border-color: rgba(47, 216, 255, 0.35); box-shadow: 0 12px 40px rgba(47, 216, 255, 0.12), 0 0 0 1px rgba(47, 216, 255, 0.15) inset; }
+.ticket-card.settled:hover { transform: translate3d(0, -3px, 0); border-color: color-mix(in srgb, var(--neon-cyan) 35%, transparent); box-shadow: 0 12px 40px color-mix(in srgb, var(--neon-cyan) 12%, transparent), 0 0 0 1px color-mix(in srgb, var(--neon-cyan) 15%, transparent) inset; }
 /* Elements that mount on user action (holder details, errors) fade up into place */
 @keyframes enter-fade {
   from { opacity: 0; transform: translate3d(0, 12px, 0); }

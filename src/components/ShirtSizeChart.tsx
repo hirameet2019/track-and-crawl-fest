@@ -1,9 +1,9 @@
 "use client";
 
-import Image from "next/image";
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { SHIRT_SIZES, SHIRT_SIZE_CHART, SHIRT_SIZE_CHART_IMAGE, isShirtSize, shirtSizeSummary } from "@/config/event";
+import { useRules } from "@/components/RulesProvider";
+import { shirtSummary } from "@/lib/rules-types";
 
 /**
  * "Size chart" trigger + modal for ticket types that include the event t-shirt.
@@ -22,6 +22,8 @@ export function ShirtSizeChartButton({ highlight, className = "", label = "Size 
   const [everOpened, setEverOpened] = useState(false);
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
+  // Sizes, measurements and chart image from Admin > Settings.
+  const { shirtChart, shirtChartImage } = useRules();
 
   useEffect(() => {
     const el = ref.current;
@@ -30,7 +32,7 @@ export function ShirtSizeChartButton({ highlight, className = "", label = "Size 
     else if (!open && el.open) el.close();
   }, [open]);
 
-  const selected = highlight && isShirtSize(highlight) ? highlight : null;
+  const selected = highlight && shirtChart.some((r) => r.size === highlight) ? highlight : null;
 
   const dialog = (
       <dialog
@@ -55,15 +57,15 @@ export function ShirtSizeChartButton({ highlight, className = "", label = "Size 
             </div>
 
             <div className="overflow-y-auto px-5 py-4">
-              <Image
-                src={SHIRT_SIZE_CHART_IMAGE.src}
-                width={SHIRT_SIZE_CHART_IMAGE.width}
-                height={SHIRT_SIZE_CHART_IMAGE.height}
-                alt="Regular shirt size chart: width, length and sleeve length in inches for sizes 2XS to 8XL"
-                className="w-full rounded-xl border border-white/10"
-                sizes="(max-width: 52rem) 100vw, 52rem"
-                priority
-              />
+              {shirtChartImage && (
+                // Uploaded charts come from Storage with unknown dimensions, so a plain img.
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={shirtChartImage}
+                  alt={`Shirt size chart: width, length and sleeve length in inches for sizes ${shirtChart[0]?.size} to ${shirtChart.at(-1)?.size}`}
+                  className="w-full rounded-xl border border-white/10"
+                />
+              )}
 
               <table className="mt-4 w-full border-collapse text-sm tabular-nums">
                 <caption className="sr-only">Regular shirt measurements in inches</caption>
@@ -76,8 +78,8 @@ export function ShirtSizeChartButton({ highlight, className = "", label = "Size 
                   </tr>
                 </thead>
                 <tbody>
-                  {SHIRT_SIZES.map((s) => {
-                    const m = SHIRT_SIZE_CHART[s];
+                  {shirtChart.map((m) => {
+                    const s = m.size;
                     const active = s === selected;
                     return (
                       <tr key={s} className={`border-t border-white/10 ${active ? "bg-cyan-400/10 text-cyan-200" : ""}`} aria-current={active ? "true" : undefined}>
@@ -115,8 +117,9 @@ export function ShirtSizeChartButton({ highlight, className = "", label = "Size 
 
 /** Live measurement line under the size dropdown, e.g. "M: Width 20 in · Length 29 in · Sleeve 9.5 in". */
 export function ShirtSizeHint({ size }: { size: string }) {
-  if (size && isShirtSize(size)) {
-    return <p className="mt-1 text-xs text-zinc-400"><span className="font-semibold text-zinc-300">{size}:</span> {shirtSizeSummary(size)}</p>;
+  const summary = shirtSummary(useRules().shirtChart, size);
+  if (size && summary) {
+    return <p className="mt-1 text-xs text-zinc-400"><span className="font-semibold text-zinc-300">{size}:</span> {summary}</p>;
   }
   return <p className="mt-1 text-xs text-zinc-500">Measurements are in inches. Open the size chart if you are unsure.</p>;
 }

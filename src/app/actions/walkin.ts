@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { assertStaff } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { SHIRT_SIZES } from "@/config/event";
+import { getRules } from "@/lib/rules";
 import type { PaymentMethod } from "@/lib/supabase/types";
 import type { ActionResult } from "./orders";
 
@@ -41,7 +41,8 @@ export async function recordWalkin(input: RecordWalkinInput): Promise<ActionResu
     const delta = z.number().int().min(-50).max(50).parse(input.delta);
     if (delta === 0) return { ok: false, error: "Nothing to record" };
     const method = methodSchema.parse(input.method);
-    const shirtSize = input.shirtSize ? z.enum(SHIRT_SIZES).parse(input.shirtSize) : null;
+    const sizes = (await getRules()).shirtChart.map((r) => r.size);
+    const shirtSize = input.shirtSize ? z.string().refine((v) => sizes.includes(v), "That shirt size is not offered").parse(input.shirtSize) : null;
     const holderName = z.string().trim().max(80).optional().nullable().parse(input.holderName) || null;
     const vehiclePlate = z.string().trim().max(20).optional().nullable().parse(input.vehiclePlate) || null;
     const clientRef = input.clientRef ? z.string().uuid().parse(input.clientRef) : null;

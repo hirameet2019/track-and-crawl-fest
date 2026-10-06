@@ -5,6 +5,11 @@ GoTyme Bank InstaPay QR (GCash / Maya can be re-enabled), upload proof, staff ve
 that match pre-printed wristbands. Includes a receipt PDF, email delivery, on-site
 sales, a sales dashboard, and a mobile gate scanner with offline fallback.
 
+**Running another event?** Follow [SETUP-NEW-EVENT.md](SETUP-NEW-EVENT.md). Event details,
+ticket types, artwork, slideshow, colours and PDF branding are all edited in
+**Admin > Settings** (tabs: Overview, Event, Tickets, Payments, Ordering, Look,
+Email, Advanced); `src/config/site.ts` and `src/config/event.ts` only hold the defaults.
+
 ## Stack
 
 - Next.js 16 (App Router, server actions) + Tailwind 4
@@ -23,8 +28,8 @@ sales, a sales dashboard, and a mobile gate scanner with offline fallback.
 
 ## Supabase project
 
-Project **DriftTickets**, ref `bcrxzihpyoahvfmrayej`, region ap-southeast-1, org
-Digital Transformation Office. Both migrations and the placeholder seed are already
+Project **DriftTickets**, ref `bcrxzihpyoahvfmrayej`, region ap-southeast-1 (moved
+to a new organization on 2026-09-21; same ref and keys). Both migrations and the placeholder seed are already
 applied there. `.env.local` has the URL and anon key; the service role key must be
 pasted from Dashboard > Project Settings > API Keys.
 
@@ -66,8 +71,9 @@ update events set gotyme_qr_url = '/payment/gotyme-qr.jpg', gotyme_account_name 
 ```
 
 To bring GCash or Maya back, set their `*_qr_url` (public path or Storage URL)
-again; no deploy needed. Labels/colours live in `PAYMENT_CHANNELS`
-(`src/config/event.ts`); the marketing copy uses `PAY_VIA` from the same file.
+again (Admin > Settings > Payments); no deploy needed. Buyer instructions name
+the first channel with a QR. Labels and wording live in `PAYMENT_CHANNELS`
+(`src/config/event.ts`).
 
 ## Flows
 
@@ -110,8 +116,8 @@ node --env-file=.env.local scripts/send-test-email.mjs you@example.com
 
 ## Notes
 
-- Orders hold inventory for 30 minutes (`PAYMENT_WINDOW_MINUTES`) until proof is
-  uploaded, then until staff decide.
+- Orders hold inventory for `PAYMENT_WINDOW_MINUTES` (60) until proof is uploaded,
+  then until staff decide. Expiry is final.
 - A GCash/Maya reference number can only be used on one live order.
 - Receipt label defaults to "ACKNOWLEDGMENT RECEIPT". Change `events.receipt_label`
   to "OFFICIAL RECEIPT" only once the organizer's accountant confirms BIR

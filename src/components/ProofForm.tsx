@@ -2,11 +2,12 @@
 
 import { useState, useTransition } from "react";
 import { submitPaymentProof } from "@/app/actions/orders";
-import { PAYMENT_CHANNELS } from "@/config/event";
+import { useRules } from "@/components/RulesProvider";
 import { shrinkImage } from "@/lib/image";
 import type { OnlinePaymentMethod } from "@/lib/supabase/types";
 
 export function ProofForm({ orderId, methods }: { orderId: string; methods: OnlinePaymentMethod[] }) {
+  const PAYMENT_CHANNELS = useRules().channels;
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const single = methods.length === 1;
@@ -51,8 +52,10 @@ export function ProofForm({ orderId, methods }: { orderId: string; methods: Onli
         <p className="mt-1 text-xs text-zinc-500">The reference / transaction number on your payment confirmation screen. Letters and digits, spaces are ignored.</p>
         <details className="mt-2 rounded-lg border border-zinc-200 bg-zinc-50 p-2 text-xs">
           <summary className="cursor-pointer font-semibold text-zinc-700">Where do I find the reference number? <span className="font-normal text-zinc-500">Saan ito makikita?</span></summary>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/help/gotyme-reference.png" alt="Example confirmation screen with the reference number highlighted" className="mx-auto mt-2 w-full max-w-[260px] rounded-lg border border-zinc-200" />
+          {PAYMENT_CHANNELS[methods[0]]?.referenceImage && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={PAYMENT_CHANNELS[methods[0]].referenceImage} alt="Example confirmation screen with the reference number highlighted" className="mx-auto mt-2 w-full max-w-[260px] rounded-lg border border-zinc-200" />
+          )}
           <p className="mt-2 text-zinc-600">
             Open your bank or e-wallet app, tap the transfer you just made, and copy the long number labelled <b>Reference No.</b>, <b>Transaction ID</b>, or <b>Trace No.</b> It is also on the confirmation screenshot.
             <br /><span className="text-zinc-500">Buksan ang app, hanapin ang transfer na ginawa mo, at kopyahin ang mahabang numero na Reference No. o Transaction ID.</span>

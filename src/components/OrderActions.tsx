@@ -1,5 +1,6 @@
 "use client";
 
+import { LOCALE } from "@/config/site";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { approveOrder, getProofUrl, rejectOrder, resendTickets, settleOrderBalance, voidOrder } from "@/app/actions/admin";
@@ -9,10 +10,12 @@ import type { OrderStatus } from "@/lib/supabase/types";
 
 export function OrderActions({
   orderId, status, proofPath, hasEmail, isAdmin = false,
-  buyerName = "", totalCentavos = 0, balanceCentavos = 0, balanceSettledAt = null, hasRedeemed = false,
+  buyerName = "", totalCentavos = 0, balanceCentavos = 0, balanceSettledAt = null, hasRedeemed = false, payApp,
 }: {
   orderId: string; status: OrderStatus; proofPath: string | null; hasEmail: boolean; isAdmin?: boolean;
   buyerName?: string; totalCentavos?: number; balanceCentavos?: number; balanceSettledAt?: string | null; hasRedeemed?: boolean;
+  /** Short name of the channel refunds and balances move through, e.g. "GoTyme". */
+  payApp: string;
 }) {
   const router = useRouter();
   const [msg, setMsg] = useState<string | null>(null);
@@ -60,11 +63,11 @@ export function OrderActions({
           </div>
           <div className="text-xl font-black">{php(Math.abs(balanceCentavos))}</div>
           {balanceSettledAt ? (
-            <p className="text-xs opacity-80">Marked settled on {new Date(balanceSettledAt).toLocaleString("en-PH", { timeZone: "Asia/Manila" })}.</p>
+            <p className="text-xs opacity-80">Marked settled on {new Date(balanceSettledAt).toLocaleString(LOCALE.locale, { timeZone: LOCALE.timeZone })}.</p>
           ) : isAdmin ? (
             <>
-              <p className="text-xs opacity-80">Left over from a conversion. Move the money in GoTyme first, then record it here.</p>
-              <input className="input" placeholder="Reference or note, e.g. GoTyme ref 123456" value={settleNote} onChange={(e) => setSettleNote(e.target.value)} />
+              <p className="text-xs opacity-80">Left over from a conversion. Move the money in {payApp} first, then record it here.</p>
+              <input className="input" placeholder={`Reference or note, e.g. ${payApp} ref 123456`} value={settleNote} onChange={(e) => setSettleNote(e.target.value)} />
               <button className="btn-secondary w-full" disabled={pending} onClick={() => run(() => settleOrderBalance(orderId, settleNote), "Balance marked settled")}>
                 Mark {balanceCentavos > 0 ? "refunded" : "collected"}
               </button>

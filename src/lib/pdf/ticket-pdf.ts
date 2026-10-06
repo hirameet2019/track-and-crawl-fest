@@ -1,3 +1,4 @@
+import { BRAND as SITE_BRAND, LOCALE } from "@/config/site";
 import { PDFDocument, StandardFonts, degrees, rgb, type PDFFont, type PDFImage, type PDFPage } from "pdf-lib";
 import fontkit from "@pdf-lib/fontkit";
 import { readFile } from "fs/promises";
@@ -6,7 +7,8 @@ import path from "path";
 import QRCode from "qrcode";
 import { SITE_URL } from "@/config/event";
 import type { OrderBundle } from "@/lib/queries";
-import { itemLabel } from "@/lib/items";
+import { carNameOf, itemLabel } from "@/lib/items";
+import { getSiteSettings } from "@/lib/site-settings";
 
 const A4: [number, number] = [595.28, 841.89];
 
@@ -16,7 +18,7 @@ const A4: [number, number] = [595.28, 841.89];
  * character is replaced before drawing.
  */
 function php(centavos: number): string {
-  return "PHP " + new Intl.NumberFormat("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(centavos / 100);
+  return `${LOCALE.currencyCode} ` + new Intl.NumberFormat(LOCALE.locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(centavos / 100);
 }
 function safe(s: string): string {
   // Printable ASCII, Latin-1 supplement, and the few typographic marks WinAnsi has.
@@ -33,10 +35,10 @@ interface Fonts {
 
 function fmtDate(iso: string | null | undefined): string {
   if (!iso) return "TBA";
-  return new Date(iso).toLocaleString("en-PH", {
+  return new Date(iso).toLocaleString(LOCALE.locale, {
     dateStyle: "long",
     timeStyle: "short",
-    timeZone: "Asia/Manila",
+    timeZone: LOCALE.timeZone,
   });
 }
 
@@ -174,7 +176,7 @@ function drawReceiptPage(doc: PDFDocument, f: Fonts, b: OrderBundle) {
 
   let rowIdx = 0;
   for (const it of items) {
-    const descLines = wrap(f.regular, itemLabel(it, false), 10, colQty - MARGIN - 60);
+    const descLines = wrap(f.regular, itemLabel(it, false, carNameOf(b.items)), 10, colQty - MARGIN - 60);
     const rowH = Math.max(24, 10 + descLines.length * 13);
     if (rowIdx % 2 === 1) page.drawRectangle({ x: MARGIN, y: y - rowH, width: contentW, height: rowH, color: PANEL });
     let ty = y - 16;
@@ -224,7 +226,16 @@ function drawReceiptPage(doc: PDFDocument, f: Fonts, b: OrderBundle) {
 }
 
 /* -------------------------------------------------------------- ticket */
-const BRAND = {
+/** "#ff3fd1" or "#f3d" to a pdf-lib colour; null when it is not a hex colour. */
+function hexRgb(hex: string): ReturnType<typeof rgb> | null {
+  const m = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(hex.trim());
+  if (!m) return null;
+  const h = m[1].length === 3 ? [...m[1]].map((c) => c + c).join("") : m[1];
+  return rgb(parseInt(h.slice(0, 2), 16) / 255, parseInt(h.slice(2, 4), 16) / 255, parseInt(h.slice(4, 6), 16) / 255);
+}
+
+/** The PDF's own colours, each overridable from SITE_BRAND.pdf.palette. */
+const PDF_DEFAULTS = {
   pink: rgb(1, 0.37, 0.85),
   pinkDark: rgb(0.29, 0.02, 0.31),
   green: rgb(0.36, 0.99, 0.48),
@@ -234,6 +245,21 @@ const BRAND = {
   goldDark: rgb(0.23, 0.14, 0),
   violet: rgb(0.7, 0.3, 1),
 };
+type PdfColors = typeof PDF_DEFAULTS;
+
+/**
+ * The PDF palette for one document: built-in colours, then the code override
+ * (site.ts C.pdf.palette), then what was saved in Admin > Settings.
+ */
+function pdfColors(saved: Partial<Record<string, string>>): PdfColors {
+  const code = SITE_BRAND.pdf.palette as Partial<Record<string, string>>;
+  return Object.fromEntries(
+    Object.entries(PDF_DEFAULTS).map(([k, v]) => {
+      const o = saved[k] ?? code[k];
+      return [k, (o && hexRgb(o)) || v];
+    }),
+  ) as PdfColors;
+}
 
 const BAND_COLORS: Record<string, ReturnType<typeof rgb>> = {
   green: rgb(0.13, 0.77, 0.37),
@@ -258,77 +284,110 @@ async function embedOnce(doc: PDFDocument, key: string, make: () => Promise<PDFI
   return img;
 }
 
-let logoCache: Uint8Array | null | undefined;
-async function logoBytes(): Promise<Uint8Array | null> {
-  if (logoCache !== undefined) return logoCache;
-  try {
-    logoCache = new Uint8Array(await readFile(path.join(process.cwd(), "src", "lib", "pdf", "logo-pdf.png")));
-  } catch {
-    logoCache = null;
-  }
-  return logoCache;
+/** Where the PDF's logo and banner come from for this document. */
+interface PdfArt {
+  logo: string;
+  banner: string;
+  colors: PdfColors;
 }
 
-let posterCache: Uint8Array | null | undefined;
-async function posterBytes(): Promise<Uint8Array | null> {
-  if (posterCache !== undefined) return posterCache;
-  try {
-    posterCache = new Uint8Array(await readFile(path.join(process.cwd(), "public", "poster-1x.jpg")));
-  } catch {
-    posterCache = null;
+/**
+ * Bytes of a logo or banner, kept for the life of the server instance. The source
+ * is an uploaded https URL (Admin > Settings), a /public path, or a path from the
+ * project root (the built-in files). Null when it cannot be read; a failed
+ * download is not remembered, so the next PDF tries again.
+ */
+const artCache = new Map<string, Promise<Uint8Array | null>>();
+function artBytes(source: string): Promise<Uint8Array | null> {
+  let p = artCache.get(source);
+  if (!p) {
+    p = (async () => {
+      try {
+        if (/^https:\/\//.test(source)) {
+          const res = await fetch(source, { signal: AbortSignal.timeout(10_000) });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return new Uint8Array(await res.arrayBuffer());
+        }
+        const file = source.startsWith("/") ? path.join(process.cwd(), "public", source) : path.join(process.cwd(), source);
+        return new Uint8Array(await readFile(file));
+      } catch (e) {
+        console.warn(`[pdf] artwork skipped (${source}):`, e instanceof Error ? e.message : e);
+        if (/^https:/.test(source)) artCache.delete(source);
+        return null;
+      }
+    })();
+    artCache.set(source, p);
   }
-  return posterCache;
+  return p;
+}
+
+/** Embed a PNG or JPG once per document, by content. Null if missing or another format. */
+async function embedArt(doc: PDFDocument, source: string): Promise<PDFImage | null> {
+  const bytes = await artBytes(source);
+  if (!bytes) return null;
+  try {
+    return await embedOnce(doc, `art:${source}`, () => {
+      const isPng = bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47;
+      return isPng ? doc.embedPng(bytes) : doc.embedJpg(bytes);
+    });
+  } catch (e) {
+    console.warn(`[pdf] artwork not PNG/JPG (${source}):`, e instanceof Error ? e.message : e);
+    return null;
+  }
 }
 
 /** Text with a fake outline: the same string drawn around the fill in the outline colour. */
 function outlined(page: PDFPage, s: string, x: number, y: number, size: number, font: PDFFont, fill: ReturnType<typeof rgb>, outline: ReturnType<typeof rgb>, thick = 1.6) {
   const t = safe(s);
+  // pdf-lib: ySkew slants the letters (italic); xSkew would tilt the whole baseline.
   const skew = degrees(12);
   for (const [dx, dy] of [[-thick, 0], [thick, 0], [0, -thick], [0, thick], [-thick, -thick], [thick, thick], [-thick, thick], [thick, -thick]]) {
-    page.drawText(t, { x: x + dx, y: y + dy, size, font, color: outline, xSkew: skew });
+    page.drawText(t, { x: x + dx, y: y + dy, size, font, color: outline, ySkew: skew });
   }
-  page.drawText(t, { x, y, size, font, color: fill, xSkew: skew });
+  page.drawText(t, { x, y, size, font, color: fill, ySkew: skew });
 }
 
-/** The event wordmark, drawn in Orbitron: MEET & / DRIFT 3 / FINAL ROUND. */
-function drawWordmark(page: PDFPage, f: Fonts, x: number, topY: number, scale = 1) {
-  const s1 = 34 * scale, s2 = 34 * scale, s3 = 11 * scale;
-  const y1 = topY - s1;
-  outlined(page, "MEET &", x, y1, s1, f.display, BRAND.pink, BRAND.pinkDark, 1.8 * scale);
-  const y2 = y1 - s2 - 6 * scale;
-  outlined(page, "DRIFT", x + 8 * scale, y2, s2, f.display, BRAND.green, BRAND.teal, 1.8 * scale);
-  const gap = s2 * 0.22;
-  const wDrift = f.display.widthOfTextAtSize("DRIFT", s2) + gap;
-  outlined(page, "3", x + 8 * scale + wDrift, y2, s2, f.display, BRAND.cyan, BRAND.teal, 1.8 * scale);
-  const y3 = y2 - s3 - 8 * scale;
-  const sub = "FINAL ROUND";
-  const wSub = f.display.widthOfTextAtSize(sub, s3);
-  const total = wDrift + f.display.widthOfTextAtSize("3", s2) + 8 * scale;
-  const subX = x + (total - wSub) / 2;
-  outlined(page, sub, subX, y3, s3, f.display, BRAND.gold, BRAND.goldDark, 1.1 * scale);
-  const ly = y3 + s3 * 0.35;
-  page.drawLine({ start: { x: x - 2 * scale, y: ly }, end: { x: subX - 10 * scale, y: ly }, thickness: 2 * scale, color: BRAND.gold, dashArray: [10 * scale, 5 * scale] });
-  page.drawLine({ start: { x: subX + wSub + 10 * scale, y: ly }, end: { x: x + total + 2 * scale, y: ly }, thickness: 2 * scale, color: BRAND.gold, dashArray: [10 * scale, 5 * scale] });
-  return y3;
+/**
+ * Text wordmark for when there is no logo PNG: the event name in Orbitron, at
+ * most three lines, alternating the first two palette colours, with a gold
+ * dashed rule under it. Shrinks until the longest word fits the width.
+ */
+function drawWordmark(page: PDFPage, f: Fonts, name: string, x: number, topY: number, width: number, C: PdfColors) {
+  const scale = width / 300;
+  const words = safe(name.toUpperCase()).split(/\s+/).filter(Boolean);
+  let size = 34 * scale;
+  let lines: string[] = [];
+  for (; size > 10 * scale; size -= 2 * scale) {
+    lines = wrap(f.display, words.join(" "), size, width);
+    if (lines.length <= 3 && lines.every((l) => f.display.widthOfTextAtSize(l, size) <= width)) break;
+  }
+  const fills = [[C.pink, C.pinkDark], [C.green, C.teal]] as const;
+  let y = topY;
+  lines.slice(0, 3).forEach((line, i) => {
+    y -= size + (i ? 6 * scale : 0);
+    const [fill, edge] = fills[i % 2];
+    outlined(page, line, x, y, size, f.display, fill, edge, 1.8 * scale);
+  });
+  y -= 10 * scale;
+  page.drawLine({ start: { x, y }, end: { x: x + width, y }, thickness: 2 * scale, color: C.gold, dashArray: [10 * scale, 5 * scale] });
+  return y;
 }
 
-/** Event wordmark: the official PNG when available, else the drawn Orbitron version. */
-async function drawBrand(doc: PDFDocument, page: PDFPage, f: Fonts, x: number, topY: number, width: number): Promise<{ bottom: number; width: number }> {
-  const bytes = await logoBytes();
-  if (bytes) {
-    const img = await embedOnce(doc, "logo", () => doc.embedPng(bytes));
+/** Event wordmark: the logo PNG from site.ts when available, else the event name in Orbitron. */
+async function drawBrand(doc: PDFDocument, page: PDFPage, f: Fonts, logo: string, name: string, x: number, topY: number, width: number, C: PdfColors): Promise<{ bottom: number; width: number }> {
+  const img = await embedArt(doc, logo);
+  if (img) {
     const h = (img.height / img.width) * width;
     page.drawImage(img, { x, y: topY - h, width, height: h });
     return { bottom: topY - h, width };
   }
-  const scale = width / 300;
-  const bottom = drawWordmark(page, f, x, topY, scale);
+  const bottom = drawWordmark(page, f, name, x, topY, width, C);
   return { bottom, width };
 }
 
 /** Four-colour brand stripe. */
-function stripe(page: PDFPage, x: number, y: number, w: number, h: number) {
-  const cols = [BRAND.pink, BRAND.violet, BRAND.cyan, BRAND.green];
+function stripe(page: PDFPage, x: number, y: number, w: number, h: number, C: PdfColors) {
+  const cols = [C.pink, C.violet, C.cyan, C.green];
   cols.forEach((c, i) => page.drawRectangle({ x: x + (w / cols.length) * i, y, width: w / cols.length, height: h, color: c }));
 }
 
@@ -338,7 +397,8 @@ function labelValue(page: PDFPage, f: Fonts, label: string, value: string, x: nu
   return y - valueSize - 19;
 }
 
-async function drawTicketPage(doc: PDFDocument, f: Fonts, b: OrderBundle, t: OrderBundle["tickets"][number]) {
+async function drawTicketPage(doc: PDFDocument, f: Fonts, b: OrderBundle, t: OrderBundle["tickets"][number], art: PdfArt) {
+  const C = art.colors;
   const page = doc.addPage(A4);
   const { event, order } = b;
   const tt = t.ticket_type;
@@ -354,9 +414,8 @@ async function drawTicketPage(doc: PDFDocument, f: Fonts, b: OrderBundle, t: Ord
   const bannerH = 222;
   const bannerY = H - bannerH;
   page.drawRectangle({ x: 0, y: bannerY, width: W, height: bannerH, color: rgb(0.05, 0.03, 0.09) });
-  const poster = await posterBytes();
-  if (poster) {
-    const img = await embedOnce(doc, "poster", () => doc.embedJpg(poster));
+  const img = await embedArt(doc, art.banner);
+  if (img) {
     const scale = Math.max(W / img.width, bannerH / img.height) * 1.05;
     const iw = img.width * scale, ih = img.height * scale;
     page.drawImage(img, { x: (W - iw) / 2, y: bannerY + bannerH - ih + ih * 0.12, width: iw, height: ih });
@@ -366,10 +425,10 @@ async function drawTicketPage(doc: PDFDocument, f: Fonts, b: OrderBundle, t: Ord
   // darken for legibility: stronger at the bottom of the banner
   page.drawRectangle({ x: 0, y: bannerY, width: W, height: bannerH, color: rgb(0, 0, 0), opacity: 0.42 });
   page.drawRectangle({ x: 0, y: bannerY, width: W, height: 110, color: rgb(0, 0, 0), opacity: 0.35 });
-  stripe(page, 0, bannerY - 4, W, 4);
+  stripe(page, 0, bannerY - 4, W, 4, C);
 
   // wordmark + event meta
-  const brand = await drawBrand(doc, page, f, MARGIN, H - 30, 300);
+  const brand = await drawBrand(doc, page, f, art.logo, event.name, MARGIN, H - 30, 300, C);
   const wmBottom = brand.bottom;
   page.drawText(safe(fmtDate(event.starts_at)), { x: MARGIN, y: wmBottom - 22, size: 9.5, font: f.bold, color: WHITE });
   if (event.venue) page.drawText(safe(event.venue), { x: MARGIN, y: wmBottom - 35, size: 9, font: f.regular, color: rgb(0.85, 0.85, 0.9) });
@@ -381,7 +440,7 @@ async function drawTicketPage(doc: PDFDocument, f: Fonts, b: OrderBundle, t: Ord
     while (f.display.widthOfTextAtSize(label, size) > 210 && size > 8) size -= 0.5;
     const bw = f.display.widthOfTextAtSize(label, size) + 28, bh = 30;
     const bx = right - bw, by = H - 34 - bh;
-    page.drawRectangle({ x: bx, y: by, width: bw, height: bh, color: isVip ? BRAND.gold : BRAND.cyan });
+    page.drawRectangle({ x: bx, y: by, width: bw, height: bh, color: isVip ? C.gold : C.cyan });
     page.drawText(label, { x: bx + 14, y: by + 9.5, size, font: f.display, color: rgb(0.05, 0.05, 0.08) });
     page.drawText("ADMIT ONE", { x: right - f.bold.widthOfTextAtSize("ADMIT ONE", 8), y: by - 14, size: 8, font: f.bold, color: rgb(0.9, 0.9, 0.95) });
   }
@@ -389,7 +448,7 @@ async function drawTicketPage(doc: PDFDocument, f: Fonts, b: OrderBundle, t: Ord
   // ---------------------------------------------------------- body card
   const cardTop = bannerY - 24, cardBottom = 204;
   page.drawRectangle({ x: MARGIN, y: cardBottom, width: contentW, height: cardTop - cardBottom, color: WHITE, borderColor: LINE, borderWidth: 0.8 });
-  page.drawRectangle({ x: MARGIN, y: cardBottom, width: 5, height: cardTop - cardBottom, color: isVip ? BRAND.gold : BRAND.cyan });
+  page.drawRectangle({ x: MARGIN, y: cardBottom, width: 5, height: cardTop - cardBottom, color: isVip ? C.gold : C.cyan });
 
   // left: wristband number + details
   const lx = MARGIN + 24;
@@ -445,7 +504,7 @@ async function drawTicketPage(doc: PDFDocument, f: Fonts, b: OrderBundle, t: Ord
     page.drawText("AT THE GATE", { x: boxX + 12, y: boxY + boxH - 17, size: 8, font: f.display, color: INK });
     let sy = boxY + boxH - 34;
     for (const [num, line] of steps) {
-      page.drawRectangle({ x: boxX + 12, y: sy - 3, width: 14, height: 14, color: isVip ? BRAND.gold : BRAND.cyan });
+      page.drawRectangle({ x: boxX + 12, y: sy - 3, width: 14, height: 14, color: isVip ? C.gold : C.cyan });
       page.drawText(num, { x: boxX + 16, y: sy, size: fs, font: f.display, color: rgb(0.05, 0.05, 0.08) });
       const end = paragraph(page, line, boxX + 32, sy, fs, f.regular, boxW - 44, INK, 1.25);
       sy = end - 4;
@@ -472,7 +531,7 @@ async function drawTicketPage(doc: PDFDocument, f: Fonts, b: OrderBundle, t: Ord
 
   const sY = 70, sH = stubTop - 24 - sY;
   page.drawRectangle({ x: MARGIN, y: sY, width: contentW, height: sH, color: rgb(0.05, 0.03, 0.09) });
-  stripe(page, MARGIN, sY + sH - 4, contentW, 4);
+  stripe(page, MARGIN, sY + sH - 4, contentW, 4, C);
   // Car pass stubs show the registered car instead of the logo, so marshals can match it.
   let sx = MARGIN + 14 + 150 + 22;
   const carImg = isCarPass && t.vehicle_photo_path ? await vehiclePhoto(doc, t.vehicle_photo_path) : null;
@@ -483,7 +542,7 @@ async function drawTicketPage(doc: PDFDocument, f: Fonts, b: OrderBundle, t: Ord
     sx = MARGIN + 14 + pw + 22;
   } else {
     const brandW = 150;
-    await drawBrand(doc, page, f, MARGIN + 14, sY + sH - 4 - (sH - 8 - brandW * 0.33) / 2, brandW);
+    await drawBrand(doc, page, f, art.logo, event.name, MARGIN + 14, sY + sH - 4 - (sH - 8 - brandW * 0.33) / 2, brandW, C);
   }
   const bigText = isCarPass ? (t.vehicle_plate ?? "PLATE TBA") : t.number;
   const smallText = isCarPass
@@ -505,7 +564,7 @@ async function drawTicketPage(doc: PDFDocument, f: Fonts, b: OrderBundle, t: Ord
     let size = 9;
     while (f.display.widthOfTextAtSize(label, size) > 150 && size > 6) size -= 0.5;
     const tx = right - 12 - sq - 18 - f.display.widthOfTextAtSize(label, size);
-    page.drawText(label, { x: tx, y: sY + sH - 22, size, font: f.display, color: isVip ? BRAND.gold : BRAND.cyan });
+    page.drawText(label, { x: tx, y: sY + sH - 22, size, font: f.display, color: isVip ? C.gold : C.cyan });
   }
 
   // ---------------------------------------------------------- void stamp
@@ -566,9 +625,12 @@ export async function buildOrderPdf(bundle: OrderBundle): Promise<Uint8Array> {
     display,
   };
   doc.setTitle(`${bundle.event.name} - Order #${bundle.order.order_no}`);
+  // Uploaded artwork from Admin > Settings, else the files that ship with the app.
+  const site = await getSiteSettings();
+  const art: PdfArt = { logo: site.pdfLogo ?? SITE_BRAND.pdf.logo, banner: site.pdfBanner ?? SITE_BRAND.pdf.banner, colors: pdfColors(site.pdfPalette) };
   drawReceiptPage(doc, f, bundle);
   // A ticket converted to another type gave its band back to the pool; it is not the
   // buyer's any more, so it gets no page. Ordinary voids keep theirs, stamped VOID.
-  for (const t of bundle.tickets.filter((t) => t.ticket_number_id !== null)) await drawTicketPage(doc, f, bundle, t);
+  for (const t of bundle.tickets.filter((t) => t.ticket_number_id !== null)) await drawTicketPage(doc, f, bundle, t, art);
   return doc.save();
 }

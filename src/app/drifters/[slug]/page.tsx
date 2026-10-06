@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 
 // Shared with drifters only: keep it out of search results.
 export const metadata: Metadata = {
-  title: "Drifter sign-up · Meet & Drift 3",
+  title: "Drifter sign-up",
   robots: { index: false, follow: false },
 };
 
@@ -32,8 +32,8 @@ export default async function DrifterSignupPage({ params }: { params: Promise<{ 
   const type = data as TicketTypeRow | null;
 
   return (
-    <main className="flex flex-1 flex-col bg-[#0a0a0c]">
-      {event && <EventBanner event={event} backLabel="Meet & Drift 3" />}
+    <main className="flex flex-1 flex-col bg-brand">
+      {event && <EventBanner event={event} backLabel={event.name} />}
       <div className="dark-zone mx-auto w-full max-w-xl flex-1 px-4 py-8">
         {!type ? (
           <>

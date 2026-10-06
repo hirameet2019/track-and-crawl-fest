@@ -2,7 +2,8 @@
 
 import { useMemo, useRef, useState, useTransition } from "react";
 import { createOnlineOrder, type CreateOrderInput } from "@/app/actions/orders";
-import { MAX_COMPANIONS_PER_CAR, MAX_QTY_PER_TYPE, PAYMENT_WINDOW_MINUTES, SHIRT_SIZES, SHIRT_SIZE_CHART } from "@/config/event";
+import type { PaymentChannel } from "@/config/event";
+import { useRules } from "@/components/RulesProvider";
 import { shrinkImage } from "@/lib/image";
 import { php } from "@/lib/money";
 import { fmtCutoff, hoursUntilCutoff, isTypeClosed } from "@/lib/cutoff";
@@ -89,7 +90,11 @@ function CarPhotoField({ preview, fileName, onPick }: { preview: string | null; 
   );
 }
 
-export function OrderForm({ types, availability }: { types: TicketTypeRow[]; availability: PublicAvailability[] }) {
+export function OrderForm({ types, availability, channel }: { types: TicketTypeRow[]; availability: PublicAvailability[]; channel: PaymentChannel }) {
+  // Limits, hold time and shirt sizes from Admin > Settings.
+  const { maxQtyPerType: MAX_QTY_PER_TYPE, maxCompanionsPerCar: MAX_COMPANIONS_PER_CAR, paymentWindowMinutes: PAYMENT_WINDOW_MINUTES, shirtChart } = useRules();
+  const SHIRT_SIZES = shirtChart.map((r) => r.size);
+  const SHIRT_SIZE_CHART = Object.fromEntries(shirtChart.map((r) => [r.size, r]));
   const [qty, setQty] = useState<Record<string, number>>({});
   const [attendees, setAttendees] = useState<Record<string, Attendee[]>>({});
   const [buyer, setBuyer] = useState({ buyer_name: "", buyer_email: "", buyer_mobile: "" });
@@ -570,14 +575,16 @@ export function OrderForm({ types, availability }: { types: TicketTypeRow[]; ava
             {pending ? "Reserving..." : "Review & continue"}
           </button>
         </div>
-        <p className="mt-3 text-xs text-zinc-400">You will have {PAYMENT_WINDOW_MINUTES} minutes to pay via GoTyme (InstaPay QR) and upload your proof of payment. <span className="text-zinc-500">Sa susunod na page ang QR at ang pag-upload ng screenshot.</span></p>
+        <p className="mt-3 text-xs text-zinc-400">You will have {PAYMENT_WINDOW_MINUTES} minutes to pay via {channel.via} and upload your proof of payment. <span className="text-zinc-500">Sa susunod na page ang QR at ang pag-upload ng screenshot.</span></p>
       </Reveal>
     </form>
     {review && (
       <OrderReviewModal
+        channel={channel}
         lines={reviewLines}
         companionPrice={companionPrice}
-        companionLabel={companionType?.name ?? "VIP Pass"}
+        companionLabel={companionType?.name ?? "Companion"}
+        companionBand={companionType?.band_color ?? null}
         buyer={{ ...buyer, buyer_mobile: normalizeMobile(buyer.buyer_mobile) || buyer.buyer_mobile }}
         total={total}
         pending={pending}

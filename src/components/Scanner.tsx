@@ -1,5 +1,6 @@
 "use client";
 
+import { LOCALE } from "@/config/site";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { downloadTicketCache, findTickets, markKitClaimed, redeemTicket, type ScanResult, type TicketMatch } from "@/app/actions/scan";
 
@@ -274,7 +275,7 @@ function ResultCard({ r, onKit }: { r: AnyResult; onKit: (id: string, item: stri
     <div className={`rounded-xl p-5 text-white ${tone}`}>
       <div className="flex items-start justify-between">
         <div className="text-2xl font-black">{title}</div>
-        {r.result === "already_redeemed" && t.redeemed_at && <div className="text-right text-xs">first scan<br />{new Date(t.redeemed_at).toLocaleTimeString("en-PH", { timeZone: "Asia/Manila" })}</div>}
+        {r.result === "already_redeemed" && t.redeemed_at && <div className="text-right text-xs">first scan<br />{new Date(t.redeemed_at).toLocaleTimeString(LOCALE.locale, { timeZone: LOCALE.timeZone })}</div>}
       </div>
       <div className="mt-3 text-4xl font-black tracking-wide">{t.number}</div>
       <div className="text-lg font-semibold">{t.ticket_type.name}{t.ticket_type.band_color ? ` · ${t.ticket_type.band_color} band` : ""}</div>

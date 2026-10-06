@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { LoginForm } from "@/components/LoginForm";
 import { getStaff } from "@/lib/auth";
 import { homeFor, roleRank } from "@/lib/roles";
+import { getActiveEvent } from "@/lib/queries";
+import { getSiteSettings } from "@/lib/site-settings";
 
 export const dynamic = "force-dynamic";
 
@@ -13,17 +15,18 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   // bouncing between pages it cannot open.
   if (session && roleRank(session.staff.role) > 0) redirect(next && next.startsWith("/") ? next : homeFor(session.staff.role));
   const notStaff = reason === "not_staff";
+  const [event, site] = await Promise.all([getActiveEvent(), getSiteSettings()]);
 
   return (
-    <main className="relative isolate flex flex-1 flex-col items-center justify-center overflow-hidden bg-[#0a0a0c] px-4 py-12 text-white">
-      <div className="absolute inset-0 -z-20 bg-[url(/poster.jpg)] bg-cover bg-[position:center_40%] opacity-50" aria-hidden />
-      <div className="absolute inset-0 -z-10 bg-gradient-to-b from-black/70 via-black/60 to-[#0a0a0c]" aria-hidden />
+    <main className="relative isolate flex flex-1 flex-col items-center justify-center overflow-hidden bg-brand px-4 py-12 text-white">
+      <div className="absolute inset-0 -z-20 bg-cover bg-[position:center_40%] opacity-50" style={{ backgroundImage: `url(${site.backdrop})` }} aria-hidden />
+      <div className="absolute inset-0 -z-10 bg-gradient-to-b from-black/70 via-black/60 to-brand" aria-hidden />
       <Link href="/" className="absolute left-4 top-4 inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-black/40 px-3 py-1.5 text-sm text-zinc-200 backdrop-blur-sm transition hover:bg-white/10 hover:text-white sm:left-6 sm:top-6">
         <span aria-hidden>&larr;</span> Back to tickets
       </Link>
       <div className="w-full max-w-sm">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo.png" alt="Meet & Drift 3" className="mx-auto mb-6 w-64 drop-shadow-[0_6px_24px_rgba(0,0,0,0.7)]" />
+        <img src={site.logo} alt={event?.name ?? ""} className="mx-auto mb-6 w-64 drop-shadow-[0_6px_24px_rgba(0,0,0,0.7)]" />
         <h1 className="text-center text-xl font-bold">Staff login</h1>
         <p className="mb-6 text-center text-sm text-zinc-300">For organizer staff, verifiers, and gate scanners.</p>
         {notStaff && (

@@ -1,3 +1,4 @@
+import { LOCALE } from "@/config/site";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 /**
@@ -66,6 +67,12 @@ const ACTIONS: Record<string, { cat: AuditCategory; label: string }> = {
   "staff.signed_out": { cat: "staff", label: "Staff signed out" },
   "settings.email_updated": { cat: "settings", label: "Email settings changed" },
   "ticket_type.cutoff": { cat: "settings", label: "Sales cut-off changed" },
+  "settings.site_updated": { cat: "settings", label: "Site look changed" },
+  "settings.site_reset": { cat: "settings", label: "Site look reset to defaults" },
+  "settings.rules_updated": { cat: "settings", label: "Ordering / payment rules changed" },
+  "event.updated": { cat: "settings", label: "Event details changed" },
+  "ticket_type.created": { cat: "settings", label: "Ticket type added" },
+  "ticket_type.updated": { cat: "settings", label: "Ticket type changed" },
 };
 
 export const ALL_ACTIONS = Object.keys(ACTIONS);
@@ -78,7 +85,7 @@ export function actionsInCategory(cat: AuditCategory): string[] {
   return ALL_ACTIONS.filter((a) => ACTIONS[a].cat === cat);
 }
 
-const peso = (c: unknown) => (typeof c === "number" ? `PHP ${(c / 100).toLocaleString("en-PH", { minimumFractionDigits: 2 })}` : "");
+const peso = (c: unknown) => (typeof c === "number" ? `${LOCALE.currencyCode} ${(c / 100).toLocaleString(LOCALE.locale, { minimumFractionDigits: 2 })}` : "");
 
 /** One-line, plain-English summary of an entry's data payload. */
 export function describe(action: string, data: Record<string, unknown> | null | undefined): string {
@@ -97,7 +104,7 @@ export function describe(action: string, data: Record<string, unknown> | null | 
     case "ticket.unredeemed":
       return [
         d.number ? String(d.number) : "",
-        d.was_redeemed_at ? `was scanned ${new Date(String(d.was_redeemed_at)).toLocaleString("en-PH", { timeZone: "Asia/Manila", dateStyle: "medium", timeStyle: "short" })}` : "",
+        d.was_redeemed_at ? `was scanned ${new Date(String(d.was_redeemed_at)).toLocaleString(LOCALE.locale, { timeZone: LOCALE.timeZone, dateStyle: "medium", timeStyle: "short" })}` : "",
         d.reason ? `Reason: ${d.reason}` : "",
       ].filter(Boolean).join(" · ");
     case "order.voided":
@@ -170,8 +177,15 @@ export function describe(action: string, data: Record<string, unknown> | null | 
       return [d.email, d.role].filter(Boolean).join(" · ");
     case "settings.email_updated":
       return d.provider ? `Provider ${d.provider}` : "";
+    case "settings.site_updated":
+    case "settings.rules_updated":
+    case "event.updated":
+      return Array.isArray(d.changed) && d.changed.length ? `Changed: ${(d.changed as string[]).join(", ")}` : "No changes";
+    case "ticket_type.created":
+    case "ticket_type.updated":
+      return [d.code ? `${d.code} · ${d.name ?? ""}` : String(d.name ?? ""), Array.isArray(d.changed) && d.changed.length ? `changed ${(d.changed as string[]).join(", ")}` : ""].filter(Boolean).join(" · ");
     case "ticket_type.cutoff":
-      return `${d.name ?? "Ticket type"}: ${d.sales_close_at ? `closes ${new Date(String(d.sales_close_at)).toLocaleString("en-PH", { timeZone: "Asia/Manila", dateStyle: "medium", timeStyle: "short" })}` : "open, no cut-off"}`;
+      return `${d.name ?? "Ticket type"}: ${d.sales_close_at ? `closes ${new Date(String(d.sales_close_at)).toLocaleString(LOCALE.locale, { timeZone: LOCALE.timeZone, dateStyle: "medium", timeStyle: "short" })}` : "open, no cut-off"}`;
     default:
       return Object.keys(d).length ? JSON.stringify(d) : "";
   }

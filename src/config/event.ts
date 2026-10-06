@@ -1,7 +1,8 @@
 /**
- * Static, non-sensitive presentation settings.
- * Event details, organizer receipt details, prices and ticket types live in the
- * database (see supabase/seed.sql) so they can be edited without a redeploy.
+ * Business rules: payment window, order limits, shirt sizes, payment channels.
+ * Branding, artwork, colours and locale are in src/config/site.ts. Event details,
+ * receipt details, prices and ticket types live in the database so staff can edit
+ * them in Admin without a redeploy.
  */
 export const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ?? "http://localhost:3000";
@@ -68,36 +69,6 @@ export function shirtSizeSummary(size: ShirtSize): string {
   return `Width ${m.width} in · Length ${m.length} in · Sleeve ${m.sleeve} in`;
 }
 
-/**
- * Artwork behind the sales hero, shown as a slideshow in this order. Drop a file
- * in /public and add a line here; nothing else needs to change. `label` is what a
- * screen reader announces on that slide's dot.
- */
-export interface HeroSlide {
-  src: string;
-  label: string;
-  /** CSS background-position. Pick the part that must stay in frame when cropped. */
-  position?: string;
-  /** "cover" fills and crops; "contain" fits the whole image in, letterboxed. */
-  size?: "cover" | "contain";
-  /**
-   * Muted looping clip played instead of the still. `src` is then its poster
-   * frame, which is what shows while it buffers and for anyone who asked for
-   * reduced motion. Keep clips short and silent: this is wallpaper, not a player.
-   */
-  video?: string;
-}
-
-export const HERO_SLIDES: readonly HeroSlide[] = [
-  { src: "/poster.jpg", label: "event poster", position: "center 35%" },
-  // 4.6s cut from the event reel, silent and looping. Taken from the stretch with
-  // no burned-in titles, so it does not fight the headline sitting on top of it.
-  { src: "/hero-drift.jpg", label: "drift reel", video: "/hero-drift.mp4", position: "center 45%" },
-  // Wide sponsor banner: centred, so the logos along the top and bottom edges
-  // survive the crop on a tall screen.
-  { src: "/poster-sponsors.jpg", label: "sponsors", position: "center center" },
-];
-
 /** Maximum tickets per online order. */
 export const MAX_QTY_PER_TYPE = 10;
 /** Passengers that can be added inside one VIP Car Display ticket. */
@@ -108,14 +79,60 @@ export const MAX_COMPANIONS_PER_CAR = 12;
  * offered is decided by the events row: a channel shows up on the pay page and
  * in "I paid with" only when its *_qr_url is set. Currently only GoTyme is set.
  */
-export const PAYMENT_CHANNELS: Record<PaymentMethod, { label: string; accent: string; hint?: string }> = {
-  gotyme: { label: "GoTyme Bank", accent: "text-teal-600", hint: "InstaPay QR. Scan with GoTyme or any bank / e-wallet app that supports InstaPay QR." },
-  gcash: { label: "GCash", accent: "text-sky-700" },
-  maya: { label: "Maya", accent: "text-emerald-700" },
-  cash: { label: "Cash", accent: "text-zinc-700" },
+export interface PaymentChannel {
+  /** Full name, shown on the payment card and in Admin. */
+  label: string;
+  /** Short name used in instructions: "Open your GoTyme app", "via GoTyme". */
+  app: string;
+  /** Short "pay via" phrase in the order form footnote. */
+  via: string;
+  /** Longer phrase for the page description and marketing copy ("Pay via ..."). */
+  payVia: string;
+  /** Optional aside after the app name on the payment page, e.g. which other apps work. */
+  scanHint?: string;
+  accent: string;
+  hint?: string;
+  /** Screenshot under "Where do I find the reference number?", served from /public. */
+  referenceImage?: string;
+}
+
+export const PAYMENT_CHANNELS: Record<PaymentMethod, PaymentChannel> = {
+  gotyme: {
+    label: "GoTyme Bank",
+    app: "GoTyme",
+    via: "GoTyme (InstaPay QR)",
+    payVia: "GoTyme Bank (InstaPay QR)",
+    scanHint: "or any bank app with InstaPay QR",
+    accent: "text-teal-600",
+    hint: "InstaPay QR. Scan with GoTyme or any bank / e-wallet app that supports InstaPay QR.",
+    referenceImage: "/help/gotyme-reference.png",
+  },
+  gcash: { label: "GCash", app: "GCash", via: "GCash", payVia: "GCash", accent: "text-sky-700" },
+  maya: { label: "Maya", app: "Maya", via: "Maya", payVia: "Maya", accent: "text-emerald-700" },
+  cash: { label: "Cash", app: "Cash", via: "cash", payVia: "cash", accent: "text-zinc-700" },
 };
 
-/** Short phrase for marketing copy ("Pay via ..."). Keep in sync with the channels enabled above. */
-export const PAY_VIA = "GoTyme Bank (InstaPay QR)";
+/** Online channels in the order the payment page lists them. */
+export const ONLINE_CHANNELS = ["gotyme", "gcash", "maya"] as const satisfies readonly OnlinePaymentMethod[];
 
-import type { PaymentMethod } from "@/lib/supabase/types";
+type ChannelFields = Partial<Pick<EventRow, "gotyme_qr_url" | "gcash_qr_url" | "maya_qr_url">>;
+
+/**
+ * The channel buyer-facing copy names ("Open your GoTyme app", "via GoTyme"): the
+ * first one with a QR code uploaded in Admin > Settings. Nothing to keep in sync,
+ * the wording follows whichever QR the organizer put up.
+ */
+export function primaryChannelKey(event: ChannelFields | null | undefined): OnlinePaymentMethod {
+  return ONLINE_CHANNELS.find((k) => event?.[`${k}_qr_url`]) ?? "gotyme";
+}
+
+/** The primary channel's display details. */
+export const primaryChannel = (event: ChannelFields | null | undefined, channels: Record<PaymentMethod, PaymentChannel> = PAYMENT_CHANNELS): PaymentChannel =>
+  channels[primaryChannelKey(event)];
+
+/** Account holder name shown beside the primary channel's QR, from the events row. */
+export function primaryAccountName(event: ChannelFields & Pick<EventRow, "gotyme_account_name" | "gcash_account_name" | "maya_account_name">): string | null {
+  return event[`${primaryChannelKey(event)}_account_name`] ?? null;
+}
+
+import type { EventRow, OnlinePaymentMethod, PaymentMethod } from "@/lib/supabase/types";

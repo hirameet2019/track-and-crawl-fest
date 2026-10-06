@@ -1,3 +1,4 @@
+import { LOCALE } from "@/config/site";
 import Link from "next/link";
 import { requireStaff } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -21,8 +22,8 @@ const CAT_TONE: Record<AuditCategory, string> = {
 
 type Row = { id: number; created_at: string; actor: string | null; action: string; entity: string; entity_id: string | null; data: Record<string, unknown> | null };
 
-const fmt = (iso: string) => new Date(iso).toLocaleString("en-PH", { timeZone: "Asia/Manila", dateStyle: "medium", timeStyle: "medium" });
-const manilaDayStart = () => new Date(`${new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Manila" })}T00:00:00+08:00`).toISOString();
+const fmt = (iso: string) => new Date(iso).toLocaleString(LOCALE.locale, { timeZone: LOCALE.timeZone, dateStyle: "medium", timeStyle: "medium" });
+const manilaDayStart = () => new Date(`${new Date().toLocaleDateString("en-CA", { timeZone: LOCALE.timeZone })}T00:00:00${LOCALE.utcOffset}`).toISOString();
 
 function entityHref(entity: string, id: string | null): string | null {
   if (!id) return null;
@@ -53,8 +54,8 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
   if (cat) query = query.in("action", actionsInCategory(cat).length ? actionsInCategory(cat) : ["__none__"]);
   if (actor === "system") query = query.is("actor", null);
   else if (actor) query = query.eq("actor", actor);
-  if (from) query = query.gte("created_at", new Date(`${from}T00:00:00+08:00`).toISOString());
-  if (to) query = query.lte("created_at", new Date(`${to}T23:59:59.999+08:00`).toISOString());
+  if (from) query = query.gte("created_at", new Date(`${from}T00:00:00${LOCALE.utcOffset}`).toISOString());
+  if (to) query = query.lte("created_at", new Date(`${to}T23:59:59.999${LOCALE.utcOffset}`).toISOString());
   if (q) {
     // PostgREST cannot cast jsonb in a filter, so search the payload keys we actually write.
     const like = `ilike.%${q.replace(/[,()]/g, " ")}%`;

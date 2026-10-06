@@ -8,7 +8,7 @@ import { getOrderBundle } from "@/lib/queries";
 import { audit } from "@/lib/audit";
 import { issueOrder, deliverOrder, deliverConversion } from "@/lib/issue";
 import { sendRejectionEmail, sendVoidEmail } from "@/lib/email";
-import { itemLabel } from "@/lib/items";
+import { carNameOf, itemLabel } from "@/lib/items";
 import { php } from "@/lib/money";
 import { newQrToken } from "@/lib/tokens";
 import type { OrderStatus, TicketStatus, TicketTypeRow } from "@/lib/supabase/types";
@@ -247,6 +247,8 @@ export interface ConvertTarget {
   sellable: number;
   /** The Drifters label: allowed here, but it sits outside that tab's free allowance. */
   drifter_family: boolean;
+  /** Free bands each drifter gets on that label (only meaningful when drifter_family). */
+  free_allowance: number;
 }
 
 /**
@@ -264,7 +266,7 @@ export async function getConvertTargets(orderId: string): Promise<ConvertTarget[
   if (!order) return [];
   const { data: types } = await admin
     .from("ticket_types")
-    .select("id, code, name, band_color, price_centavos, includes_shirt, requires_vehicle, drifter_family")
+    .select("id, code, name, band_color, price_centavos, includes_shirt, requires_vehicle, drifter_family, free_allowance")
     .eq("event_id", order.event_id)
     .eq("active", true)
     .order("sort_order");
@@ -273,12 +275,13 @@ export async function getConvertTargets(orderId: string): Promise<ConvertTarget[
     .select("ticket_type_id, sellable")
     .eq("event_id", order.event_id);
   const left = new Map((avail ?? []).map((a) => [a.ticket_type_id as string, Number(a.sellable)]));
-  return ((types ?? []) as (Pick<TicketTypeRow, "id" | "code" | "name" | "band_color" | "price_centavos" | "includes_shirt" | "requires_vehicle" | "drifter_family">)[])
+  return ((types ?? []) as (Pick<TicketTypeRow, "id" | "code" | "name" | "band_color" | "price_centavos" | "includes_shirt" | "requires_vehicle" | "drifter_family" | "free_allowance">)[])
     .filter((t) => !t.requires_vehicle && t.price_centavos > 0)
     .map((t) => ({
       id: t.id, code: t.code, name: t.name, band_color: t.band_color,
       price_centavos: t.price_centavos, includes_shirt: t.includes_shirt,
       sellable: left.get(t.id) ?? 0, drifter_family: t.drifter_family,
+      free_allowance: t.free_allowance,
     }));
 }
 
@@ -428,7 +431,7 @@ export async function getOrderDetail(orderId: string): Promise<OrderDetail | nul
     balance_centavos: order.balance_centavos,
     balance_settled_at: order.balance_settled_at,
     balance_note: order.balance_note,
-    items: items.map((it) => ({ id: it.id, label: itemLabel(it), amount_centavos: it.qty * it.unit_price_centavos })),
+    items: items.map((it) => ({ id: it.id, label: itemLabel(it, true, carNameOf(items)), amount_centavos: it.qty * it.unit_price_centavos })),
     tickets: tickets.map((t) => ({
       id: t.id,
       number: t.number,

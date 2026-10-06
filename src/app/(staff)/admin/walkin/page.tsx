@@ -1,3 +1,4 @@
+import { LOCALE } from "@/config/site";
 import { requireStaff } from "@/lib/auth";
 import { hasRole } from "@/lib/roles";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -10,8 +11,8 @@ export const dynamic = "force-dynamic";
 /** Start of today in Asia/Manila as an ISO string. */
 function manilaDayStart(): string {
   const now = new Date();
-  const ymd = now.toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
-  return new Date(`${ymd}T00:00:00+08:00`).toISOString();
+  const ymd = now.toLocaleDateString("en-CA", { timeZone: LOCALE.timeZone });
+  return new Date(`${ymd}T00:00:00${LOCALE.utcOffset}`).toISOString();
 }
 
 export default async function WalkinPage() {

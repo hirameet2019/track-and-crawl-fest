@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { addDrifterEntries, removeDrifterEntry, setDrifterSignup } from "@/app/actions/drifter-entries";
 import { drifterLink, drifterReference } from "@/lib/drifter";
+import { useRules } from "@/components/RulesProvider";
 import type { DrifterEntryRow } from "@/lib/supabase/types";
 
 /**
@@ -41,6 +42,7 @@ async function copy(text: string) {
  * one at a time or paste the whole list, then copy each link into Messenger.
  */
 export function DrifterLinks({ entries, siteUrl, signupSlug }: { entries: DrifterEntryRow[]; siteUrl: string; signupSlug: string | null }) {
+  const prefix = useRules().drifterReferencePrefix;
   const router = useRouter();
   const [name, setName] = useState("");
   const [team, setTeam] = useState("");
@@ -258,7 +260,7 @@ export function DrifterLinks({ entries, siteUrl, signupSlug }: { entries: Drifte
                         {copied === e.id ? "Copied" : "Copy"}
                       </button>
                     </div>
-                    <div className="mt-0.5 font-mono text-[10px] text-zinc-500">{drifterReference(e.token)}</div>
+                    <div className="mt-0.5 font-mono text-[10px] text-zinc-500">{drifterReference(e.token, prefix)}</div>
                   </td>
                   <td className="whitespace-nowrap py-2.5 text-right">
                     {removing === e.id ? (

@@ -1,3 +1,4 @@
+import { LOCALE } from "@/config/site";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import QRCode from "qrcode";
@@ -9,7 +10,7 @@ import { ticketUrl } from "@/lib/pdf/ticket-pdf";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SupportContact } from "@/components/SupportContact";
 
-import { itemLabel } from "@/lib/items";
+import { carNameOf, itemLabel } from "@/lib/items";
 
 export const dynamic = "force-dynamic";
 
@@ -85,8 +86,8 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ or
           <p className="mt-1 text-sm">
             Your order was changed to a different ticket.{" "}
             {order.balance_centavos > 0
-              ? <><b>{php(order.balance_centavos)}</b> will be returned to the account you paid from{order.balance_settled_at ? <> &mdash; sent on {new Date(order.balance_settled_at).toLocaleDateString("en-PH", { timeZone: "Asia/Manila", dateStyle: "medium" })}</> : null}.</>
-              : <><b>{php(-order.balance_centavos)}</b> is still to be paid{order.balance_settled_at ? <> &mdash; received on {new Date(order.balance_settled_at).toLocaleDateString("en-PH", { timeZone: "Asia/Manila", dateStyle: "medium" })}</> : null}. Your tickets below are already valid.</>}
+              ? <><b>{php(order.balance_centavos)}</b> will be returned to the account you paid from{order.balance_settled_at ? <> &mdash; sent on {new Date(order.balance_settled_at).toLocaleDateString(LOCALE.locale, { timeZone: LOCALE.timeZone, dateStyle: "medium" })}</> : null}.</>
+              : <><b>{php(-order.balance_centavos)}</b> is still to be paid{order.balance_settled_at ? <> &mdash; received on {new Date(order.balance_settled_at).toLocaleDateString(LOCALE.locale, { timeZone: LOCALE.timeZone, dateStyle: "medium" })}</> : null}. Your tickets below are already valid.</>}
           </p>
           {!order.balance_settled_at && <p className="mt-1 text-xs opacity-80">Kontakin ang organizer at banggitin ang order number kung may tanong.</p>}
         </div>
@@ -110,7 +111,7 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ or
         <ul className="mt-2 divide-y text-sm">
           {items.map((it) => (
             <li key={it.id} className="flex justify-between py-2">
-              <span>{itemLabel(it)}</span>
+              <span>{itemLabel(it, true, carNameOf(items))}</span>
               <span>{php(it.qty * it.unit_price_centavos)}</span>
             </li>
           ))}

@@ -8,6 +8,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getActiveEvent } from "@/lib/queries";
 import { newDrifterToken } from "@/lib/tokens";
 import { drifterLink, drifterReference } from "@/lib/drifter";
+import { getRules } from "@/lib/rules";
 import { sendDrifterLinkEmail } from "@/lib/email";
 import { SITE_URL } from "@/config/event";
 import { DRIFTER_ROLES, type PaymentMethod } from "@/lib/supabase/types";
@@ -233,7 +234,7 @@ export async function selfRegisterDrifter(input: {
         try {
           const event = await getActiveEvent();
           const sent = await sendDrifterLinkEmail(email, {
-            drifterName: name, link: drifterLink(SITE_URL, token), reference: drifterReference(token), eventName: event?.name ?? "Meet & Drift 3",
+            drifterName: name, link: drifterLink(SITE_URL, token), reference: drifterReference(token, (await getRules()).drifterReferencePrefix), eventName: event?.name ?? "the event",
           });
           if (sent?.ok) await createAdminClient().from("drifter_entries").update({ link_sent_at: new Date().toISOString() }).eq("token", token);
         } catch (e) {
@@ -307,8 +308,8 @@ export async function resendDrifterLink(input: { email: string }): Promise<Actio
         for (const e of due) {
           try {
             const sent = await sendDrifterLinkEmail(email, {
-              drifterName: e.drifter_name, link: drifterLink(SITE_URL, e.token), reference: drifterReference(e.token),
-              eventName: event?.name ?? "Meet & Drift 3", resend: true,
+              drifterName: e.drifter_name, link: drifterLink(SITE_URL, e.token), reference: drifterReference(e.token, (await getRules()).drifterReferencePrefix),
+              eventName: event?.name ?? "the event", resend: true,
             });
             if (sent?.ok) await createAdminClient().from("drifter_entries").update({ link_sent_at: new Date().toISOString() }).eq("id", e.id);
           } catch (err) {

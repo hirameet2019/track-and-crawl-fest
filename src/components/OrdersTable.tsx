@@ -1,5 +1,6 @@
 "use client";
 
+import { LOCALE } from "@/config/site";
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { getOrderDetail, type OrderDetail } from "@/app/actions/admin";
@@ -24,7 +25,7 @@ export interface OrderRow {
   created_at: string;
 }
 
-const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleString("en-PH", { timeZone: "Asia/Manila" }) : "-");
+const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleString(LOCALE.locale, { timeZone: LOCALE.timeZone }) : "-");
 const COLS = 7;
 
 /**
@@ -32,7 +33,7 @@ const COLS = 7;
  * fetched the first time a row is opened and re-fetched only when that order's status
  * changes (an approval, rejection or void), so browsing the list costs one query.
  */
-export function OrdersTable({ rows, isAdmin }: { rows: OrderRow[]; isAdmin: boolean }) {
+export function OrdersTable({ rows, isAdmin, payApp }: { rows: OrderRow[]; isAdmin: boolean; payApp: string }) {
   const [openId, setOpenId] = useState<string | null>(null);
   // detail plus the status it was loaded at, so a live update can invalidate it
   const [cache, setCache] = useState<Record<string, { at: OrderStatus; detail: OrderDetail | null }>>({});
@@ -104,7 +105,7 @@ export function OrdersTable({ rows, isAdmin }: { rows: OrderRow[]; isAdmin: bool
                     <td className="text-xs"><span className="uppercase">{o.payment_method}</span> <span className="font-mono text-zinc-500">{o.payment_reference}</span></td>
                     <td className="text-right">{php(o.total_centavos)}</td>
                     <td><OrderStatusBadge status={o.status} /></td>
-                    <td className="text-xs text-zinc-500">{new Date(o.created_at).toLocaleString("en-PH", { timeZone: "Asia/Manila" })}</td>
+                    <td className="text-xs text-zinc-500">{new Date(o.created_at).toLocaleString(LOCALE.locale, { timeZone: LOCALE.timeZone })}</td>
                   </tr>
                   {open && (
                     <tr className="border-t border-white/10 bg-black/20">
@@ -113,7 +114,7 @@ export function OrdersTable({ rows, isAdmin }: { rows: OrderRow[]; isAdmin: bool
                           {loading === o.id && !entry ? (
                             <div className="py-6 text-center text-sm text-zinc-500">Loading order #{o.order_no}...</div>
                           ) : entry?.detail ? (
-                            <OrderPanel d={entry.detail} isAdmin={isAdmin} />
+                            <OrderPanel d={entry.detail} isAdmin={isAdmin} payApp={payApp} />
                           ) : (
                             <div className="py-6 text-center text-sm text-zinc-500">Could not load this order.</div>
                           )}
@@ -131,7 +132,7 @@ export function OrdersTable({ rows, isAdmin }: { rows: OrderRow[]; isAdmin: bool
   );
 }
 
-function OrderPanel({ d, isAdmin }: { d: OrderDetail; isAdmin: boolean }) {
+function OrderPanel({ d, isAdmin, payApp }: { d: OrderDetail; isAdmin: boolean; payApp: string }) {
   return (
     <div className="grid gap-4 lg:grid-cols-3">
       <div className="lg:col-span-2">
@@ -170,6 +171,7 @@ function OrderPanel({ d, isAdmin }: { d: OrderDetail; isAdmin: boolean }) {
             buyerName={d.buyer_name} totalCentavos={d.total_centavos}
             balanceCentavos={d.balance_centavos} balanceSettledAt={d.balance_settled_at}
             hasRedeemed={d.tickets.some((t) => t.status === "redeemed")}
+            payApp={payApp}
           />
         </div>
         {d.payment_proof_path && (

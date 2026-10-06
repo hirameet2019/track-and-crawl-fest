@@ -1,3 +1,4 @@
+import { LOCALE } from "@/config/site";
 import type { Metadata } from "next";
 import { EventBanner } from "@/components/EventHero";
 import { DrifterRegistrationForm } from "@/components/DrifterRegistrationForm";
@@ -5,6 +6,7 @@ import { ForgetThisLink, RememberThisLink } from "@/components/DrifterLinkMemory
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getActiveEvent } from "@/lib/queries";
 import { drifterReference } from "@/lib/drifter";
+import { getRules } from "@/lib/rules";
 import { php } from "@/lib/money";
 import type { DrifterEntryRow, TicketTypeRow } from "@/lib/supabase/types";
 
@@ -12,7 +14,7 @@ export const dynamic = "force-dynamic";
 
 // A private link: keep it out of search results and link previews.
 export const metadata: Metadata = {
-  title: "Drifter wristbands · Meet & Drift 3",
+  title: "Drifter wristbands",
   robots: { index: false, follow: false },
 };
 
@@ -23,7 +25,7 @@ export const metadata: Metadata = {
  */
 export default async function DrifterLinkPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
-  const event = await getActiveEvent();
+  const [event, { drifterReferencePrefix: prefix }] = await Promise.all([getActiveEvent(), getRules()]);
   const admin = createAdminClient();
 
   const { data } = token.length >= 10 && token.length <= 40
@@ -37,8 +39,8 @@ export default async function DrifterLinkPage({ params }: { params: Promise<{ to
   const type = typeRow as TicketTypeRow | null;
 
   const shell = (children: React.ReactNode) => (
-    <main className="flex flex-1 flex-col bg-[#0a0a0c]">
-      {event && <EventBanner event={event} backLabel="Meet & Drift 3" />}
+    <main className="flex flex-1 flex-col bg-brand">
+      {event && <EventBanner event={event} backLabel={event.name} />}
       <div className="dark-zone mx-auto w-full max-w-xl flex-1 px-4 py-8">{children}</div>
     </main>
   );
@@ -90,7 +92,7 @@ export default async function DrifterLinkPage({ params }: { params: Promise<{ to
           They give your name or the code below.
         </p>
         <p className="mt-1 text-xs text-zinc-500">Pwede pang kunin ng iba sa registration desk. Ibigay lang ang pangalan mo o ang code.</p>
-        <p className="mt-3 font-mono text-lg font-bold text-cyan-300">{drifterReference(entry.token)}</p>
+        <p className="mt-3 font-mono text-lg font-bold text-cyan-300">{drifterReference(entry.token, prefix)}</p>
         {nameList}
         {paidBox}
         <p className="mt-4 text-xs text-zinc-500">Need to change the list? Ask at the registration desk.</p>
@@ -106,11 +108,11 @@ export default async function DrifterLinkPage({ params }: { params: Promise<{ to
         <h1 className="mt-4 text-xl font-bold">Wristbands handed over</h1>
         <p className="mt-2 text-sm text-zinc-400">
           All {entry.band_count} wristband{entry.band_count === 1 ? "" : "s"} for {entry.drifter_name}&rsquo;s group were handed over at the registration desk; the last on{" "}
-          {new Date(entry.handed_over_at).toLocaleString("en-PH", { timeZone: "Asia/Manila", dateStyle: "medium", timeStyle: "short" })}.
+          {new Date(entry.handed_over_at).toLocaleString(LOCALE.locale, { timeZone: LOCALE.timeZone, dateStyle: "medium", timeStyle: "short" })}.
         </p>
         {entry.people.length > 0 && nameList}
         {paidBox}
-        <p className="mt-3 font-mono text-sm text-zinc-500">{drifterReference(entry.token)}</p>
+        <p className="mt-3 font-mono text-sm text-zinc-500">{drifterReference(entry.token, prefix)}</p>
         <p className="mt-3 text-xs text-zinc-500">Need more bands? Ask at the registration desk.</p>
       </div>,
     );

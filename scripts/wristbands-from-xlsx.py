@@ -85,7 +85,8 @@ def push(groups):
         with urllib.request.urlopen(req) as r:
             return int(r.headers["Content-Range"].split("/")[-1])
 
-    types = {t["code"]: t["id"] for t in call("GET", "ticket_types?select=id,code")}
+    # Active event only: a past event in the same project reuses the same band letters.
+    types = {t["code"]: t["id"] for t in call("GET", "ticket_types?select=id,code,events!inner(active)&events.active=eq.true")}
     for letter, serials in groups.items():
         if letter not in types:
             sys.exit(f"no ticket type with code {letter}; run the migration first")

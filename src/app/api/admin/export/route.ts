@@ -1,3 +1,4 @@
+import { LOCALE } from "@/config/site";
 import { NextResponse, type NextRequest } from "next/server";
 import { getStaff } from "@/lib/auth";
 import { hasRole } from "@/lib/roles";
@@ -6,6 +7,7 @@ import { actionMeta, describe } from "@/lib/audit";
 import { buildTicketsWorkbook } from "@/lib/export-xlsx";
 import { SITE_URL } from "@/config/event";
 import { drifterLink, drifterReference } from "@/lib/drifter";
+import { getRules } from "@/lib/rules";
 
 export const dynamic = "force-dynamic";
 
@@ -43,7 +45,7 @@ async function tallyRows(): Promise<TallyRow[]> {
 
 /** Bands given away inside a drifter's free allowance are never charged. */
 const tallyAmount = (r: TallyRow) => (r.qty - r.free_qty) * r.unit_price_centavos;
-const manilaTime = (iso: string) => new Date(iso).toLocaleString("en-PH", { timeZone: "Asia/Manila" });
+const manilaTime = (iso: string) => new Date(iso).toLocaleString(LOCALE.locale, { timeZone: LOCALE.timeZone });
 
 /** Walk-in tally entries, one row per tap. Drifter family bands have their own export. */
 async function walkinCsv() {
@@ -124,6 +126,7 @@ async function orderBandRows(admin: ReturnType<typeof createAdminClient>) {
  * One row per drifter, plus where their list stands.
  */
 async function drifterLinksCsv() {
+  const prefix = (await getRules()).drifterReferencePrefix;
   const admin = createAdminClient();
   const { data } = await admin
     .from("drifter_entries")
@@ -140,7 +143,7 @@ async function drifterLinksCsv() {
     ["drifter", "team", "car_no", "email", "added_by", "link", "reference", "status", "bands", "collected", "rules_confirmed_manila", "handed_over_manila", "paid_php", "payment_method", "payment_ref", "people"],
     ...rows.map((r) => [
       r.drifter_name, r.team_name, r.car_no, r.contact_email ?? "", r.self_registered ? "self sign-up" : "organizer",
-      drifterLink(SITE_URL, r.token), drifterReference(r.token),
+      drifterLink(SITE_URL, r.token), drifterReference(r.token, prefix),
       r.handed_over_at ? "handed over" : r.bands_given > 0 ? "partly collected" : r.submitted_at ? "list sent" : "waiting",
       r.band_count ?? "", r.bands_given ?? 0, r.rules_ack_at ? manilaTime(r.rules_ack_at) : "", r.handed_over_at ? manilaTime(r.handed_over_at) : "",
       (Number(r.paid_centavos ?? 0) / 100).toFixed(2), r.payment_method ?? "", r.payment_ref ?? "",
@@ -162,7 +165,7 @@ async function auditCsv() {
     ...(data ?? []).map((r) => {
       const m = actionMeta(r.action);
       return [
-        new Date(r.created_at).toLocaleString("en-PH", { timeZone: "Asia/Manila" }), m.cat, r.action, m.label,
+        new Date(r.created_at).toLocaleString(LOCALE.locale, { timeZone: LOCALE.timeZone }), m.cat, r.action, m.label,
         r.actor ? names.get(r.actor) ?? r.actor : "buyer/system", r.entity, r.entity_id, describe(r.action, r.data as Record<string, unknown> | null), r.data ? JSON.stringify(r.data) : "",
       ];
     }),

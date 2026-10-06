@@ -4,9 +4,13 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { VerifyQueue, type QueueOrder } from "@/components/VerifyQueue";
 import { LiveOrders } from "@/components/LiveOrders";
 import type { Attendee } from "@/lib/supabase/types";
+import { primaryChannel } from "@/config/event";
+import { getActiveEvent } from "@/lib/queries";
+import { getRules } from "@/lib/rules";
 
 export default async function VerifyPage() {
   await requireStaff("staff");
+  const [event, rules] = await Promise.all([getActiveEvent(), getRules()]);
   const admin = createAdminClient();
   const { data } = await admin
     .from("orders")
@@ -32,7 +36,7 @@ export default async function VerifyPage() {
         <h1 className="text-2xl font-bold">Payment verification</h1>
         <LiveOrders watch="verification" />
       </div>
-      <p className="text-sm text-zinc-500">Compare each screenshot and reference number with the organizer&apos;s GoTyme transaction history, then approve or reject. New proofs appear here on their own; no need to refresh.</p>
+      <p className="text-sm text-zinc-500">Compare each screenshot and reference number with the organizer&apos;s {primaryChannel(event, rules.channels).app} transaction history, then approve or reject. New proofs appear here on their own; no need to refresh.</p>
       <div className="mt-6">
         <VerifyQueue orders={orders} />
       </div>

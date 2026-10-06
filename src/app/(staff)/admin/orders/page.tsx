@@ -5,6 +5,8 @@ import { LiveOrders } from "@/components/LiveOrders";
 import { OrdersTable, type OrderRow } from "@/components/OrdersTable";
 import { php } from "@/lib/money";
 import { getActiveEvent, getTicketTypes } from "@/lib/queries";
+import { primaryChannel } from "@/config/event";
+import { getRules } from "@/lib/rules";
 import type { OrderStatus } from "@/lib/supabase/types";
 
 const STATUSES: OrderStatus[] = ["awaiting_verification", "paid", "voided", "pending_payment", "rejected", "expired", "cancelled"];
@@ -221,7 +223,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
         Tap a row to open the order here. Nothing else loads until you do.
         {truncated ? ` The table shows the newest ${LIST_LIMIT}; the totals above cover all ${totalRows.length}.` : ""}
       </p>
-      <OrdersTable rows={(orders ?? []) as unknown as OrderRow[]} isAdmin={isAdmin} />
+      <OrdersTable rows={(orders ?? []) as unknown as OrderRow[]} isAdmin={isAdmin} payApp={primaryChannel(event, (await getRules()).channels).app} />
     </div>
   );
 }

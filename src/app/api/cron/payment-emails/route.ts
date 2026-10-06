@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getOrderBundle } from "@/lib/queries";
 import { sendExpiryNoticeEmail, sendPaymentReminderEmail } from "@/lib/email";
-import { EXPIRY_NOTICE_MAX_AGE_HOURS, REMINDER_MINUTES_BEFORE_EXPIRY } from "@/config/event";
+import { getRules } from "@/lib/rules";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +35,7 @@ export async function GET(req: NextRequest) {
   // state and an order cannot be picked up as both "expiring" and "expired".
   await admin.rpc("expire_stale_orders", {});
 
+  const { reminderMinutes: REMINDER_MINUTES_BEFORE_EXPIRY, expiryNoticeMaxAgeHours: EXPIRY_NOTICE_MAX_AGE_HOURS } = await getRules();
   const now = Date.now();
   const reminderCutoff = new Date(now + REMINDER_MINUTES_BEFORE_EXPIRY * 60_000).toISOString();
   const noticeFloor = new Date(now - EXPIRY_NOTICE_MAX_AGE_HOURS * 3_600_000).toISOString();

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { resendDrifterLink } from "@/app/actions/drifter-entries";
+import { NOTES } from "@/config/site";
 
 /**
  * Getting a drifter back to their personal link after they close the page.
@@ -12,7 +13,8 @@ import { resendDrifterLink } from "@/app/actions/drifter-entries";
  * drifter already holds: their own link and name, on their own device.
  */
 
-const KEY = "md3-drifter-links";
+// Per event, so a phone that kept links from a past event does not offer them here.
+const KEY = `${NOTES.drifterReferencePrefix.toLowerCase()}-drifter-links`;
 type Saved = { token: string; name: string };
 
 function read(): Saved[] {

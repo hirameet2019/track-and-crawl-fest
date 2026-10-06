@@ -5,8 +5,10 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { recordSignIn } from "@/app/actions/auth";
 import { PasswordInput } from "@/components/PasswordInput";
+import { useRules } from "@/components/RulesProvider";
 
 export function LoginForm({ next, signedOutFirst = false }: { next?: string; signedOutFirst?: boolean }) {
+  const domain = useRules().staffUsernameDomain;
   const router = useRouter();
   // A user who is authenticated but not on the staff list keeps a valid session cookie;
   // clear it so the next attempt (possibly with another account) starts clean.
@@ -23,9 +25,9 @@ export function LoginForm({ next, signedOutFirst = false }: { next?: string; sig
     setBusy(true);
     setError(null);
     const supabase = createClient();
-    // Gate staff get short usernames (e.g. "walkin1"); the account behind it is username@drift.local.
+    // Gate staff get short usernames (e.g. "walkin1"); the account behind it is username@<domain from Settings>.
     const id = email.trim().toLowerCase();
-    const { error } = await supabase.auth.signInWithPassword({ email: id.includes("@") ? id : `${id}@drift.local`, password });
+    const { error } = await supabase.auth.signInWithPassword({ email: id.includes("@") ? id : `${id}@${domain}`, password });
     setBusy(false);
     if (error) return setError(error.message);
     await recordSignIn().catch(() => {});

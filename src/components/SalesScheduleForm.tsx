@@ -12,7 +12,7 @@ import type { TicketTypeRow } from "@/lib/supabase/types";
  * its cut-off in Manila time. "Close now" stops sales immediately, "Reopen"
  * clears the cut-off, and a saved date closes automatically at that minute.
  */
-export function SalesScheduleForm({ types }: { types: TicketTypeRow[] }) {
+export function SalesScheduleForm({ types, note }: { types: TicketTypeRow[]; note: string | null }) {
   const router = useRouter();
   const [drafts, setDrafts] = useState<Record<string, string>>(() => Object.fromEntries(types.map((t) => [t.id, toManilaLocalInput(t.sales_close_at)])));
   const [msg, setMsg] = useState<Record<string, string>>({});
@@ -73,7 +73,7 @@ export function SalesScheduleForm({ types }: { types: TicketTypeRow[] }) {
           );
         })}
       </ul>
-      <p className="text-xs text-zinc-500">Organizer&apos;s schedule: Early Bird and Early Bird Kids close end of Oct 8; VIP Car Display and VIP Pass close end of Oct 4. The passenger included with each VIP Car ticket follows the VIP Pass cut-off.</p>
+      {note && <p className="text-xs text-zinc-500">{note}</p>}
     </div>
   );
 }

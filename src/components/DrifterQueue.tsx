@@ -1,23 +1,20 @@
 "use client";
 
+import { LOCALE } from "@/config/site";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { handOverDrifterEntry } from "@/app/actions/drifter-entries";
 import { drifterReference } from "@/lib/drifter";
 import { php } from "@/lib/money";
 import type { DrifterEntryRow, PaymentMethod } from "@/lib/supabase/types";
+import { useRules } from "@/components/RulesProvider";
+import { staffMethods } from "@/lib/rules-types";
 
-const METHODS: { key: PaymentMethod; label: string }[] = [
-  { key: "cash", label: "Cash" },
-  { key: "gotyme", label: "GoTyme" },
-  { key: "gcash", label: "GCash" },
-  { key: "maya", label: "Maya" },
-];
 
 /** Status pill; never wraps inside itself ("CHECK COMPETITOR / PASS"). */
 const PILL = "whitespace-nowrap rounded-full border px-2 py-0.5 font-semibold uppercase tracking-wide";
 
-const when = (iso: string) => new Date(iso).toLocaleString("en-PH", { timeZone: "Asia/Manila", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+const when = (iso: string) => new Date(iso).toLocaleString(LOCALE.locale, { timeZone: LOCALE.timeZone, month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 
 /**
  * Drifters who pre-registered and still have people waiting for a band. On event
@@ -37,6 +34,8 @@ export function DrifterQueue({
   /** Bands each drifter (lower-cased name) already has, which eat into the free ones. */
   alreadyOut: Record<string, number>;
 }) {
+  const rules = useRules();
+  const METHODS = staffMethods(rules.channels);
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState<string | null>(null);
@@ -53,7 +52,7 @@ export function DrifterQueue({
   const q = query.trim().toLowerCase();
   const shown = q
     ? waiting.filter((e) =>
-        [e.drifter_name, e.team_name ?? "", e.car_no ?? "", drifterReference(e.token), ...e.people.map((p) => p.name)]
+        [e.drifter_name, e.team_name ?? "", e.car_no ?? "", drifterReference(e.token, rules.drifterReferencePrefix), ...e.people.map((p) => p.name)]
           .some((v) => v.toLowerCase().includes(q)),
       )
     : waiting;
@@ -150,7 +149,7 @@ export function DrifterQueue({
                 <div className="min-w-0">
                   <div className="break-words font-semibold sm:truncate" title={e.drifter_name}>{e.drifter_name}</div>
                   <div className="break-words text-xs text-zinc-500 sm:truncate">
-                    {[e.team_name ?? "no team", e.car_no ? `Car #${e.car_no}` : null, drifterReference(e.token)].filter(Boolean).join(" · ")}
+                    {[e.team_name ?? "no team", e.car_no ? `Car #${e.car_no}` : null, drifterReference(e.token, rules.drifterReferencePrefix)].filter(Boolean).join(" · ")}
                   </div>
                   <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px]">
                     <span className={`${PILL} border-emerald-500/35 bg-emerald-500/10 text-emerald-300`}>Rules confirmed</span>

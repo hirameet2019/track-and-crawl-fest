@@ -1,10 +1,11 @@
 /* eslint-disable react-hooks/purity -- server component: rendered once per request, Date.now() is intentional */
+import { LOCALE } from "@/config/site";
 import Link from "next/link";
 import { LiveOrders } from "@/components/LiveOrders";
 import { humanMinutes } from "@/lib/elapsed";
 import { requireStaff } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getActiveEvent, getAvailability } from "@/lib/queries";
+import { getActiveEvent, getAvailability, hasDrifterLabel } from "@/lib/queries";
 import { php } from "@/lib/money";
 import { PAYMENT_CHANNELS } from "@/config/event";
 import { BandSwatch } from "@/components/BandSwatch";
@@ -19,12 +20,14 @@ function Stat({ label, value, sub }: { label: string; value: string; sub?: strin
   );
 }
 
-const manilaDay = (iso: string) => new Date(iso).toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
+const manilaDay = (iso: string) => new Date(iso).toLocaleDateString("en-CA", { timeZone: LOCALE.timeZone });
 
 export default async function DashboardPage() {
   await requireStaff("staff");
   const event = await getActiveEvent();
   if (!event) return <p>No active event. Run the seed.</p>;
+  // cached: the staff layout already asked, so this costs no extra query
+  const drifters = await hasDrifterLabel(event.id);
 
   const admin = createAdminClient();
   const [availability, { data: paidOrders }, { data: walkins }, { count: queueCount }, { data: oldest }, { data: recent }, { data: voidRows }] = await Promise.all([
@@ -82,7 +85,7 @@ export default async function DashboardPage() {
   const dayTotals = [...days.values()].map((d) => d.online + d.walkin);
   const maxDay = Math.max(1, ...dayTotals);
   const windowTotal = dayTotals.reduce((a, b) => a + b, 0);
-  const dayLabel = (iso: string) => new Date(`${iso}T12:00:00+08:00`).toLocaleDateString("en-PH", { timeZone: "Asia/Manila", month: "short", day: "numeric" });
+  const dayLabel = (iso: string) => new Date(`${iso}T12:00:00${LOCALE.utcOffset}`).toLocaleDateString(LOCALE.locale, { timeZone: LOCALE.timeZone, month: "short", day: "numeric" });
   const oldestAgeMin = oldest?.proof_submitted_at ? Math.round((Date.now() - new Date(oldest.proof_submitted_at).getTime()) / 60000) : null;
 
   return (
@@ -94,7 +97,7 @@ export default async function DashboardPage() {
         </div>
         <div className="flex gap-2">
           <Link prefetch={false} href="/admin/walkin" className="btn-secondary">Walk-in tally</Link>
-          <Link prefetch={false} href="/admin/drifters" className="btn-secondary">Drifters</Link>
+          {drifters && <Link prefetch={false} href="/admin/drifters" className="btn-secondary">Drifters</Link>}
           <Link prefetch={false} href="/admin/verify" className={`btn-primary ${queueCount ? "" : "opacity-60"}`}>
             Verify queue {queueCount ? <span className="rounded-full bg-amber-400 px-2 text-xs text-black">{queueCount}</span> : null}
           </Link>

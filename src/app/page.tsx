@@ -7,19 +7,23 @@ import { SupportContact } from "@/components/SupportContact";
 import { getActiveEvent, getAvailability, getTicketTypes, isSalesOpen, publicAvailability, publicOrder } from "@/lib/queries";
 import { fmtCutoff, isTypeClosed } from "@/lib/cutoff";
 import { php } from "@/lib/money";
+import { primaryChannel } from "@/config/event";
+import { getRules } from "@/lib/rules";
 
 export const dynamic = "force-dynamic";
 
+// The title is the root layout's default ("<event> · Tickets"); only the description
+// is phrased for the sales page. Setting a title string here would run it through
+// the layout's "%s · <event>" template and name the event twice.
 export async function generateMetadata(): Promise<Metadata> {
-  const event = await getActiveEvent();
+  const [event, rules] = await Promise.all([getActiveEvent(), getRules()]);
   return {
-    title: event ? `${event.name} · Tickets` : "Tickets",
-    description: event ? `${event.name}${event.venue ? ` at ${event.venue}` : ""}. Pay via GoTyme Bank (InstaPay QR).` : undefined,
+    description: event ? `${event.name}${event.venue ? ` at ${event.venue}` : ""}. Pay via ${primaryChannel(event, rules.channels).payVia}.` : undefined,
   };
 }
 
 export default async function HomePage() {
-  const event = await getActiveEvent();
+  const [event, rules] = await Promise.all([getActiveEvent(), getRules()]);
   if (!event) {
     return (
       <main className="mx-auto max-w-2xl p-8 text-center">
@@ -42,7 +46,7 @@ export default async function HomePage() {
   // must not create a sideways scroll on phones, and clip keeps the sticky
   // total bar working, which an overflow:hidden ancestor would break.
   return (
-    <main className="flex-1 overflow-x-clip bg-[#0a0a0c]">
+    <main className="flex-1 overflow-x-clip bg-brand">
       <EventHero event={event} prices={prices} />
 
       <section id="tickets" className="dark-zone mx-auto max-w-3xl px-4 pb-16 pt-6 sm:px-8">
@@ -52,12 +56,12 @@ export default async function HomePage() {
             <h2 className="reveal-title text-2xl font-black uppercase italic sm:text-3xl">Secure your spot</h2>
           </div>
           <p className="hidden text-right text-xs text-zinc-400 sm:block">
-            Pay via GoTyme Bank (InstaPay QR).<br />Tickets emailed after verification (check Spam too).
+            Pay via {primaryChannel(event, rules.channels).payVia}.<br />Tickets emailed after verification (check Spam too).
           </p>
         </Reveal>
 
         {open ? (
-          <OrderForm types={types} availability={publicAvailability(availability, types)} />
+          <OrderForm types={types} availability={publicAvailability(availability, types)} channel={primaryChannel(event, rules.channels)} />
         ) : (
           <Reveal from="zoom" className="card text-center">
             <h2 className="text-xl font-bold">Online ticket sales are closed</h2>
@@ -68,7 +72,7 @@ export default async function HomePage() {
 
         <div className="mt-10 flex justify-center"><SupportContact event={event} compact /></div>
         <p className="mt-3 text-center text-xs text-zinc-500">
-          Payment via GoTyme Bank (InstaPay QR). Tickets are emailed after payment verification. <Link href="/login" className="underline">Staff login</Link>
+          Payment via {primaryChannel(event, rules.channels).payVia}. Tickets are emailed after payment verification. <Link href="/login" className="underline">Staff login</Link>
         </p>
       </section>
     </main>

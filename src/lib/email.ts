@@ -1,10 +1,13 @@
 import { Resend } from "resend";
 import nodemailer, { type Transporter } from "nodemailer";
-import { PAYMENT_WINDOW_MINUTES, PAY_VIA, SITE_URL } from "@/config/event";
+import { SITE_URL, primaryAccountName, primaryChannel } from "@/config/event";
+import { getRules } from "@/lib/rules";
+import type { Rules } from "@/lib/rules-types";
+import { LOCALE } from "@/config/site";
 import { php } from "@/lib/money";
 import { getEmailSettings, type EmailSettings } from "@/lib/settings";
 import type { OrderBundle } from "@/lib/queries";
-import { itemLabel } from "@/lib/items";
+import { carNameOf, itemLabel } from "@/lib/items";
 
 export interface MailMessage {
   to: string;
@@ -86,8 +89,8 @@ export async function sendTestEmail(to: string, settings: EmailSettings) {
   return send(
     {
       to,
-      subject: `Drift Tickets email test ${new Date().toLocaleString("en-PH", { timeZone: "Asia/Manila" })}`,
-      html: `<p>This is a test message from the Drift Tickets system.</p><p>If you can read this, outbound email is configured correctly (provider: ${settings.provider}).</p>`,
+      subject: `Ticketing email test ${new Date().toLocaleString(LOCALE.locale, { timeZone: LOCALE.timeZone })}`,
+      html: `<p>This is a test message from the ticketing system.</p><p>If you can read this, outbound email is configured correctly (provider: ${settings.provider}).</p>`,
     },
     settings,
   );
@@ -133,19 +136,20 @@ export async function sendTicketsEmail(b: OrderBundle, pdf: Uint8Array) {
  */
 export async function sendOrderReceivedEmail(b: OrderBundle) {
   if (!b.order.buyer_email) return { ok: false, reason: "no email" as const };
+  const { paymentWindowMinutes: PAYMENT_WINDOW_MINUTES, channels } = await getRules();
   const total = php(b.order.total_centavos);
   const deadline = b.order.expires_at
-    ? new Date(b.order.expires_at).toLocaleString("en-PH", { timeZone: "Asia/Manila", dateStyle: "medium", timeStyle: "short" })
+    ? new Date(b.order.expires_at).toLocaleString(LOCALE.locale, { timeZone: LOCALE.timeZone, dateStyle: "medium", timeStyle: "short" })
     : null;
   const payUrl = `${SITE_URL}/pay/${b.order.id}`;
   const rows = b.items
     .map(
       (it) =>
-        `<tr><td style="padding:6px 10px;border-bottom:1px solid #eee">${itemLabel(it).replace(" x ", " &times; ")}</td>
+        `<tr><td style="padding:6px 10px;border-bottom:1px solid #eee">${itemLabel(it, true, carNameOf(b.items)).replace(" x ", " &times; ")}</td>
          <td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:right">${php(it.qty * it.unit_price_centavos)}</td></tr>`,
     )
     .join("");
-  const account = b.event.gotyme_account_name ? ` (account name: <b>${b.event.gotyme_account_name}</b>)` : "";
+  const account = primaryAccountName(b.event) ? ` (account name: <b>${primaryAccountName(b.event)}</b>)` : "";
   const html = `
   <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#111">
     <h2 style="margin-bottom:4px">${b.event.name}</h2>
@@ -154,12 +158,12 @@ export async function sendOrderReceivedEmail(b: OrderBundle) {
       <tr><td style="padding:8px 10px;font-weight:bold">Total to pay</td><td style="padding:8px 10px;text-align:right;font-weight:bold">${total}</td></tr>
     </table>
     <ol style="padding-left:20px;line-height:1.6">
-      <li>Pay exactly <b>${total}</b> via ${PAY_VIA}${account}. The QR code is on the payment page below.</li>
+      <li>Pay exactly <b>${total}</b> via ${primaryChannel(b.event, channels).payVia}${account}. The QR code is on the payment page below.</li>
       <li>Take a screenshot of the confirmation and upload it, with the reference number, on the same page.</li>
     </ol>
     ${deadline ? `<p style="background:#fff7e0;border:1px solid #f1d58a;padding:10px;border-radius:6px"><b>Please finish within ${PAYMENT_WINDOW_MINUTES} minutes</b>, by ${deadline}. <b>After that the order is cancelled</b> and the wristbands are released to other buyers, so pay and upload before the deadline.</p>` : ""}
     <p><a href="${payUrl}" style="background:#111;color:#fff;padding:12px 18px;text-decoration:none;border-radius:6px;display:inline-block;font-weight:bold">Pay and upload proof</a></p>
-    <p style="color:#555;font-size:13px">Bayaran ang eksaktong <b>${total}</b> via GoTyme, i-screenshot ang confirmation, at i-upload sa link sa itaas. Kapag na-verify, ipapadala ang tickets sa email na ito.</p>
+    <p style="color:#555;font-size:13px">Bayaran ang eksaktong <b>${total}</b> via ${primaryChannel(b.event, channels).app}, i-screenshot ang confirmation, at i-upload sa link sa itaas. Kapag na-verify, ipapadala ang tickets sa email na ito.</p>
     <p style="color:#777;font-size:12px">After we verify your payment, your receipt and QR tickets are emailed here within 24 hours. Check your order any time: <a href="${SITE_URL}/order/${b.order.id}">${SITE_URL}/order/${b.order.id}</a></p>
     <p style="color:#777;font-size:12px">Found this in Spam or Promotions? Mark it as "Not spam" so your tickets land in your inbox.</p>
   </div>`;
@@ -174,23 +178,23 @@ export async function sendOrderReceivedEmail(b: OrderBundle) {
 export async function sendPaymentReminderEmail(b: OrderBundle, minutesLeft: number) {
   if (!b.order.buyer_email) return { ok: false, reason: "no email" as const };
   const total = php(b.order.total_centavos);
-  return send({ to: b.order.buyer_email, subject: `${minutesLeft} minutes left to pay ${total} - Order #${b.order.order_no}`, html: paymentReminderHtml(b, minutesLeft) });
+  return send({ to: b.order.buyer_email, subject: `${minutesLeft} minutes left to pay ${total} - Order #${b.order.order_no}`, html: paymentReminderHtml(b, minutesLeft, (await getRules()).channels) });
 }
 
 /** Body of the reminder, split out from sending so it can be previewed without mailing anyone. */
-export function paymentReminderHtml(b: OrderBundle, minutesLeft: number): string {
+export function paymentReminderHtml(b: OrderBundle, minutesLeft: number, channels: Rules["channels"]): string {
   const total = php(b.order.total_centavos);
   const payUrl = `${SITE_URL}/pay/${b.order.id}`;
-  const account = b.event.gotyme_account_name ? ` (account name: <b>${b.event.gotyme_account_name}</b>)` : "";
+  const account = primaryAccountName(b.event) ? ` (account name: <b>${primaryAccountName(b.event)}</b>)` : "";
   return `
   <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#111">
     <h2 style="margin-bottom:4px">${b.event.name}</h2>
     <p style="margin-top:0;color:#555">Your wristbands for order <b>#${b.order.order_no}</b> are still on hold, but not for much longer.</p>
     <p style="background:#fff7e0;border:1px solid #f1d58a;padding:10px;border-radius:6px">
-      <b>About ${minutesLeft} minutes left</b> to pay ${total} via ${PAY_VIA}${account} and upload your screenshot.
+      <b>About ${minutesLeft} minutes left</b> to pay ${total} via ${primaryChannel(b.event, channels).payVia}${account} and upload your screenshot.
     </p>
     <p><a href="${payUrl}" style="background:#111;color:#fff;padding:12px 18px;text-decoration:none;border-radius:6px;display:inline-block;font-weight:bold">Pay and upload proof</a></p>
-    <p style="color:#555;font-size:13px">May <b>${minutesLeft} minuto</b> pa bago matapos ang hold sa wristbands mo. Bayaran ang eksaktong ${total} via GoTyme at i-upload ang screenshot sa link sa itaas.</p>
+    <p style="color:#555;font-size:13px">May <b>${minutesLeft} minuto</b> pa bago matapos ang hold sa wristbands mo. Bayaran ang eksaktong ${total} via ${primaryChannel(b.event, channels).app} at i-upload ang screenshot sa link sa itaas.</p>
     <p style="color:#777;font-size:12px">Already paid? Just upload the screenshot and reference number on that page; you do not need to pay again. <b>When the timer ends the order is cancelled</b> and the wristbands go back to the pool, so upload before then.</p>
   </div>`;
 }
