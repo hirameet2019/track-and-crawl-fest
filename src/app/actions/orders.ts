@@ -10,6 +10,7 @@ import { getRules } from "@/lib/rules";
 import { IMAGE_MIME, MAX_UPLOAD_BYTES } from "@/lib/image";
 import { MOBILE_RE, emailProblem, normalizeEmail, normalizeMobile } from "@/lib/contact";
 import { audit } from "@/lib/audit";
+import { COURIERS } from "@/lib/shipping";
 
 export type ActionResult = { ok: true; warning?: string } | { ok: false; error: string };
 
@@ -25,6 +26,20 @@ const attendeeSchema = z.object({
   companion_of: z.string().trim().max(20).optional(),
   // Free companion bundled with the car package; the server re-derives the price.
   included: z.boolean().optional(),
+});
+
+/** Where a shipped shirt goes (labels with ships_shirt). */
+const shippingSchema = z.object({
+  name: z.string().trim().min(2, "Shipping: enter the recipient's full name").max(80),
+  mobile: z.preprocess(
+    (v) => normalizeMobile(String(v ?? "")),
+    z.string().regex(MOBILE_RE, "Shipping: enter an 11-digit PH mobile number for the courier, like 09171234567"),
+  ),
+  address: z.string().trim().min(5, "Shipping: enter the house or unit no., street and barangay").max(200),
+  city: z.string().trim().min(2, "Shipping: enter the city or municipality").max(80),
+  province: z.string().trim().min(2, "Shipping: enter the province").max(80),
+  zip: z.string().trim().regex(/^\d{4}$/, "Shipping: enter the 4-digit ZIP code"),
+  courier: z.enum(COURIERS, { message: "Shipping: choose LBC or J&T Express" }),
 });
 
 /** Plates compare without spaces or case: "NBC 8821" == "nbc8821". */
@@ -61,6 +76,8 @@ const createOrderSchema = z.object({
       }),
     )
     .min(1, "Select at least one ticket"),
+  // Required when the order holds a shirt that ships; dropped otherwise.
+  shipping: shippingSchema.optional().nullable(),
 });
 export type CreateOrderInput = z.infer<typeof createOrderSchema>;
 
@@ -151,6 +168,13 @@ export async function createOnlineOrder(formData: FormData): Promise<ActionResul
   }
 
   if (includedTotal > carQty * allowancePerCar) return { ok: false, error: "More included companions than the car package allows" };
+
+  // A shirt that ships needs somewhere to go. The included passenger has no shirt.
+  const shipsShirt = parsed.data.items.some(
+    (i) => types.find((t) => t.id === i.ticket_type_id)?.ships_shirt && i.attendees.some((a) => !a.included),
+  );
+  if (shipsShirt && !parsed.data.shipping) return { ok: false, error: "Enter where to ship your shirt (name, mobile, address, ZIP and courier)." };
+  const shipping = shipsShirt ? parsed.data.shipping ?? null : null;
   // Price is decided here, never by the client: an item is free only when every attendee is an included companion.
   for (const item of parsed.data.items) {
     const allIncluded = item.attendees.length > 0 && item.attendees.every((a) => a.included && a.companion_of);
@@ -186,6 +210,15 @@ export async function createOnlineOrder(formData: FormData): Promise<ActionResul
     p_expires_minutes: PAYMENT_WINDOW_MINUTES,
   });
   if (error || !orderId) return { ok: false, error: error?.message ?? "Could not create order" };
+  // The address goes on the order straight after it is made. Should that fail, the
+  // order is cancelled at once (freeing its wristbands) rather than left without one.
+  if (shipping) {
+    const { error: shipErr } = await admin.from("orders").update({ shipping }).eq("id", orderId);
+    if (shipErr) {
+      await admin.from("orders").update({ status: "cancelled" }).eq("id", orderId);
+      return { ok: false, error: "Could not save the shipping address. Nothing was charged; please try again." };
+    }
+  }
   await audit(admin, {
     actor: null,
     action: "order.created",

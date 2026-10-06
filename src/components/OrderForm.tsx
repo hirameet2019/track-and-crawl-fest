@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState, useTransition } from "react";
 import { createOnlineOrder, type CreateOrderInput } from "@/app/actions/orders";
+import { COURIERS, SHIPPING_NOTE, SHIPPING_NOTE_TL, SHIRT_PROCESSING, type Courier } from "@/lib/shipping";
 import type { PaymentChannel } from "@/config/event";
 import { useRules } from "@/components/RulesProvider";
 import { shrinkImage } from "@/lib/image";
@@ -99,6 +100,10 @@ export function OrderForm({ types, availability, channel }: { types: TicketTypeR
   const [attendees, setAttendees] = useState<Record<string, Attendee[]>>({});
   const [buyer, setBuyer] = useState({ buyer_name: "", buyer_email: "", buyer_mobile: "" });
   const [emailConfirm, setEmailConfirm] = useState("");
+  // Where a shirt that ships goes (VIP Pass and other ships_shirt labels). The name and
+  // mobile follow the buyer's unless someone else receives it.
+  const [ship, setShip] = useState({ name: "", mobile: "", address: "", city: "", province: "", zip: "", courier: "LBC" as Courier });
+  const [shipToBuyer, setShipToBuyer] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [review, setReview] = useState(false);
   const [pending, start] = useTransition();
@@ -175,6 +180,10 @@ export function OrderForm({ types, availability, channel }: { types: TicketTypeR
   }
 
   const selectedTypes = types.filter((t) => (qty[t.id] ?? 0) > 0);
+  /** The order holds a shirt that ships: a selected label with ships_shirt, or paid companions of one. */
+  const needsShipping = selectedTypes.some((t) => t.ships_shirt) || (!!companionType?.ships_shirt && paidCompanionCount > 0);
+  const shipTo = { ...ship, name: shipToBuyer ? buyer.buyer_name : ship.name, mobile: shipToBuyer ? buyer.buyer_mobile : ship.mobile };
+  const shipMobileIssue = needsShipping && !shipToBuyer ? mobileProblem(ship.mobile) : null;
   const reviewLines: ReviewLine[] = selectedTypes.map((t) => ({ type: t, qty: qty[t.id], attendees: attendees[t.id] ?? [] }));
 
   /** Stage 1: the form's own validation has passed; check what HTML cannot, then show the review. */
@@ -218,6 +227,21 @@ export function OrderForm({ types, availability, channel }: { types: TicketTypeR
             return;
           }
         }
+      }
+    }
+    if (needsShipping) {
+      const missing =
+        shipTo.name.trim().length < 2 ? ["ship-name", "the recipient's full name"]
+        : shipMobileIssue ? ["ship-mobile", `the recipient's mobile number (${shipMobileIssue})`]
+        : ship.address.trim().length < 5 ? ["ship-address", "the house or unit no., street and barangay"]
+        : ship.city.trim().length < 2 ? ["ship-city", "the city or municipality"]
+        : ship.province.trim().length < 2 ? ["ship-province", "the province"]
+        : !/^\d{4}$/.test(ship.zip.trim()) ? ["ship-zip", "the 4-digit ZIP code"]
+        : null;
+      if (missing) {
+        setError(`Shirt delivery: enter ${missing[1]}.`);
+        document.getElementById(missing[0])?.focus();
+        return;
       }
     }
     if (companionType && companionsLeft < 0) {
@@ -271,7 +295,10 @@ export function OrderForm({ types, availability, channel }: { types: TicketTypeR
     }
     start(async () => {
       const fd = new FormData();
-      fd.set("payload", JSON.stringify({ ...buyer, buyer_email: normalizeEmail(buyer.buyer_email), buyer_mobile: normalizeMobile(buyer.buyer_mobile), items }));
+      const shipping = needsShipping
+        ? { name: shipTo.name.trim(), mobile: normalizeMobile(shipTo.mobile) || shipTo.mobile.trim(), address: ship.address.trim(), city: ship.city.trim(), province: ship.province.trim(), zip: ship.zip.trim(), courier: ship.courier }
+        : null;
+      fd.set("payload", JSON.stringify({ ...buyer, buyer_email: normalizeEmail(buyer.buyer_email), buyer_mobile: normalizeMobile(buyer.buyer_mobile), items, shipping }));
       for (const t of selected) {
         if (!t.requires_vehicle) continue;
         for (const [i, a] of (attendees[t.id] ?? []).entries()) {
@@ -320,6 +347,7 @@ export function OrderForm({ types, availability, channel }: { types: TicketTypeR
                 {t.includes_shirt && (
                   <div className="mt-1 flex flex-wrap items-center gap-1 text-[11px]">
                     <span className="rounded bg-cyan-400/15 px-1.5 py-0.5 font-semibold text-cyan-300">Includes event t-shirt</span>
+                    {t.ships_shirt && <span className="rounded bg-violet-400/15 px-1.5 py-0.5 font-semibold text-violet-200">Shirt ships to you in {SHIRT_PROCESSING}</span>}
                     <ShirtSizeChartButton label="View size chart" />
                   </div>
                 )}
@@ -562,6 +590,69 @@ export function OrderForm({ types, availability, channel }: { types: TicketTypeR
         </div>
       </Reveal>
 
+      {needsShipping && (
+        <Reveal as="section" className="space-y-3" delay={120}>
+          <h2 className="text-lg font-bold">4. Shirt delivery <span className="block text-sm font-normal text-zinc-500">Saan ipapadala ang shirt.</span></h2>
+          <div className="card space-y-3">
+            <div className="rounded-lg border border-violet-400/30 bg-violet-400/10 p-3 text-sm text-violet-100">
+              {SHIPPING_NOTE}
+              <span className="mt-1 block text-xs text-violet-200/80">{SHIPPING_NOTE_TL}</span>
+            </div>
+            <label className="flex cursor-pointer items-center gap-2 text-sm">
+              <input type="checkbox" className="h-4 w-4 accent-cyan-400" checked={shipToBuyer} onChange={(e) => setShipToBuyer(e.target.checked)} />
+              Send it to me ({buyer.buyer_name.trim() || "the name above"}, {buyer.buyer_mobile.trim() || "the mobile above"})
+            </label>
+            {!shipToBuyer && (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="label" htmlFor="ship-name">Recipient&apos;s full name *</label>
+                  <input id="ship-name" className="input" autoComplete="shipping name" value={ship.name} onChange={(e) => setShip({ ...ship, name: e.target.value })} />
+                </div>
+                <div>
+                  <label className="label" htmlFor="ship-mobile">Recipient&apos;s mobile *</label>
+                  <input id="ship-mobile" className="input" type="tel" inputMode="numeric" autoComplete="shipping tel-national" placeholder="09171234567" maxLength={16}
+                    value={ship.mobile} onChange={(e) => setShip({ ...ship, mobile: e.target.value.replace(/[^\d+\s-]/g, "") })}
+                    aria-describedby="ship-mobile-hint" />
+                  <p id="ship-mobile-hint" className={`mt-1 text-xs ${shipMobileIssue ? "text-amber-300" : "text-zinc-500"}`}>{shipMobileIssue ?? "The courier calls this number."}</p>
+                </div>
+              </div>
+            )}
+            <div>
+              <label className="label" htmlFor="ship-address">House / unit no., street, barangay *</label>
+              <input id="ship-address" className="input" autoComplete="shipping street-address" placeholder="e.g. Blk 3 Lot 12, Mabini St., Brgy. San Isidro"
+                value={ship.address} onChange={(e) => setShip({ ...ship, address: e.target.value })} />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_7rem]">
+              <div>
+                <label className="label" htmlFor="ship-city">City / municipality *</label>
+                <input id="ship-city" className="input" autoComplete="shipping address-level2" value={ship.city} onChange={(e) => setShip({ ...ship, city: e.target.value })} />
+              </div>
+              <div>
+                <label className="label" htmlFor="ship-province">Province *</label>
+                <input id="ship-province" className="input" autoComplete="shipping address-level1" value={ship.province} onChange={(e) => setShip({ ...ship, province: e.target.value })} />
+              </div>
+              <div>
+                <label className="label" htmlFor="ship-zip">ZIP code *</label>
+                <input id="ship-zip" className="input" inputMode="numeric" autoComplete="shipping postal-code" maxLength={4} placeholder="3018"
+                  value={ship.zip} onChange={(e) => setShip({ ...ship, zip: e.target.value.replace(/\D/g, "") })} />
+              </div>
+            </div>
+            <div>
+              <span className="label">Courier *</span>
+              <div className="mt-1 inline-flex rounded-lg border border-white/15 bg-black/30 p-0.5" role="radiogroup" aria-label="Courier">
+                {COURIERS.map((c) => (
+                  <button key={c} type="button" role="radio" aria-checked={ship.courier === c} onClick={() => setShip({ ...ship, courier: c })}
+                    className={`rounded-md px-4 py-1.5 text-sm font-semibold transition ${ship.courier === c ? "bg-gradient-to-r from-cyan-300 to-green-300 text-zinc-950" : "text-zinc-300 hover:bg-white/10"}`}>
+                    {c}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-1 text-xs text-zinc-500">The shipping fee is paid by you and is not part of the total below.</p>
+            </div>
+          </div>
+        </Reveal>
+      )}
+
       {error && <p className="enter rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p>}
 
       <Reveal from="zoom" delay={200} className="sticky bottom-0 -mx-4 border-t border-white/10 bg-zinc-950/90 p-4 text-white backdrop-blur-md sm:static sm:mx-0 sm:rounded-2xl sm:border sm:border-white/10 sm:bg-white/[0.06]">
@@ -586,6 +677,7 @@ export function OrderForm({ types, availability, channel }: { types: TicketTypeR
         companionLabel={companionType?.name ?? "Companion"}
         companionBand={companionType?.band_color ?? null}
         buyer={{ ...buyer, buyer_mobile: normalizeMobile(buyer.buyer_mobile) || buyer.buyer_mobile }}
+        shipping={needsShipping ? { ...shipTo, mobile: normalizeMobile(shipTo.mobile) || shipTo.mobile } : null}
         total={total}
         pending={pending}
         onClose={() => !pending && setReview(false)}

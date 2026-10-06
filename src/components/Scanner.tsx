@@ -266,7 +266,8 @@ function ResultCard({ r, onKit }: { r: AnyResult; onKit: (id: string, item: stri
   const t = r.ticket;
   const kit: { key: string; label: string; show: boolean }[] = [
     // Passengers bundled with a VIP Car Display package get no shirt: the package has one, for the driver.
-    { key: "shirt", label: `T-shirt ${t.shirt_size ?? ""}`, show: t.ticket_type.includes_shirt && !t.included },
+    // A shirt that ships goes to the buyer by courier: nothing to hand over here.
+    { key: "shirt", label: `T-shirt ${t.shirt_size ?? ""}`, show: t.ticket_type.includes_shirt && !t.included && !t.shirt_ships },
     { key: "lanyard", label: "ID lanyard", show: t.ticket_type.includes_lanyard },
     { key: "sticker", label: t.ticket_type.includes_car_pass && !t.companion_of ? "Event decals (2)" : "Event decal", show: t.ticket_type.includes_sticker },
     { key: "car_pass", label: "Car pass", show: t.ticket_type.includes_car_pass && !t.companion_of },
@@ -282,6 +283,9 @@ function ResultCard({ r, onKit }: { r: AnyResult; onKit: (id: string, item: stri
       <div className="mt-1 text-sm">{t.holder_name} &middot; Order #{t.order.order_no}</div>
       {t.vehicle_plate && <div className="text-sm">Vehicle: {t.vehicle_plate} {t.vehicle_model}</div>}
       {t.companion_of && <div className="mt-1 inline-block rounded bg-black/25 px-2 py-0.5 text-sm font-semibold">Companion of car {t.companion_of}</div>}
+      {t.shirt_ships && (
+        <div className="mt-1 inline-block rounded bg-black/25 px-2 py-0.5 text-sm font-semibold">Shirt {t.shirt_size ?? ""} ships to the buyer: do not hand one over</div>
+      )}
       {t.vehicle_photo_url && (
         <a href={t.vehicle_photo_url} target="_blank" rel="noreferrer" className="mt-2 block">
           {/* eslint-disable-next-line @next/next/no-img-element */}

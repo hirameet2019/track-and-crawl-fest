@@ -1,3 +1,5 @@
+import type { Shipping } from "@/lib/shipping";
+
 /**
  * Hand-maintained row/enum types used across the app. The generated schema types
  * from the live project live in ./database.types.ts. Regenerate those with
@@ -86,6 +88,8 @@ export interface TicketTypeRow {
   walkin_name: string | null;
   /** A gate sale records the person's name (a car label also records the plate). */
   gate_needs_name: boolean;
+  /** Online orders give a shipping address and the shirt ships instead of being handed over. */
+  ships_shirt: boolean;
 }
 
 export interface TicketNumberRow {
@@ -135,6 +139,8 @@ export interface OrderRow {
   notes: string | null;
   /** Left over after a conversion: positive = refund owed to the buyer, negative = the buyer owes. */
   balance_centavos: number;
+  /** Where the shirt ships, for an order holding a label with ships_shirt; null otherwise. */
+  shipping: Shipping | null;
   /** Set once staff have actually moved the money. */
   balance_settled_at: string | null;
   balance_note: string | null;

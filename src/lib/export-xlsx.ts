@@ -1,4 +1,5 @@
 import { LOCALE } from "@/config/site";
+import { shirtShips, shippingOneLine, type Shipping } from "@/lib/shipping";
 import ExcelJS from "exceljs";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { bandHex } from "@/lib/bands";
@@ -10,11 +11,11 @@ import { bandHex } from "@/lib/bands";
  * glance. Walk-in-only labels list their gate taps instead of tickets.
  */
 
-type TypeRow = { id: string; code: string; name: string; band_color: string | null; price_centavos: number; walkin_price_centavos: number | null; sort_order: number; sell_online: boolean; drifter_family: boolean };
+type TypeRow = { id: string; code: string; name: string; band_color: string | null; price_centavos: number; walkin_price_centavos: number | null; sort_order: number; sell_online: boolean; drifter_family: boolean; ships_shirt: boolean };
 type TicketRow = {
   number: string; status: string; holder_name: string | null; shirt_size: string | null; vehicle_plate: string | null; vehicle_model: string | null;
-  vehicle_photo_path: string | null; companion_of: string | null; redeemed_at: string | null; void_reason: string | null; ticket_type_id: string; created_at: string;
-  order: { order_no: number; receipt_no: number | null; status: string; channel: string; buyer_name: string; buyer_email: string | null; buyer_mobile: string | null; total_centavos: number; payment_method: string | null; payment_reference: string | null; paid_at: string | null } | null;
+  vehicle_photo_path: string | null; companion_of: string | null; included: boolean; redeemed_at: string | null; void_reason: string | null; ticket_type_id: string; created_at: string;
+  order: { order_no: number; receipt_no: number | null; status: string; channel: string; buyer_name: string; buyer_email: string | null; buyer_mobile: string | null; total_centavos: number; payment_method: string | null; payment_reference: string | null; paid_at: string | null; shipping: Shipping | null } | null;
 };
 type WalkinRow = { created_at: string; qty: number; free_qty: number; drifter_name: string | null; unit_price_centavos: number; payment_method: string; payment_ref: string | null; shirt_size: string | null; holder_name: string | null; vehicle_plate: string | null; ticket_type_id: string; staff: { full_name: string } | null };
 /** Bands inside a drifter's free allowance are handed over, not sold. */
@@ -66,11 +67,11 @@ function bandBlock(ws: ExcelJS.Worksheet, t: TypeRow, hex: string) {
 export async function buildTicketsWorkbook(): Promise<Buffer> {
   const admin = createAdminClient();
   const [{ data: types }, { data: tickets }, { data: walkins }, { data: avail }, { data: event }] = await Promise.all([
-    admin.from("ticket_types").select("id, code, name, band_color, price_centavos, walkin_price_centavos, sort_order, sell_online, drifter_family").eq("active", true).order("sort_order"),
+    admin.from("ticket_types").select("id, code, name, band_color, price_centavos, walkin_price_centavos, sort_order, sell_online, drifter_family, ships_shirt").eq("active", true).order("sort_order"),
     admin
       .from("tickets")
       .select(
-        "number, status, holder_name, shirt_size, vehicle_plate, vehicle_model, vehicle_photo_path, companion_of, redeemed_at, void_reason, ticket_type_id, created_at, order:orders(order_no, receipt_no, status, channel, buyer_name, buyer_email, buyer_mobile, total_centavos, payment_method, payment_reference, paid_at)",
+        "number, status, holder_name, shirt_size, vehicle_plate, vehicle_model, vehicle_photo_path, companion_of, included, redeemed_at, void_reason, ticket_type_id, created_at, order:orders(order_no, receipt_no, status, channel, buyer_name, buyer_email, buyer_mobile, total_centavos, payment_method, payment_reference, paid_at, shipping)",
       )
       .order("number")
       .limit(50000),
@@ -120,7 +121,7 @@ export async function buildTicketsWorkbook(): Promise<Buffer> {
   sum.columns.forEach((c, i) => { c.width = [7, 26, 20, 10, 11, 14, 14, 16, 9, 12, 15, 15][i] ?? 12; });
 
   // ------------------------------------------------------ per label sheets
-  const ticketHeader = ["Wristband no.", "Status", "Holder", "Shirt", "Plate", "Vehicle", "Car photo", "Companion of car", "Scanned at gate", "Void reason", "Order #", "Receipt #", "Order status", "Channel", "Buyer", "Email", "Mobile", "Order total (PHP)", "Payment", "Reference", "Paid at", "Issued at"];
+  const ticketHeader = ["Wristband no.", "Status", "Holder", "Shirt", "Plate", "Vehicle", "Car photo", "Companion of car", "Ship shirt to", "Scanned at gate", "Void reason", "Order #", "Receipt #", "Order status", "Channel", "Buyer", "Email", "Mobile", "Order total (PHP)", "Payment", "Reference", "Paid at", "Issued at"];
   // A package sale (VIP Car with shirt) is one sale of two bands: the passenger's is included.
   const walkinHeader = ["Time (Manila)", "Sales", "Bands", "Price each (PHP)", "Amount (PHP)", "Shirt", "Name", "Plate", "Payment", "Reference", "Staff"];
   const drifterHeader = ["Time (Manila)", "Drifter", "Bands", "Free", "Charged", "Price each (PHP)", "Amount (PHP)", "Payment", "Staff"];
@@ -152,11 +153,11 @@ export async function buildTicketsWorkbook(): Promise<Buffer> {
         const r = ws.getRow(row);
         r.values = [
           x.number, x.status, x.holder_name ?? "", x.shirt_size ?? "", x.vehicle_plate ?? "", x.vehicle_model ?? "", x.vehicle_photo_path ? "yes" : "", x.companion_of ?? "",
-          manila(x.redeemed_at), x.void_reason ?? "", x.order?.order_no ?? "", x.order?.receipt_no ?? "", x.order?.status ?? "", x.order?.channel ?? "", x.order?.buyer_name ?? "",
+          !x.included && shirtShips(t, x.order) ? shippingOneLine(x.order!.shipping!) : "", manila(x.redeemed_at), x.void_reason ?? "", x.order?.order_no ?? "", x.order?.receipt_no ?? "", x.order?.status ?? "", x.order?.channel ?? "", x.order?.buyer_name ?? "",
           x.order?.buyer_email ?? "", x.order?.buyer_mobile ?? "", php(x.order?.total_centavos), x.order?.payment_method ?? "", x.order?.payment_reference ?? "", manila(x.order?.paid_at), manila(x.created_at),
         ];
         r.getCell(1).font = { bold: true };
-        r.getCell(18).numFmt = "#,##0.00";
+        r.getCell(19).numFmt = "#,##0.00";
         if (x.status === "void") { r.font = { color: { argb: "FF999999" }, strike: true }; r.getCell(2).font = { bold: true, color: { argb: "FFCC0000" }, strike: false }; }
         if (x.status === "redeemed") r.getCell(2).font = { bold: true, color: { argb: "FF1B7F3B" } };
       }
@@ -199,7 +200,7 @@ export async function buildTicketsWorkbook(): Promise<Buffer> {
       ? [19, 26, 8, 8, 10, 16, 14, 10, 20]
       : !t.sell_online && mine.length === 0
         ? [22, 8, 8, 16, 14, 8, 24, 12, 10, 18, 20]
-        : [14, 10, 22, 6, 11, 22, 9, 16, 19, 28, 8, 9, 13, 8, 22, 28, 13, 16, 9, 20, 19, 19];
+        : [14, 10, 22, 6, 11, 22, 9, 16, 40, 19, 28, 8, 9, 13, 8, 22, 28, 13, 16, 9, 20, 19, 19];
     ws.columns.forEach((c, i) => { c.width = widths[i] ?? 12; });
   }
 

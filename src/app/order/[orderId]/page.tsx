@@ -11,6 +11,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { SupportContact } from "@/components/SupportContact";
 
 import { carNameOf, itemLabel } from "@/lib/items";
+import { SHIPPING_NOTE, SHIPPING_NOTE_TL, shirtShips } from "@/lib/shipping";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,7 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ or
   const b = await getOrderBundle(orderId);
   if (!b) notFound();
   const { order, event, items } = b;
+  const shipping = order.shipping;
   // A ticket converted to another type handed its wristband back; it is no longer the
   // buyer's, so it is not listed here at all. Ordinary voids stay, marked VOID.
   const tickets = b.tickets.filter((t) => t.ticket_number_id !== null);
@@ -122,6 +124,20 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ or
         )}
       </div>
 
+      {shipping && (
+        <div className="card mt-6 border-violet-400/30">
+          <h2 className="font-semibold">Shirt delivery</h2>
+          <p className="mt-1 text-sm text-zinc-600">
+            {shipping.name} · {shipping.mobile}<br />
+            {shipping.address}<br />
+            {shipping.city}, {shipping.province} {shipping.zip}<br />
+            <span className="text-zinc-500">via {shipping.courier}</span>
+          </p>
+          <p className="mt-2 text-xs text-zinc-500">{SHIPPING_NOTE}</p>
+          <p className="mt-1 text-xs text-zinc-500">{SHIPPING_NOTE_TL}</p>
+        </div>
+      )}
+
       {(order.status === "paid" || order.status === "voided") && (
         <section className="mt-6">
           <h2 className="text-lg font-bold">Your tickets</h2>
@@ -140,7 +156,7 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ or
                 )}
                 <div className="text-sm font-medium">{t.holder_name}</div>
                 <div className="text-xs text-zinc-500">
-                  {t.shirt_size && <>Shirt {t.shirt_size} </>}
+                  {t.shirt_size && <>Shirt {t.shirt_size}{shirtShips(t.ticket_type, order) ? " (ships to you)" : ""} </>}
                   {t.vehicle_plate && <>&middot; {t.vehicle_plate} {t.vehicle_model}</>}
                   {t.companion_of && <>&middot; {t.included ? "Passenger of car" : "Companion of car"} {t.companion_of}{t.included ? " (included, no shirt)" : ""}</>}
                 </div>

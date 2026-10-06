@@ -26,6 +26,7 @@ const toForm = (t: TicketTypeRow): TicketTypeInput => ({
   walkin_name: t.walkin_name ?? "",
   gate_needs_name: t.gate_needs_name,
   includes_shirt: t.includes_shirt,
+  ships_shirt: t.ships_shirt,
   includes_lanyard: t.includes_lanyard,
   includes_sticker: t.includes_sticker,
   includes_car_pass: t.includes_car_pass,
@@ -42,7 +43,7 @@ const toForm = (t: TicketTypeRow): TicketTypeInput => ({
 const blank = (sort: number): TicketTypeInput => ({
   id: null, code: "", name: "", description: "", price: 0, walkin_price: null, band_color: "",
   sell_online: true, sell_at_gate: true, walkin_name: "", gate_needs_name: false,
-  includes_shirt: false, includes_lanyard: false, includes_sticker: false, includes_car_pass: false,
+  includes_shirt: false, ships_shirt: false, includes_lanyard: false, includes_sticker: false, includes_car_pass: false,
   requires_vehicle: false, included_companions: 0, is_child: false, online_cap: null,
   drifter_family: false, free_allowance: 0, sort_order: sort, active: true,
 });
@@ -125,6 +126,9 @@ function TypeForm({ initial, stock, onDone }: { initial: TicketTypeInput; stock?
         <div className="space-y-2">
           <div className="text-sm font-semibold text-zinc-200">Includes</div>
           <Check label="T-shirt (asks for a size)" checked={f.includes_shirt} onChange={(v) => set("includes_shirt", v)} />
+          {f.includes_shirt && (
+            <Check label="Shirt ships by courier" checked={f.ships_shirt} onChange={(v) => set("ships_shirt", v)} hint="Online buyers enter an address; made to order, about two weeks, LBC or J&T, buyer pays shipping" />
+          )}
           <Check label="ID lanyard" checked={f.includes_lanyard} onChange={(v) => set("includes_lanyard", v)} />
           <Check label="Sticker / decal" checked={f.includes_sticker} onChange={(v) => set("includes_sticker", v)} />
           <Check label="Car pass" checked={f.includes_car_pass} onChange={(v) => set("includes_car_pass", v)} />

@@ -1,4 +1,5 @@
 import { Resend } from "resend";
+import { SHIPPING_NOTE, shirtShips } from "@/lib/shipping";
 import nodemailer, { type Transporter } from "nodemailer";
 import { SITE_URL, primaryAccountName, primaryChannel } from "@/config/event";
 import { getRules } from "@/lib/rules";
@@ -96,6 +97,18 @@ export async function sendTestEmail(to: string, settings: EmailSettings) {
   );
 }
 
+/** The shirt that ships and where to, for the buyer's emails. Empty when nothing ships. */
+function shippingBlockHtml(b: OrderBundle): string {
+  const s = b.order.shipping;
+  if (!s) return "";
+  const esc = (v: string) => v.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
+  return `<div style="margin-top:16px;padding:12px 14px;border:1px solid #d8ccff;background:#f7f4ff;border-radius:8px">
+      <p style="margin:0 0 6px;font-weight:bold">Your shirt ships to</p>
+      <p style="margin:0">${esc(s.name)} &middot; ${esc(s.mobile)}<br>${esc(s.address)}<br>${esc(s.city)}, ${esc(s.province)} ${esc(s.zip)}<br>via ${esc(s.courier)}</p>
+      <p style="margin:8px 0 0;color:#555;font-size:13px">${SHIPPING_NOTE}</p>
+    </div>`;
+}
+
 export async function sendTicketsEmail(b: OrderBundle, pdf: Uint8Array) {
   if (!b.order.buyer_email) return { ok: false, reason: "no email" as const };
   const rows = b.tickets
@@ -117,7 +130,8 @@ export async function sendTicketsEmail(b: OrderBundle, pdf: Uint8Array) {
       </tr></thead>
       <tbody>${rows}</tbody>
     </table>
-    <p style="margin-top:20px">At the venue, show the QR code for each ticket (in the attached PDF or at the link below). Staff will scan it and hand you the matching wristband${b.tickets.some((t) => t.ticket_type.includes_shirt) ? " and t-shirt" : ""}.</p>
+    <p style="margin-top:20px">At the venue, show the QR code for each ticket (in the attached PDF or at the link below). Staff will scan it and hand you the matching wristband${b.tickets.some((t) => t.ticket_type.includes_shirt && !t.included && !shirtShips(t.ticket_type, b.order)) ? " and t-shirt" : ""}.</p>
+    ${shippingBlockHtml(b)}
     <p><a href="${SITE_URL}/order/${b.order.id}" style="background:#111;color:#fff;padding:10px 16px;text-decoration:none;border-radius:6px;display:inline-block">View my tickets online</a></p>
     <p style="color:#777;font-size:12px">Each QR code admits one person once. Do not share screenshots of your QR codes.</p>
     <p style="color:#777;font-size:12px">Found this in Spam or Promotions? Mark it as "Not spam" or move it to your inbox so future updates about your order arrive normally.</p>
@@ -164,6 +178,7 @@ export async function sendOrderReceivedEmail(b: OrderBundle) {
     ${deadline ? `<p style="background:#fff7e0;border:1px solid #f1d58a;padding:10px;border-radius:6px"><b>Please finish within ${PAYMENT_WINDOW_MINUTES} minutes</b>, by ${deadline}. <b>After that the order is cancelled</b> and the wristbands are released to other buyers, so pay and upload before the deadline.</p>` : ""}
     <p><a href="${payUrl}" style="background:#111;color:#fff;padding:12px 18px;text-decoration:none;border-radius:6px;display:inline-block;font-weight:bold">Pay and upload proof</a></p>
     <p style="color:#555;font-size:13px">Bayaran ang eksaktong <b>${total}</b> via ${primaryChannel(b.event, channels).app}, i-screenshot ang confirmation, at i-upload sa link sa itaas. Kapag na-verify, ipapadala ang tickets sa email na ito.</p>
+    ${shippingBlockHtml(b)}
     <p style="color:#777;font-size:12px">After we verify your payment, your receipt and QR tickets are emailed here within 24 hours. Check your order any time: <a href="${SITE_URL}/order/${b.order.id}">${SITE_URL}/order/${b.order.id}</a></p>
     <p style="color:#777;font-size:12px">Found this in Spam or Promotions? Mark it as "Not spam" so your tickets land in your inbox.</p>
   </div>`;

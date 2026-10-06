@@ -254,6 +254,7 @@ const ticketTypeSchema = z.object({
   walkin_name: optText(80),
   gate_needs_name: z.boolean(),
   includes_shirt: z.boolean(),
+  ships_shirt: z.boolean(),
   includes_lanyard: z.boolean(),
   includes_sticker: z.boolean(),
   includes_car_pass: z.boolean(),
@@ -278,6 +279,7 @@ export async function saveTicketType(input: TicketTypeInput): Promise<ActionResu
     if (row.sell_online && row.price_centavos === 0 && !row.drifter_family) {
       return { ok: false, error: "A ticket sold online needs a price above zero" };
     }
+    if (row.ships_shirt && !row.includes_shirt) row.ships_shirt = false;
     if (row.included_companions > 0 && !row.requires_vehicle) {
       return { ok: false, error: "Free companions ride on a car ticket: tick \"Needs car details\" or set companions to 0" };
     }

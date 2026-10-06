@@ -4,6 +4,7 @@ import { useEffect, useId, useState } from "react";
 import type { PaymentChannel } from "@/config/event";
 import { useRules } from "@/components/RulesProvider";
 import { php } from "@/lib/money";
+import { SHIPPING_NOTE, type Shipping } from "@/lib/shipping";
 import type { TicketTypeRow } from "@/lib/supabase/types";
 import { BandSwatch } from "@/components/BandSwatch";
 
@@ -38,6 +39,7 @@ export function OrderReviewModal({
   companionLabel = "Companion",
   companionBand = null,
   channel,
+  shipping = null,
 }: {
   lines: ReviewLine[];
   /** The payment channel buyers are told to use. */
@@ -47,6 +49,8 @@ export function OrderReviewModal({
   /** Wristband colour of the companion ticket type, e.g. "Green". */
   companionBand?: string | null;
   buyer: { buyer_name: string; buyer_email: string; buyer_mobile: string };
+  /** Where a shirt that ships goes; null when the order has none. */
+  shipping?: Shipping | null;
   total: number;
   pending: boolean;
   onClose: () => void;
@@ -164,6 +168,20 @@ export function OrderReviewModal({
             <div className="min-w-0"><div className="text-[10px] uppercase text-zinc-500">Email</div><div className="break-all font-medium text-cyan-200">{buyer.buyer_email}</div></div>
             <div><div className="text-[10px] uppercase text-zinc-500">Mobile</div><div className="font-medium">{buyer.buyer_mobile}</div></div>
           </section>
+
+          {/* the shirt that ships, and where to */}
+          {shipping && (
+            <section className="space-y-2 rounded-2xl border border-violet-400/25 bg-violet-400/[0.06] p-4 text-sm">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-violet-200">Shirt ships to</div>
+              <div className="text-zinc-200">
+                <div className="font-medium">{shipping.name} · {shipping.mobile}</div>
+                <div>{shipping.address}</div>
+                <div>{shipping.city}, {shipping.province} {shipping.zip}</div>
+                <div className="text-zinc-400">via {shipping.courier}</div>
+              </div>
+              <p className="text-xs text-violet-100/80">{SHIPPING_NOTE}</p>
+            </section>
+          )}
 
           {/* what happens next */}
           <section className="rounded-2xl border border-cyan-400/20 bg-cyan-400/5 p-4 text-sm">

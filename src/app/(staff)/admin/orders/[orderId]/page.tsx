@@ -11,6 +11,7 @@ import { php } from "@/lib/money";
 import { SignedImage } from "@/components/SignedImage";
 import { TicketActions } from "@/components/TicketActions";
 import { carNameOf, itemLabel } from "@/lib/items";
+import { SHIRT_PROCESSING, shirtShips } from "@/lib/shipping";
 
 const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleString(LOCALE.locale, { timeZone: LOCALE.timeZone }) : "-");
 
@@ -48,6 +49,17 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ or
             <div><dt className="text-zinc-500">Email sent</dt><dd>{fmt(order.email_sent_at)}</dd></div>
             {order.rejection_reason && <div className="col-span-2"><dt className="text-zinc-500">Rejection reason</dt><dd className="text-red-700">{order.rejection_reason}</dd></div>}
           </dl>
+          {order.shipping && (
+            <div className="mt-4 rounded-lg border border-violet-400/30 bg-violet-400/5 p-3 text-sm">
+              <div className="text-xs font-semibold uppercase tracking-wide text-violet-300">Shirt ships to (via {order.shipping.courier})</div>
+              <div className="mt-1">
+                {order.shipping.name} · {order.shipping.mobile}<br />
+                {order.shipping.address}<br />
+                {order.shipping.city}, {order.shipping.province} {order.shipping.zip}
+              </div>
+              <div className="mt-1 text-xs text-zinc-500">Made to order, {SHIRT_PROCESSING} of processing; shipping fee shouldered by the buyer. Do not hand these shirts over at the gate.</div>
+            </div>
+          )}
           <h2 className="mt-5 font-semibold">Items</h2>
           <ul className="mt-2 divide-y text-sm">
             {items.map((it) => (
@@ -79,7 +91,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ or
                   <td className="py-2 font-bold">{t.number}</td>
                   <td>{t.ticket_type.name}</td>
                   <td>{t.holder_name}</td>
-                  <td>{t.shirt_size ?? "-"}</td>
+                  <td>{t.shirt_size ?? "-"}{t.shirt_size && shirtShips(t.ticket_type, order) ? <span className="ml-1 rounded bg-violet-400/15 px-1 text-[10px] font-semibold text-violet-200">ships</span> : null}</td>
                   <td>{t.vehicle_plate ? `${t.vehicle_plate} ${t.vehicle_model ?? ""}` : t.companion_of ? <span className="text-emerald-300">Companion of {t.companion_of}</span> : "-"}</td>
                   <td>{t.vehicle_photo_path ? <SignedImage bucket="vehicle-photos" path={t.vehicle_photo_path} alt={`Car ${t.vehicle_plate ?? ""}`} className="h-12 w-16 rounded-md object-cover" /> : "-"}</td>
                   <td><TicketStatusBadge status={t.status} /></td>

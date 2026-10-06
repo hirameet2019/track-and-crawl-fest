@@ -1,4 +1,5 @@
 import { BRAND as SITE_BRAND, LOCALE } from "@/config/site";
+import { shirtShips, type Shipping } from "@/lib/shipping";
 import { PDFDocument, StandardFonts, degrees, rgb, type PDFFont, type PDFImage, type PDFPage } from "pdf-lib";
 import fontkit from "@pdf-lib/fontkit";
 import { readFile } from "fs/promises";
@@ -476,7 +477,11 @@ async function drawTicketPage(doc: PDFDocument, f: Fonts, b: OrderBundle, t: Ord
   }
   y -= 30;
   y = labelValue(page, f, "HOLDER", t.holder_name ?? order.buyer_name, lx, y, 13);
-  if (tt.includes_shirt && !t.included) y = labelValue(page, f, "T-SHIRT SIZE", t.shirt_size ?? "Not specified", lx, y);
+  // A shirt that ships is not handed over at the gate; say so on the ticket.
+  const shipped = shirtShips(tt, order);
+  if (tt.includes_shirt && !t.included) {
+    y = labelValue(page, f, shipped ? "T-SHIRT SIZE (SHIPPED)" : "T-SHIRT SIZE", `${t.shirt_size ?? "Not specified"}${shipped ? ` · ${(order.shipping as Shipping).courier}` : ""}`, lx, y);
+  }
   if (tt.requires_vehicle && !t.companion_of) {
     y = labelValue(page, f, "VEHICLE PLATE", t.vehicle_plate ?? "Not specified", lx, y);
     y = labelValue(page, f, "VEHICLE", t.vehicle_model ?? "Not specified", lx, y);
@@ -486,7 +491,7 @@ async function drawTicketPage(doc: PDFDocument, f: Fonts, b: OrderBundle, t: Ord
   if (t.companion_of) y = labelValue(page, f, t.included ? "PASSENGER OF CAR (INCLUDED)" : "RIDING WITH CAR", t.companion_of, lx, y);
   y = labelValue(page, f, "ORDER", `#${order.order_no}`, lx, y);
   const includes: string[] = [];
-  if (tt.includes_shirt && !t.included) includes.push("Event T-shirt");
+  if (tt.includes_shirt && !t.included) includes.push(shipped ? "Event T-shirt (shipped to you)" : "Event T-shirt");
   if (tt.includes_lanyard) includes.push("ID Lanyard");
   if (tt.includes_sticker) includes.push(isCarPass ? "2 Event Decals" : "Event Decal");
   if (isCarPass) includes.push("Car Pass");

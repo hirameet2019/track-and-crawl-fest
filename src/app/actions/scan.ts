@@ -1,6 +1,7 @@
 "use server";
 
 import { assertStaff } from "@/lib/auth";
+import { shirtShips } from "@/lib/shipping";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { TicketRow, TicketTypeRow } from "@/lib/supabase/types";
 
@@ -24,6 +25,8 @@ export interface ScanTicket {
     "name" | "code" | "band_color" | "includes_shirt" | "includes_lanyard" | "includes_sticker" | "includes_car_pass"
   >;
   order: { order_no: number; buyer_name: string; buyer_mobile: string | null };
+  /** The shirt ships to the buyer: nothing to hand over at the gate. */
+  shirt_ships: boolean;
 }
 
 export type ScanResult =
@@ -42,12 +45,19 @@ async function loadTicket(ticketId: string): Promise<ScanTicket | null> {
   const { data } = await admin
     .from("tickets")
     .select(
-      "id, number, status, holder_name, shirt_size, vehicle_plate, vehicle_model, vehicle_photo_path, companion_of, included, redeemed_at, kit_claimed, ticket_type:ticket_types(name, code, band_color, includes_shirt, includes_lanyard, includes_sticker, includes_car_pass), order:orders(order_no, buyer_name, buyer_mobile)",
+      "id, number, status, holder_name, shirt_size, vehicle_plate, vehicle_model, vehicle_photo_path, companion_of, included, redeemed_at, kit_claimed, ticket_type:ticket_types(name, code, band_color, includes_shirt, includes_lanyard, includes_sticker, includes_car_pass, ships_shirt), order:orders(order_no, buyer_name, buyer_mobile, shipping)",
     )
     .eq("id", ticketId)
     .maybeSingle();
   if (!data) return null;
-  const row = data as unknown as ScanTicket & { vehicle_photo_path: string | null };
+  const row = data as unknown as ScanTicket & {
+    vehicle_photo_path: string | null;
+    ticket_type: ScanTicket["ticket_type"] & { ships_shirt?: boolean };
+    order: ScanTicket["order"] & { shipping?: unknown };
+  };
+  // The gate only needs to know the shirt is not theirs to hand over, not the address.
+  row.shirt_ships = shirtShips(row.ticket_type, row.order);
+  delete row.order.shipping;
   if (row.vehicle_photo_path) {
     const { data: signed } = await admin.storage.from("vehicle-photos").createSignedUrl(row.vehicle_photo_path, 60 * 10);
     row.vehicle_photo_url = signed?.signedUrl ?? null;
