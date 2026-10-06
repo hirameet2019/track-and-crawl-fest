@@ -9,6 +9,7 @@ import { audit } from "@/lib/audit";
 import { issueOrder, deliverOrder, deliverConversion } from "@/lib/issue";
 import { sendRejectionEmail, sendVoidEmail } from "@/lib/email";
 import { carNameOf, itemLabel } from "@/lib/items";
+import { shirtShips, type Shipping } from "@/lib/shipping";
 import { php } from "@/lib/money";
 import { newQrToken } from "@/lib/tokens";
 import type { OrderStatus, TicketStatus, TicketTypeRow } from "@/lib/supabase/types";
@@ -396,8 +397,12 @@ export interface OrderDetail {
   balance_settled_at: string | null;
   balance_note: string | null;
   items: { id: string; label: string; amount_centavos: number }[];
+  /** Where the shirts ship; null when nothing in the order ships. */
+  shipping: Shipping | null;
   tickets: {
     id: string; number: string; type: string; holder_name: string | null; shirt_size: string | null;
+    /** This ticket's shirt is shipped rather than handed over at the gate. */
+    ships: boolean;
     vehicle: string | null; vehicle_photo_path: string | null; companion_of: string | null; included: boolean;
     status: TicketStatus; redeemed_at: string | null; void_reason: string | null; qr_token: string;
     /** Voided by a conversion: the band went back to the pool, so it cannot be restored. */
@@ -432,12 +437,14 @@ export async function getOrderDetail(orderId: string): Promise<OrderDetail | nul
     balance_settled_at: order.balance_settled_at,
     balance_note: order.balance_note,
     items: items.map((it) => ({ id: it.id, label: itemLabel(it, true, carNameOf(items)), amount_centavos: it.qty * it.unit_price_centavos })),
+    shipping: order.shipping ?? null,
     tickets: tickets.map((t) => ({
       id: t.id,
       number: t.number,
       type: t.ticket_type.name,
       holder_name: t.holder_name,
       shirt_size: t.shirt_size,
+      ships: !!t.shirt_size && shirtShips(t.ticket_type, order),
       vehicle: t.vehicle_plate ? `${t.vehicle_plate} ${t.vehicle_model ?? ""}`.trim() : null,
       vehicle_photo_path: t.vehicle_photo_path,
       companion_of: t.companion_of,

@@ -11,7 +11,8 @@ import { php } from "@/lib/money";
 import { SignedImage } from "@/components/SignedImage";
 import { TicketActions } from "@/components/TicketActions";
 import { carNameOf, itemLabel } from "@/lib/items";
-import { SHIRT_PROCESSING, shirtShips } from "@/lib/shipping";
+import { shirtShips } from "@/lib/shipping";
+import { ShippingDetails } from "@/components/ShippingDetails";
 
 const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleString(LOCALE.locale, { timeZone: LOCALE.timeZone }) : "-");
 
@@ -50,15 +51,11 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ or
             {order.rejection_reason && <div className="col-span-2"><dt className="text-zinc-500">Rejection reason</dt><dd className="text-red-700">{order.rejection_reason}</dd></div>}
           </dl>
           {order.shipping && (
-            <div className="mt-4 rounded-lg border border-violet-400/30 bg-violet-400/5 p-3 text-sm">
-              <div className="text-xs font-semibold uppercase tracking-wide text-violet-300">Shirt ships to (via {order.shipping.courier})</div>
-              <div className="mt-1">
-                {order.shipping.name} · {order.shipping.mobile}<br />
-                {order.shipping.address}<br />
-                {order.shipping.city}, {order.shipping.province} {order.shipping.zip}
-              </div>
-              <div className="mt-1 text-xs text-zinc-500">Made to order, {SHIRT_PROCESSING} of processing; shipping fee shouldered by the buyer. Do not hand these shirts over at the gate.</div>
-            </div>
+            <ShippingDetails
+              className="mt-4"
+              shipping={order.shipping}
+              shirts={tickets.filter((t) => t.shirt_size && t.status !== "void" && shirtShips(t.ticket_type, order)).map((t) => ({ holder: t.holder_name, size: t.shirt_size }))}
+            />
           )}
           <h2 className="mt-5 font-semibold">Items</h2>
           <ul className="mt-2 divide-y text-sm">

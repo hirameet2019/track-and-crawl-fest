@@ -5,6 +5,8 @@ import { useEffect, useState, useTransition } from "react";
 import { approveOrder, getProofUrl, rejectOrder } from "@/app/actions/admin";
 import { php } from "@/lib/money";
 import type { Attendee } from "@/lib/supabase/types";
+import type { Shipping } from "@/lib/shipping";
+import { ShippingDetails } from "@/components/ShippingDetails";
 import { SignedImage } from "@/components/SignedImage";
 import { humanMinutes } from "@/lib/elapsed";
 
@@ -20,7 +22,9 @@ export interface QueueOrder {
   payment_proof_path: string | null;
   proof_submitted_at: string | null;
   age_min: number | null;
-  order_items: { qty: number; name: string; requires_vehicle: boolean; attendees: Attendee[] }[];
+  /** Where the shirts ship; null when nothing in the order ships. */
+  shipping: Shipping | null;
+  order_items: { qty: number; name: string; requires_vehicle: boolean; ships_shirt: boolean; attendees: Attendee[] }[];
 }
 
 function ProofImage({ path, submittedAt }: { path: string | null; submittedAt: string | null }) {
@@ -78,6 +82,12 @@ function Card({ o, onDone }: { o: QueueOrder; onDone: (id: string, warning?: str
         <ul className="text-sm text-zinc-700">
           {o.order_items.map((i, k) => <li key={k}>{i.name} x {i.qty}</li>)}
         </ul>
+        {o.shipping && (
+          <ShippingDetails
+            shipping={o.shipping}
+            shirts={o.order_items.filter((i) => i.ships_shirt).flatMap((i) => i.attendees).filter((a) => a.shirt_size).map((a) => ({ holder: a.holder_name ?? null, size: a.shirt_size ?? null }))}
+          />
+        )}
         {o.order_items.some((i) => i.requires_vehicle) && (
           <div className="rounded-lg border border-white/10 bg-black/30 p-3">
             <div className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">Cars for display</div>

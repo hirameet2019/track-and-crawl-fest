@@ -9,6 +9,7 @@ import { OrderActions } from "@/components/OrderActions";
 import { TicketActions } from "@/components/TicketActions";
 import { SignedImage } from "@/components/SignedImage";
 import { php } from "@/lib/money";
+import { ShippingDetails } from "@/components/ShippingDetails";
 import type { OrderStatus } from "@/lib/supabase/types";
 
 export interface OrderRow {
@@ -161,6 +162,13 @@ function OrderPanel({ d, isAdmin, payApp }: { d: OrderDetail; isAdmin: boolean; 
           ))}
           <li className="flex justify-between py-2 font-bold"><span>Total</span><span className="tabular-nums">{php(d.total_centavos)}</span></li>
         </ul>
+        {d.shipping && (
+          <ShippingDetails
+            className="mt-3"
+            shipping={d.shipping}
+            shirts={d.tickets.filter((t) => t.ships && t.status !== "void").map((t) => ({ holder: t.holder_name, size: t.shirt_size }))}
+          />
+        )}
       </div>
 
       <div className="space-y-3">
@@ -195,7 +203,7 @@ function OrderPanel({ d, isAdmin, payApp }: { d: OrderDetail; isAdmin: boolean; 
                   <td className="py-2 font-bold">{t.number}</td>
                   <td>{t.type}</td>
                   <td>{t.holder_name}</td>
-                  <td>{t.shirt_size ?? "-"}</td>
+                  <td>{t.shirt_size ?? "-"}{t.ships ? <span className="ml-1 rounded bg-violet-400/15 px-1 text-[10px] font-semibold text-violet-200">ships</span> : null}</td>
                   <td>{t.vehicle ?? (t.companion_of ? <span className="text-emerald-300">{t.included ? "Passenger" : "Companion"} of {t.companion_of}</span> : "-")}</td>
                   <td>{t.vehicle_photo_path ? <SignedImage bucket="vehicle-photos" path={t.vehicle_photo_path} alt={`Car ${t.vehicle ?? ""}`} className="h-12 w-16 rounded-md object-cover" /> : "-"}</td>
                   <td><TicketStatusBadge status={t.status} /></td>
