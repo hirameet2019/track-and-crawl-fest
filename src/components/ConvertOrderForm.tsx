@@ -2,14 +2,24 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { convertOrder, getConvertTargets, type ConvertTarget } from "@/app/actions/admin";
+import { convertOrder, getConvertTargets, type ConvertContext } from "@/app/actions/admin";
 import { php } from "@/lib/money";
 import { BandSwatch } from "@/components/BandSwatch";
+import { useRules } from "@/components/RulesProvider";
+import { COURIERS, type Courier, type Shipping } from "@/lib/shipping";
+
+type Row = { holder_name: string; shirt_size: string; vehicle_plate: string; vehicle_model: string; passengers: string[] };
+const blankRow = (): Row => ({ holder_name: "", shirt_size: "", vehicle_plate: "", vehicle_model: "", passengers: [] });
+const blankShipping = (buyerName: string): Shipping => ({ name: buyerName, mobile: "", address: "", city: "", province: "", zip: "", courier: "LBC" });
 
 /**
  * Swap a paid order to a different ticket type without losing the order number,
  * the receipt or the payment trail. Used when a buyer changes their mind after
  * paying - the alternative is voiding and making them order again.
+ *
+ * Car labels ask for each car's plate and model and its free passengers' names;
+ * labels whose shirt ships ask where to deliver it, unless the order already has
+ * an address. Everything is checked again on the server.
  */
 export function ConvertOrderForm({
   orderId,
@@ -23,39 +33,55 @@ export function ConvertOrderForm({
   hasRedeemed: boolean;
 }) {
   const router = useRouter();
+  const sizes = useRules().shirtChart.map((r) => r.size);
   const [open, setOpen] = useState(false);
-  const [targets, setTargets] = useState<ConvertTarget[] | null>(null);
+  const [ctx, setCtx] = useState<ConvertContext | null>(null);
   const [typeId, setTypeId] = useState("");
   const [qty, setQty] = useState(1);
   const [reason, setReason] = useState("");
-  const [names, setNames] = useState<{ holder_name: string; shirt_size: string }[]>([]);
+  const [rows, setRows] = useState<Row[]>([]);
   const [showNames, setShowNames] = useState(false);
+  const [shipping, setShipping] = useState<Shipping | null>(null);
+  const [editShipping, setEditShipping] = useState(false);
   const [confirm, setConfirm] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
   useEffect(() => {
-    if (!open || targets) return;
+    if (!open || ctx) return;
     let live = true;
-    getConvertTargets(orderId).then((t) => { if (live) setTargets(t); });
+    getConvertTargets(orderId).then((c) => {
+      if (!live) return;
+      setCtx(c);
+      setShipping(c.shipping);
+    });
     return () => { live = false; };
-  }, [open, targets, orderId]);
+  }, [open, ctx, orderId]);
 
+  const targets = ctx?.targets ?? null;
   const target = targets?.find((t) => t.id === typeId) ?? null;
+  const isCar = !!target?.requires_vehicle;
+  const passengers = target?.included_companions ?? 0;
+  const needsAddress = !!target?.ships_shirt;
   const newTotal = target ? target.price_centavos * qty : 0;
   const balance = currentTotalCentavos - newTotal;
   /** How many of the chosen ticket the money already paid would cover exactly. */
   const fits = target && target.price_centavos > 0 ? Math.floor(currentTotalCentavos / target.price_centavos) : 0;
   const tooMany = target ? qty > target.sellable : false;
 
-  const nameAt = (i: number) => names[i] ?? { holder_name: "", shirt_size: "" };
-  const setNameAt = (i: number, patch: Partial<{ holder_name: string; shirt_size: string }>) =>
-    setNames((prev) => {
+  const rowAt = (i: number) => rows[i] ?? blankRow();
+  const setRowAt = (i: number, patch: Partial<Row>) =>
+    setRows((prev) => {
       const next = [...prev];
-      while (next.length <= i) next.push({ holder_name: "", shirt_size: "" });
+      while (next.length <= i) next.push(blankRow());
       next[i] = { ...next[i], ...patch };
       return next;
     });
+  const setShip = (patch: Partial<Shipping>) => setShipping((s) => ({ ...(s ?? blankShipping(buyerName)), ...patch }));
+
+  const missingPlate = isCar && Array.from({ length: qty }, (_, i) => rowAt(i).vehicle_plate.trim()).some((p) => !p);
+  const shippingReady = !needsAddress || (!!shipping && !!shipping.name.trim() && !!shipping.mobile.trim() && !!shipping.address.trim() && !!shipping.city.trim() && !!shipping.province.trim() && /^\d{4}$/.test(shipping.zip.trim()));
+  const blocked = !target || tooMany || reason.trim().length < 3 || missingPlate || !shippingReady;
 
   if (hasRedeemed) {
     return (
@@ -75,6 +101,17 @@ export function ConvertOrderForm({
       </div>
     );
   }
+
+  const shipField = (key: Exclude<keyof Shipping, "courier">, label: string, extra: React.InputHTMLAttributes<HTMLInputElement> = {}) => (
+    <input
+      className="input py-1 text-sm"
+      placeholder={label}
+      aria-label={label}
+      value={shipping?.[key] ?? ""}
+      onChange={(e) => { setShip({ [key]: e.target.value }); setConfirm(false); }}
+      {...extra}
+    />
+  );
 
   return (
     <div className="space-y-3 rounded-lg border border-cyan-300/40 bg-cyan-300/5 p-3">
@@ -99,18 +136,19 @@ export function ConvertOrderForm({
               id={`convert-type-${orderId}`}
               className="input mt-1"
               value={typeId}
-              onChange={(e) => { setTypeId(e.target.value); setConfirm(false); }}
+              onChange={(e) => { setTypeId(e.target.value); setConfirm(false); setShowNames(false); }}
             >
               <option value="">Choose a ticket type&hellip;</option>
               {targets.map((t) => (
                 <option key={t.id} value={t.id} disabled={t.sellable <= 0}>
-                  {t.name} - {php(t.price_centavos)} ({t.sellable} left)
+                  {t.name} - {php(t.price_centavos)} ({t.sellable} left{t.included_companions ? `, +${t.included_companions} passenger` : ""})
                 </option>
               ))}
             </select>
             {target && (
-              <p className="mt-1 flex items-center gap-2 text-xs text-zinc-400">
+              <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-zinc-400">
                 <BandSwatch color={target.band_color} size={10} label={false} /> {target.band_color} wristband
+                {target.shares_stack_with && <> &middot; same bands as {target.shares_stack_with}</>}
                 {fits > 0 && <> &middot; {php(currentTotalCentavos)} covers <b>{fits}</b> of these</>}
               </p>
             )}
@@ -123,7 +161,7 @@ export function ConvertOrderForm({
           </div>
 
           <div>
-            <label className="label" htmlFor={`convert-qty-${orderId}`}>How many</label>
+            <label className="label" htmlFor={`convert-qty-${orderId}`}>{isCar ? "How many cars" : "How many"}</label>
             <div className="mt-1 flex items-center gap-2">
               <button type="button" className="btn-secondary h-10 w-10 text-lg font-black" disabled={qty <= 1} onClick={() => { setQty((q) => Math.max(1, q - 1)); setConfirm(false); }} aria-label="One less">&minus;</button>
               <input
@@ -141,6 +179,7 @@ export function ConvertOrderForm({
               )}
             </div>
             {tooMany && <p className="mt-1 text-xs text-rose-400">Only {target?.sellable} left for that label.</p>}
+            {passengers > 0 && <p className="mt-1 text-xs text-zinc-500">Each car also gets {passengers} free passenger wristband{passengers > 1 ? "s" : ""}.</p>}
           </div>
 
           {target && (
@@ -154,7 +193,40 @@ export function ConvertOrderForm({
             </dl>
           )}
 
-          {target && (
+          {target && isCar && (
+            <div className="space-y-2">
+              <div className="text-xs font-semibold text-zinc-300">Car details</div>
+              {Array.from({ length: qty }, (_, i) => (
+                <div key={i} className="space-y-2 rounded-lg border border-white/10 bg-black/20 p-2">
+                  <div className="text-[11px] text-zinc-500">Car {i + 1}</div>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <input className="input py-1 text-sm uppercase" placeholder="Plate number *" aria-label={`Plate number of car ${i + 1}`} value={rowAt(i).vehicle_plate} onChange={(e) => { setRowAt(i, { vehicle_plate: e.target.value }); setConfirm(false); }} />
+                    <input className="input py-1 text-sm" placeholder="Car model" aria-label={`Model of car ${i + 1}`} value={rowAt(i).vehicle_model} onChange={(e) => setRowAt(i, { vehicle_model: e.target.value })} />
+                    <input className="input py-1 text-sm" placeholder={`Driver - ${buyerName}`} aria-label={`Driver of car ${i + 1}`} value={rowAt(i).holder_name} onChange={(e) => setRowAt(i, { holder_name: e.target.value })} />
+                    {target.includes_shirt && (
+                      <select className="input py-1 text-sm" aria-label={`Driver shirt size, car ${i + 1}`} value={rowAt(i).shirt_size} onChange={(e) => setRowAt(i, { shirt_size: e.target.value })}>
+                        <option value="">Driver shirt size&hellip;</option>
+                        {sizes.map((s) => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    )}
+                    {Array.from({ length: passengers }, (_, k) => (
+                      <input
+                        key={k}
+                        className="input py-1 text-sm"
+                        placeholder={`Free passenger${passengers > 1 ? ` ${k + 1}` : ""} - ${buyerName}`}
+                        aria-label={`Passenger ${k + 1} of car ${i + 1}`}
+                        value={rowAt(i).passengers[k] ?? ""}
+                        onChange={(e) => { const ps = [...rowAt(i).passengers]; ps[k] = e.target.value; setRowAt(i, { passengers: ps }); }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))}
+              <p className="text-xs text-zinc-500">The plate goes on the car pass. A blank name is issued to <b>{buyerName}</b>; the car photo is not needed here.</p>
+            </div>
+          )}
+
+          {target && !isCar && (
             <div>
               <button type="button" className="text-xs text-cyan-300 hover:underline" onClick={() => setShowNames((v) => !v)}>
                 {showNames ? "Hide names" : `Names${target.includes_shirt ? " and shirt sizes" : ""} (optional)`}
@@ -167,18 +239,15 @@ export function ConvertOrderForm({
                       <input
                         className="input flex-1 py-1 text-sm"
                         placeholder={`Ticket ${i + 1} holder - ${buyerName}`}
-                        value={nameAt(i).holder_name}
-                        onChange={(e) => setNameAt(i, { holder_name: e.target.value })}
+                        value={rowAt(i).holder_name}
+                        onChange={(e) => setRowAt(i, { holder_name: e.target.value })}
                         aria-label={`Holder name for ticket ${i + 1}`}
                       />
                       {target.includes_shirt && (
-                        <input
-                          className="input w-20 py-1 text-sm"
-                          placeholder="Shirt"
-                          value={nameAt(i).shirt_size}
-                          onChange={(e) => setNameAt(i, { shirt_size: e.target.value })}
-                          aria-label={`Shirt size for ticket ${i + 1}`}
-                        />
+                        <select className="input w-24 py-1 text-sm" value={rowAt(i).shirt_size} onChange={(e) => setRowAt(i, { shirt_size: e.target.value })} aria-label={`Shirt size for ticket ${i + 1}`}>
+                          <option value="">Size</option>
+                          {sizes.map((s) => <option key={s} value={s}>{s}</option>)}
+                        </select>
                       )}
                     </div>
                   ))}
@@ -187,26 +256,50 @@ export function ConvertOrderForm({
             </div>
           )}
 
+          {target && needsAddress && (
+            <div className="space-y-2 rounded-lg border border-violet-400/30 bg-violet-400/5 p-2">
+              <div className="text-xs font-semibold text-violet-200">Where the shirt ships</div>
+              {ctx?.shipping && !editShipping ? (
+                <div className="text-xs text-zinc-300">
+                  {ctx.shipping.name} · {ctx.shipping.mobile} · {ctx.shipping.address}, {ctx.shipping.city}, {ctx.shipping.province} {ctx.shipping.zip} ({ctx.shipping.courier})
+                  <button type="button" className="ml-2 text-cyan-300 hover:underline" onClick={() => setEditShipping(true)}>Change</button>
+                </div>
+              ) : (
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {shipField("name", "Recipient name *")}
+                  {shipField("mobile", "Mobile for the courier *", { inputMode: "tel" })}
+                  <div className="sm:col-span-2">{shipField("address", "House / unit no., street, barangay *")}</div>
+                  {shipField("city", "City / municipality *")}
+                  {shipField("province", "Province *")}
+                  {shipField("zip", "ZIP code *", { inputMode: "numeric", maxLength: 4 })}
+                  <select className="input py-1 text-sm" aria-label="Courier" value={shipping?.courier ?? "LBC"} onChange={(e) => setShip({ courier: e.target.value as Courier })}>
+                    {COURIERS.map((c) => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+              )}
+              <p className="text-[11px] text-zinc-500">This ticket&apos;s shirt is made to order and delivered, not handed over at the gate. The buyer pays the shipping fee.</p>
+            </div>
+          )}
+
           <div>
             <label className="label" htmlFor={`convert-reason-${orderId}`}>Reason the buyer will see</label>
             <input
               id={`convert-reason-${orderId}`}
               className="input mt-1"
-              placeholder="e.g. Changed from car display to Early Bird at the buyer's request"
+              placeholder="e.g. Upgraded to VIP Car Display at the buyer's request"
               value={reason}
               onChange={(e) => { setReason(e.target.value); setConfirm(false); }}
             />
           </div>
 
           {!confirm ? (
-            <button
-              type="button"
-              className="btn-primary w-full"
-              disabled={pending || !target || tooMany || reason.trim().length < 3}
-              onClick={() => setConfirm(true)}
-            >
-              {target ? <>Convert to {qty} &times; {target.name}&hellip;</> : <>Choose a ticket type first</>}
-            </button>
+            <>
+              <button type="button" className="btn-primary w-full" disabled={pending || blocked} onClick={() => setConfirm(true)}>
+                {target ? <>Convert to {qty} &times; {target.name}&hellip;</> : <>Choose a ticket type first</>}
+              </button>
+              {target && missingPlate && <p className="text-xs text-amber-300">Enter a plate number for every car.</p>}
+              {target && !missingPlate && !shippingReady && <p className="text-xs text-amber-300">Enter the full delivery address (4-digit ZIP).</p>}
+            </>
           ) : (
             <div className="space-y-2">
               <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-amber-200">
@@ -227,13 +320,17 @@ export function ConvertOrderForm({
                         ticketTypeId: typeId,
                         qty,
                         reason,
-                        attendees: names.slice(0, qty).map((n) => ({
+                        attendees: Array.from({ length: qty }, (_, i) => rowAt(i)).map((n) => ({
                           holder_name: n.holder_name.trim() || undefined,
                           shirt_size: n.shirt_size.trim() || undefined,
+                          vehicle_plate: isCar ? n.vehicle_plate.trim() || undefined : undefined,
+                          vehicle_model: isCar ? n.vehicle_model.trim() || undefined : undefined,
+                          passengers: isCar ? Array.from({ length: passengers }, (_, k) => (n.passengers[k] ?? "").trim()) : undefined,
                         })),
+                        shipping: needsAddress && (editShipping || !ctx?.shipping) && shipping ? shipping : undefined,
                       });
                       setMsg(r.ok ? r.warning ?? r.summary ?? "Converted" : r.error);
-                      if (r.ok) { setOpen(false); setNames([]); setReason(""); router.refresh(); }
+                      if (r.ok) { setOpen(false); setRows([]); setReason(""); setCtx(null); router.refresh(); }
                     });
                   }}
                 >

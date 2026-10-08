@@ -10,7 +10,7 @@ import { getRules } from "@/lib/rules";
 import { IMAGE_MIME, MAX_UPLOAD_BYTES } from "@/lib/image";
 import { MOBILE_RE, emailProblem, normalizeEmail, normalizeMobile } from "@/lib/contact";
 import { audit } from "@/lib/audit";
-import { COURIERS } from "@/lib/shipping";
+import { shippingSchema } from "@/lib/shipping";
 
 export type ActionResult = { ok: true; warning?: string } | { ok: false; error: string };
 
@@ -28,19 +28,6 @@ const attendeeSchema = z.object({
   included: z.boolean().optional(),
 });
 
-/** Where a shipped shirt goes (labels with ships_shirt). */
-const shippingSchema = z.object({
-  name: z.string().trim().min(2, "Shipping: enter the recipient's full name").max(80),
-  mobile: z.preprocess(
-    (v) => normalizeMobile(String(v ?? "")),
-    z.string().regex(MOBILE_RE, "Shipping: enter an 11-digit PH mobile number for the courier, like 09171234567"),
-  ),
-  address: z.string().trim().min(5, "Shipping: enter the house or unit no., street and barangay").max(200),
-  city: z.string().trim().min(2, "Shipping: enter the city or municipality").max(80),
-  province: z.string().trim().min(2, "Shipping: enter the province").max(80),
-  zip: z.string().trim().regex(/^\d{4}$/, "Shipping: enter the 4-digit ZIP code"),
-  courier: z.enum(COURIERS, { message: "Shipping: choose LBC or J&T Express" }),
-});
 
 /** Plates compare without spaces or case: "NBC 8821" == "nbc8821". */
 const plateKey = (p: string | undefined | null) => (p ?? "").replace(/\s+/g, "").toUpperCase();

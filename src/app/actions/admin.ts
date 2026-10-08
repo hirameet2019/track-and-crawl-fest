@@ -9,7 +9,7 @@ import { audit } from "@/lib/audit";
 import { issueOrder, deliverOrder, deliverConversion } from "@/lib/issue";
 import { sendRejectionEmail, sendVoidEmail } from "@/lib/email";
 import { carNameOf, itemLabel } from "@/lib/items";
-import { shirtShips, type Shipping } from "@/lib/shipping";
+import { shippingSchema, shirtShips, type Shipping } from "@/lib/shipping";
 import { php } from "@/lib/money";
 import { newQrToken } from "@/lib/tokens";
 import type { OrderStatus, TicketStatus, TicketTypeRow } from "@/lib/supabase/types";
@@ -250,40 +250,66 @@ export interface ConvertTarget {
   drifter_family: boolean;
   /** Free bands each drifter gets on that label (only meaningful when drifter_family). */
   free_allowance: number;
+  /** A car label: each ticket needs a plate (and model), like an online car order. */
+  requires_vehicle: boolean;
+  /** Free passengers issued with each car, from the same wristband stack. */
+  included_companions: number;
+  /** The shirt is shipped to the buyer, so the order needs a delivery address. */
+  ships_shirt: boolean;
+  /** Shares another label's wristband stack (VIP Pass (no shirt) uses the VIP Pass bands). */
+  shares_stack_with: string | null;
+}
+
+export interface ConvertContext {
+  targets: ConvertTarget[];
+  /** The order's delivery address, if it already has one. */
+  shipping: Shipping | null;
 }
 
 /**
- * Ticket types a paid order can be swapped into. Two are excluded: VIP Car
- * Display needs a plate number and a car photo this form cannot collect, and a
- * label with no ticket price (the gate labels Y and O are priced per tally) would
- * collapse the order total to zero. Drifter Family is priced, so it belongs here -
- * the organizer asked for it so a drifter's relative who bought an ordinary ticket
- * can be moved onto the plain red band.
+ * Ticket types a paid order can be swapped into, and the order's delivery address.
+ * Only labels without a ticket price are left out (the gate labels Y and O are
+ * priced per tally and would collapse the order total to zero). Car labels are in:
+ * the form collects each car's plate and model and its free passengers' names.
+ * Drifter Family is priced, so it belongs here: the organizer asked for it so a
+ * drifter's relative who bought an ordinary ticket can be moved onto the plain red band.
  */
-export async function getConvertTargets(orderId: string): Promise<ConvertTarget[]> {
+export async function getConvertTargets(orderId: string): Promise<ConvertContext> {
   await assertStaff("admin");
   const admin = createAdminClient();
-  const { data: order } = await admin.from("orders").select("event_id").eq("id", orderId).maybeSingle();
-  if (!order) return [];
+  const { data: order } = await admin.from("orders").select("event_id, shipping").eq("id", orderId).maybeSingle();
+  if (!order) return { targets: [], shipping: null };
   const { data: types } = await admin
     .from("ticket_types")
-    .select("id, code, name, band_color, price_centavos, includes_shirt, requires_vehicle, drifter_family, free_allowance")
+    .select("id, code, name, band_color, price_centavos, includes_shirt, requires_vehicle, drifter_family, free_allowance, included_companions, ships_shirt, pool_type_id")
     .eq("event_id", order.event_id)
     .eq("active", true)
     .order("sort_order");
   const { data: avail } = await admin
     .from("v_ticket_type_availability")
-    .select("ticket_type_id, sellable")
+    .select("ticket_type_id, sellable, pool_sellable")
     .eq("event_id", order.event_id);
-  const left = new Map((avail ?? []).map((a) => [a.ticket_type_id as string, Number(a.sellable)]));
-  return ((types ?? []) as (Pick<TicketTypeRow, "id" | "code" | "name" | "band_color" | "price_centavos" | "includes_shirt" | "requires_vehicle" | "drifter_family" | "free_allowance">)[])
-    .filter((t) => !t.requires_vehicle && t.price_centavos > 0)
-    .map((t) => ({
-      id: t.id, code: t.code, name: t.name, band_color: t.band_color,
-      price_centavos: t.price_centavos, includes_shirt: t.includes_shirt,
-      sellable: left.get(t.id) ?? 0, drifter_family: t.drifter_family,
-      free_allowance: t.free_allowance,
-    }));
+  const stock = new Map((avail ?? []).map((a) => [a.ticket_type_id as string, { sellable: Number(a.sellable), pool: Number(a.pool_sellable) }]));
+  type Row = Pick<TicketTypeRow, "id" | "code" | "name" | "band_color" | "price_centavos" | "includes_shirt" | "requires_vehicle" | "drifter_family" | "free_allowance" | "included_companions" | "ships_shirt" | "pool_type_id">;
+  const rows = (types ?? []) as Row[];
+  const nameOf = new Map(rows.map((t) => [t.id, t.name]));
+  const targets = rows
+    .filter((t) => t.price_centavos > 0)
+    .map((t) => {
+      const s = stock.get(t.id) ?? { sellable: 0, pool: 0 };
+      const passengers = t.requires_vehicle ? t.included_companions : 0;
+      // A car also takes a band for each free passenger, from the same stack.
+      const sellable = Math.max(0, Math.min(s.sellable, Math.floor(s.pool / (1 + passengers))));
+      return {
+        id: t.id, code: t.code, name: t.name, band_color: t.band_color,
+        price_centavos: t.price_centavos, includes_shirt: t.includes_shirt,
+        sellable, drifter_family: t.drifter_family, free_allowance: t.free_allowance,
+        requires_vehicle: t.requires_vehicle, included_companions: passengers,
+        ships_shirt: t.ships_shirt && t.includes_shirt,
+        shares_stack_with: t.pool_type_id ? nameOf.get(t.pool_type_id) ?? null : null,
+      };
+    });
+  return { targets, shipping: (order.shipping as Shipping | null) ?? null };
 }
 
 const convertSchema = z.object({
@@ -294,7 +320,11 @@ const convertSchema = z.object({
   attendees: z.array(z.object({
     holder_name: z.string().trim().max(80).optional(),
     shirt_size: z.string().trim().max(10).optional(),
+    vehicle_plate: z.string().trim().max(20).optional(),
+    vehicle_model: z.string().trim().max(60).optional(),
+    passengers: z.array(z.string().trim().max(80)).max(12).optional(),
   })).max(50).optional(),
+  shipping: shippingSchema.optional(),
 });
 
 /**
@@ -305,7 +335,9 @@ const convertSchema = z.object({
 export async function convertOrder(input: z.input<typeof convertSchema>): Promise<ActionResult & { summary?: string }> {
   try {
     const { userId } = await assertStaff("admin");
-    const p = convertSchema.parse(input);
+    const parsed = convertSchema.safeParse(input);
+    if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
+    const p = parsed.data;
 
     // Captured before the swap: the email has to name the numbers that stopped working.
     const before = await getOrderBundle(p.orderId);
@@ -315,18 +347,32 @@ export async function convertOrder(input: z.input<typeof convertSchema>): Promis
       .map((t) => ({ number: t.number, type: t.ticket_type.name }));
 
     const admin = createAdminClient();
+    const { data: target } = await admin.from("ticket_types").select("requires_vehicle, included_companions, includes_shirt, ships_shirt").eq("id", p.ticketTypeId).maybeSingle();
+    if (!target) return { ok: false, error: "Unknown ticket type" };
+    const attendees = p.attendees ?? [];
+    if (target.requires_vehicle) {
+      for (let i = 0; i < p.qty; i++) {
+        if (!attendees[i]?.vehicle_plate) return { ok: false, error: `Enter the plate number of car ${i + 1}` };
+      }
+    }
+    // The shirt of these labels is made to order and shipped: the order needs an address.
+    if (target.ships_shirt && target.includes_shirt && !p.shipping && !before.order.shipping) {
+      return { ok: false, error: "Enter where the shirt ships: this ticket's shirt is delivered, not handed over at the gate" };
+    }
+    const bands = p.qty * (1 + (target.requires_vehicle ? target.included_companions : 0));
     const { data, error } = await admin.rpc("convert_order", {
       p_order_id: p.orderId,
       p_target_type_id: p.ticketTypeId,
       p_qty: p.qty,
-      p_attendees: p.attendees ?? [],
+      p_attendees: attendees,
       p_actor: userId,
       p_reason: p.reason,
-      p_tokens: Array.from({ length: p.qty }, newQrToken),
+      p_tokens: Array.from({ length: bands }, newQrToken),
+      p_shipping: target.ships_shirt && target.includes_shirt && p.shipping ? p.shipping : null,
     });
     if (error) return { ok: false, error: error.message };
 
-    const r = data as { type: string; qty: number; old_total_centavos: number; new_total_centavos: number; balance_centavos: number };
+    const r = data as { type: string; qty: number; passengers?: number; old_total_centavos: number; new_total_centavos: number; balance_centavos: number };
     const money = r.balance_centavos > 0
       ? `Refund ${php(r.balance_centavos)} to the buyer.`
       : r.balance_centavos < 0

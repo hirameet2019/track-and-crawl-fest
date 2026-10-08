@@ -4,6 +4,9 @@
  * courier with the shipping fee shouldered by the buyer. Pure; safe in client code.
  */
 
+import { z } from "zod";
+import { MOBILE_RE, normalizeMobile } from "@/lib/contact";
+
 export const COURIERS = ["LBC", "J&T Express"] as const;
 export type Courier = (typeof COURIERS)[number];
 
@@ -37,3 +40,17 @@ export const SHIPPING_NOTE =
   "The shipping fee is shouldered by the buyer and is not included in the ticket total.";
 export const SHIPPING_NOTE_TL =
   "Gagawin pa ang shirt: mga dalawang linggo bago ipadala sa LBC o J&T Express. Ang buyer ang magbabayad ng shipping fee; hindi ito kasama sa total.";
+
+/** Validates where a shipped shirt goes. Shared by the online checkout and the staff Convert form. */
+export const shippingSchema = z.object({
+  name: z.string().trim().min(2, "Shipping: enter the recipient's full name").max(80),
+  mobile: z.preprocess(
+    (v) => normalizeMobile(String(v ?? "")),
+    z.string().regex(MOBILE_RE, "Shipping: enter an 11-digit PH mobile number for the courier, like 09171234567"),
+  ),
+  address: z.string().trim().min(5, "Shipping: enter the house or unit no., street and barangay").max(200),
+  city: z.string().trim().min(2, "Shipping: enter the city or municipality").max(80),
+  province: z.string().trim().min(2, "Shipping: enter the province").max(80),
+  zip: z.string().trim().regex(/^\d{4}$/, "Shipping: enter the 4-digit ZIP code"),
+  courier: z.enum(COURIERS, { message: "Shipping: choose LBC or J&T Express" }),
+});
