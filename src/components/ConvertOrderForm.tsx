@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { convertOrder, getConvertTargets, type ConvertContext } from "@/app/actions/admin";
+import { convertOrder, getConvertTargets, type ConvertContext, type ConvertTicket } from "@/app/actions/admin";
 import { php } from "@/lib/money";
 import { BandSwatch } from "@/components/BandSwatch";
 import { useRules } from "@/components/RulesProvider";
@@ -11,11 +11,28 @@ import { COURIERS, type Courier, type Shipping } from "@/lib/shipping";
 type Row = { holder_name: string; shirt_size: string; vehicle_plate: string; vehicle_model: string; passengers: string[] };
 const blankRow = (): Row => ({ holder_name: "", shirt_size: "", vehicle_plate: "", vehicle_model: "", passengers: [] });
 const blankShipping = (buyerName: string): Shipping => ({ name: buyerName, mobile: "", address: "", city: "", province: "", zip: "", courier: "LBC" });
+const plateKey = (p: string | null) => (p ?? "").replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+/** A car ticket's free passengers (they move with the car). */
+const passengersOf = (all: ConvertTicket[], car: ConvertTicket) =>
+  car.vehicle_plate ? all.filter((p) => p.passenger_of && plateKey(p.passenger_of) === plateKey(car.vehicle_plate)) : [];
+/** New ticket details start from the picked tickets: same holders, sizes, plates and passengers. */
+const rowsFor = (all: ConvertTicket[], picked: Set<string>): Row[] =>
+  all
+    .filter((t) => !t.passenger_of && picked.has(t.id))
+    .map((t) => ({
+      holder_name: t.holder_name ?? "",
+      shirt_size: t.shirt_size ?? "",
+      vehicle_plate: t.vehicle_plate ?? "",
+      vehicle_model: t.vehicle_model ?? "",
+      passengers: passengersOf(all, t).map((x) => x.holder_name ?? ""),
+    }));
 
 /**
- * Swap a paid order to a different ticket type without losing the order number,
- * the receipt or the payment trail. Used when a buyer changes their mind after
- * paying - the alternative is voiding and making them order again.
+ * Swap a paid order's tickets to a different ticket type without losing the order
+ * number, the receipt or the payment trail. Used when a buyer changes their mind
+ * after paying - the alternative is voiding and making them order again. Staff pick
+ * which tickets change (all of them by default); the others keep their wristband
+ * number and QR code, and the balance only counts the picked ones.
  *
  * Car labels ask for each car's plate and model and its free passengers' names;
  * labels whose shirt ships ask where to deliver it, unless the order already has
@@ -42,6 +59,7 @@ export function ConvertOrderForm({
   const [rows, setRows] = useState<Row[]>([]);
   const [showNames, setShowNames] = useState(false);
   const [shipping, setShipping] = useState<Shipping | null>(null);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
   const [editShipping, setEditShipping] = useState(false);
   const [confirm, setConfirm] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -54,6 +72,11 @@ export function ConvertOrderForm({
       if (!live) return;
       setCtx(c);
       setShipping(c.shipping);
+      // Every live ticket is picked to start with: the whole order, as before.
+      const all = new Set(c.tickets.filter((t) => !t.redeemed && !t.passenger_of).map((t) => t.id));
+      setPicked(all);
+      setQty(Math.max(1, Math.min(50, all.size)));
+      setRows(rowsFor(c.tickets, all));
     });
     return () => { live = false; };
   }, [open, ctx, orderId]);
@@ -63,10 +86,35 @@ export function ConvertOrderForm({
   const isCar = !!target?.requires_vehicle;
   const passengers = target?.included_companions ?? 0;
   const needsAddress = !!target?.ships_shirt;
+  const tickets = ctx?.tickets ?? [];
+  /** Tickets that can be picked: everything but the free passengers, which follow their car. */
+  const mains = tickets.filter((t) => !t.passenger_of);
+  const pickedMains = mains.filter((t) => picked.has(t.id));
+  const pickedAll = pickedMains.flatMap((t) => [t, ...passengersOf(tickets, t).filter((x) => !x.redeemed)]);
+  const liveCount = tickets.filter((t) => !t.redeemed).length;
+  const keptCount = liveCount - pickedAll.length;
+  /** What the picked tickets were bought for: the money this change works from. */
+  const pickedValue = ctx ? pickedAll.reduce((n, t) => n + t.price_centavos, 0) : currentTotalCentavos;
   const newTotal = target ? target.price_centavos * qty : 0;
-  const balance = currentTotalCentavos - newTotal;
-  /** How many of the chosen ticket the money already paid would cover exactly. */
-  const fits = target && target.price_centavos > 0 ? Math.floor(currentTotalCentavos / target.price_centavos) : 0;
+  const balance = pickedValue - newTotal;
+  /** How many of the chosen ticket the picked tickets' money would cover exactly. */
+  const fits = target && target.price_centavos > 0 ? Math.floor(pickedValue / target.price_centavos) : 0;
+
+  function toggle(id: string) {
+    const next = new Set(picked);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    setPicked(next);
+    setQty(Math.max(1, Math.min(50, next.size)));
+    setRows(rowsFor(tickets, next));
+    setConfirm(false);
+  }
+  function pickAll(on: boolean) {
+    const next = new Set(on ? mains.filter((t) => !t.redeemed).map((t) => t.id) : []);
+    setPicked(next);
+    setQty(Math.max(1, Math.min(50, next.size)));
+    setRows(rowsFor(tickets, next));
+    setConfirm(false);
+  }
   const tooMany = target ? qty > target.sellable : false;
 
   const rowAt = (i: number) => rows[i] ?? blankRow();
@@ -81,15 +129,7 @@ export function ConvertOrderForm({
 
   const missingPlate = isCar && Array.from({ length: qty }, (_, i) => rowAt(i).vehicle_plate.trim()).some((p) => !p);
   const shippingReady = !needsAddress || (!!shipping && !!shipping.name.trim() && !!shipping.mobile.trim() && !!shipping.address.trim() && !!shipping.city.trim() && !!shipping.province.trim() && /^\d{4}$/.test(shipping.zip.trim()));
-  const blocked = !target || tooMany || reason.trim().length < 3 || missingPlate || !shippingReady;
-
-  if (hasRedeemed) {
-    return (
-      <p className="rounded-lg border border-zinc-300 bg-zinc-50 p-3 text-xs text-zinc-700">
-        A ticket in this order was already scanned at the gate, so it can no longer be converted.
-      </p>
-    );
-  }
+  const blocked = !target || pickedMains.length === 0 || tooMany || reason.trim().length < 3 || missingPlate || !shippingReady;
 
   if (!open) {
     return (
@@ -97,6 +137,7 @@ export function ConvertOrderForm({
         <button type="button" className="btn-secondary w-full" onClick={() => setOpen(true)}>
           Change to another ticket&hellip;
         </button>
+        {hasRedeemed && <p className="text-[11px] text-zinc-500">Tickets already scanned at the gate stay as they are; the others can still be changed.</p>}
         {msg && <p className="rounded bg-zinc-100 p-2 text-xs text-zinc-900">{msg}</p>}
       </div>
     );
@@ -119,8 +160,9 @@ export function ConvertOrderForm({
         <div>
           <div className="text-xs font-semibold uppercase tracking-wide text-cyan-200">Convert this order</div>
           <p className="mt-1 text-xs text-zinc-400">
-            Keeps order number and receipt. The old wristbands go back to the pool, new ones are issued, and the
-            buyer gets one email with the new PDF. Any difference in price is left as a balance to settle by hand.
+            Pick the tickets that change; the others keep their wristband number and QR code. Keeps the order number
+            and receipt. The picked tickets&apos; bands go back to the pool, new ones are issued, and the buyer gets one
+            email with the updated PDF. Any difference in price is left as a balance to settle by hand.
           </p>
         </div>
         <button type="button" className="text-xs text-zinc-400 hover:text-zinc-200" onClick={() => setOpen(false)}>Close</button>
@@ -128,8 +170,45 @@ export function ConvertOrderForm({
 
       {targets === null ? (
         <p className="text-xs text-zinc-500">Loading ticket types&hellip;</p>
+      ) : liveCount === 0 ? (
+        <p className="text-xs text-zinc-400">Every ticket in this order was already scanned at the gate, so there is nothing left to change.</p>
       ) : (
         <>
+          <div>
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="label">Tickets to change</span>
+              <span className="text-[11px] text-zinc-500">
+                {pickedAll.length} of {liveCount}
+                {pickedMains.length < mains.filter((t) => !t.redeemed).length
+                  ? <button type="button" className="ml-2 text-cyan-300 hover:underline" onClick={() => pickAll(true)}>All</button>
+                  : <button type="button" className="ml-2 text-cyan-300 hover:underline" onClick={() => pickAll(false)}>None</button>}
+              </span>
+            </div>
+            <ul className="mt-1 space-y-1">
+              {mains.map((t) => {
+                const on = picked.has(t.id);
+                const riders = passengersOf(tickets, t);
+                return (
+                  <li key={t.id}>
+                    <label className={`flex items-center gap-2 rounded-lg border px-2 py-1.5 text-sm ${t.redeemed ? "border-white/5 opacity-50" : on ? "cursor-pointer border-cyan-300/50 bg-cyan-300/10" : "cursor-pointer border-white/10"}`}>
+                      <input type="checkbox" className="h-4 w-4 accent-cyan-400" checked={on} disabled={t.redeemed} onChange={() => toggle(t.id)} aria-label={`Change ticket ${t.number}`} />
+                      <span className="shrink-0 rounded bg-white/10 px-1 text-[11px] font-black">{t.code}</span>
+                      <span className="shrink-0 font-mono text-xs">{t.number}</span>
+                      <span className="min-w-0 flex-1 truncate">{t.holder_name}{t.vehicle_plate && !t.passenger_of ? <span className="text-zinc-500"> &middot; {t.vehicle_plate}</span> : null}</span>
+                      <span className="shrink-0 text-xs text-zinc-400">{t.redeemed ? "scanned" : php(t.price_centavos)}</span>
+                    </label>
+                    {riders.map((x) => (
+                      <div key={x.id} className="ml-8 mt-0.5 text-[11px] text-zinc-500">
+                        + {x.number} free passenger{x.holder_name ? <> &middot; {x.holder_name}</> : null}{x.redeemed ? " (scanned, stays)" : " (moves with the car)"}
+                      </div>
+                    ))}
+                  </li>
+                );
+              })}
+            </ul>
+            {pickedMains.length === 0 && <p className="mt-1 text-xs text-amber-300">Pick at least one ticket to change.</p>}
+          </div>
+
           <div>
             <label className="label" htmlFor={`convert-type-${orderId}`}>New ticket</label>
             <select
@@ -149,7 +228,7 @@ export function ConvertOrderForm({
               <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-zinc-400">
                 <BandSwatch color={target.band_color} size={10} label={false} /> {target.band_color} wristband
                 {target.shares_stack_with && <> &middot; same bands as {target.shares_stack_with}</>}
-                {fits > 0 && <> &middot; {php(currentTotalCentavos)} covers <b>{fits}</b> of these</>}
+                {fits > 0 && <> &middot; {php(pickedValue)} covers <b>{fits}</b> of these</>}
               </p>
             )}
             {target?.drifter_family && (
@@ -174,7 +253,7 @@ export function ConvertOrderForm({
               <button type="button" className="btn-secondary h-10 w-10 text-lg font-black" disabled={qty >= 50} onClick={() => { setQty((q) => Math.min(50, q + 1)); setConfirm(false); }} aria-label="One more">+</button>
               {fits > 1 && fits !== qty && (
                 <button type="button" className="text-xs text-cyan-300 hover:underline" onClick={() => { setQty(Math.min(50, fits)); setConfirm(false); }}>
-                  use all {php(currentTotalCentavos)} ({fits})
+                  use all {php(pickedValue)} ({fits})
                 </button>
               )}
             </div>
@@ -184,7 +263,7 @@ export function ConvertOrderForm({
 
           {target && (
             <dl className="grid grid-cols-3 gap-2 rounded-lg bg-black/30 p-2 text-center text-xs">
-              <div><dt className="text-zinc-500">Paid</dt><dd className="text-sm font-bold">{php(currentTotalCentavos)}</dd></div>
+              <div><dt className="text-zinc-500">{keptCount > 0 ? "Paid for these" : "Paid"}</dt><dd className="text-sm font-bold">{php(pickedValue)}</dd></div>
               <div><dt className="text-zinc-500">New total</dt><dd className="text-sm font-bold">{php(newTotal)}</dd></div>
               <div>
                 <dt className="text-zinc-500">{balance >= 0 ? "To refund" : "To collect"}</dt>
@@ -295,7 +374,11 @@ export function ConvertOrderForm({
           {!confirm ? (
             <>
               <button type="button" className="btn-primary w-full" disabled={pending || blocked} onClick={() => setConfirm(true)}>
-                {target ? <>Convert to {qty} &times; {target.name}&hellip;</> : <>Choose a ticket type first</>}
+                {!target
+                  ? <>Choose a ticket type first</>
+                  : keptCount > 0
+                    ? <>Change {pickedAll.length} ticket{pickedAll.length === 1 ? "" : "s"} to {qty} &times; {target.name}&hellip;</>
+                    : <>Convert to {qty} &times; {target.name}&hellip;</>}
               </button>
               {target && missingPlate && <p className="text-xs text-amber-300">Enter a plate number for every car.</p>}
               {target && !missingPlate && !shippingReady && <p className="text-xs text-amber-300">Enter the full delivery address (4-digit ZIP).</p>}
@@ -303,7 +386,9 @@ export function ConvertOrderForm({
           ) : (
             <div className="space-y-2">
               <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-amber-200">
-                The wristband numbers on this order stop working immediately and the buyer is emailed.
+                {keptCount > 0
+                  ? <>The wristband number{pickedAll.length === 1 ? "" : "s"} of the {pickedAll.length} picked ticket{pickedAll.length === 1 ? "" : "s"} stop working immediately; the other {keptCount} stay as they are. The buyer is emailed.</>
+                  : <>The wristband numbers on this order stop working immediately and the buyer is emailed.</>}
                 {balance > 0 && <> You will still owe them <b>{php(balance)}</b>.</>}
                 {balance < 0 && <> They will still owe <b>{php(-balance)}</b>.</>}
               </p>
@@ -320,9 +405,10 @@ export function ConvertOrderForm({
                         ticketTypeId: typeId,
                         qty,
                         reason,
+                        ticketIds: pickedMains.map((t) => t.id),
                         attendees: Array.from({ length: qty }, (_, i) => rowAt(i)).map((n) => ({
                           holder_name: n.holder_name.trim() || undefined,
-                          shirt_size: n.shirt_size.trim() || undefined,
+                          shirt_size: target?.includes_shirt ? n.shirt_size.trim() || undefined : undefined,
                           vehicle_plate: isCar ? n.vehicle_plate.trim() || undefined : undefined,
                           vehicle_model: isCar ? n.vehicle_model.trim() || undefined : undefined,
                           passengers: isCar ? Array.from({ length: passengers }, (_, k) => (n.passengers[k] ?? "").trim()) : undefined,

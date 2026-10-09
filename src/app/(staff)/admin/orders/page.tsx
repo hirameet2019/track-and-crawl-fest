@@ -96,7 +96,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
     admin.from("v_order_void_deductions").select("order_id, void_centavos"),
     // With the wristband filter: that label's voided tickets, netted against its own lines below.
     type
-      ? admin.from("tickets").select("order_id, included").eq("ticket_type_id", type).eq("status", "void")
+      ? admin.from("tickets").select("order_id, included").eq("ticket_type_id", type).eq("status", "void").not("ticket_number_id", "is", null)
       : Promise.resolve({ data: [] as { order_id: string; included: boolean }[] }),
   ]);
 

@@ -69,7 +69,7 @@ export async function deliverOrder(orderId: string) {
  */
 export async function deliverConversion(
   orderId: string,
-  opts: { from: { number: string; type: string }[]; reason: string; balanceCentavos: number },
+  opts: { from: { number: string; type: string }[]; reason: string; balanceCentavos: number; kept?: number },
 ) {
   const admin = createAdminClient();
   const bundle = await getOrderBundle(orderId);

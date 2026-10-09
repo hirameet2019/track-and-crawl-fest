@@ -297,9 +297,12 @@ export async function sendRejectionEmail(b: OrderBundle, reason: string) {
 export async function sendConvertedEmail(
   b: OrderBundle,
   pdf: Uint8Array,
-  opts: { from: { number: string; type: string }[]; reason: string; balanceCentavos: number },
+  opts: { from: { number: string; type: string }[]; reason: string; balanceCentavos: number; kept?: number },
 ) {
   if (!b.order.buyer_email) return { ok: false, reason: "no email" as const };
+  // A partial change leaves the buyer's other tickets as they were.
+  const kept = opts.kept ?? 0;
+  const many = opts.from.length !== 1;
   const oldRows = opts.from.map((t) => `<li>${t.type} &middot; <b>${t.number}</b></li>`).join("");
   const newRows = b.tickets
     .filter((t) => t.status !== "void")
@@ -322,10 +325,12 @@ export async function sendConvertedEmail(
   const html = `
   <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#111">
     <h2 style="margin-bottom:4px">${b.event.name}</h2>
-    <p style="margin-top:0;color:#555">Your order <b>#${b.order.order_no}</b> has been changed to a different ticket. Your old wristband number${opts.from.length === 1 ? "" : "s"} below will <b>not</b> work at the gate any more.</p>
+    <p style="margin-top:0;color:#555">${kept
+      ? `${many ? "Some tickets" : "A ticket"} in your order <b>#${b.order.order_no}</b> ${many ? "were" : "was"} changed to a different ticket. The old wristband number${many ? "s" : ""} below will <b>not</b> work at the gate any more; your other ${kept === 1 ? "ticket stays" : `${kept} tickets stay`} as before.`
+      : `Your order <b>#${b.order.order_no}</b> has been changed to a different ticket. Your old wristband number${many ? "s" : ""} below will <b>not</b> work at the gate any more.`}</p>
     <p style="background:#f5f5f5;padding:10px;border-radius:6px"><b>Reason:</b> ${opts.reason}</p>
     ${oldRows ? `<p style="margin-bottom:4px;color:#555">No longer valid:</p><ul style="margin-top:0;color:#555">${oldRows}</ul>` : ""}
-    <p style="margin-bottom:4px"><b>Your new ticket${b.tickets.filter((t) => t.status !== "void").length === 1 ? "" : "s"}</b> &middot; new total ${php(b.order.total_centavos)}</p>
+    <p style="margin-bottom:4px"><b>${kept ? "Your tickets now" : `Your new ticket${b.tickets.filter((t) => t.status !== "void").length === 1 ? "" : "s"}`}</b> &middot; new total ${php(b.order.total_centavos)}</p>
     <table style="border-collapse:collapse;width:100%">
       <thead><tr style="text-align:left;background:#f5f5f5">
         <th style="padding:6px 10px">Ticket</th><th style="padding:6px 10px">Wristband No.</th><th style="padding:6px 10px">Holder</th>
@@ -335,7 +340,9 @@ export async function sendConvertedEmail(
     ${money}
     <p style="margin-top:20px">Show the QR code in the attached PDF at the gate. Please delete or ignore the older PDF.</p>
     <p><a href="${SITE_URL}/order/${b.order.id}" style="background:#111;color:#fff;padding:10px 16px;text-decoration:none;border-radius:6px;display:inline-block">View my tickets online</a></p>
-    <p style="color:#555;font-size:13px">Napalitan ang ticket sa order #${b.order.order_no}. Hindi na gagana ang lumang wristband number; nasa PDF na nakalakip ang bago.</p>
+    <p style="color:#555;font-size:13px">${kept
+      ? `May napalitang ticket sa order #${b.order.order_no}. Hindi na gagana ang lumang wristband number na nakalista sa itaas; pareho pa rin ang iba mong tickets. Nasa PDF na nakalakip ang lahat ng tickets mo.`
+      : `Napalitan ang ticket sa order #${b.order.order_no}. Hindi na gagana ang lumang wristband number; nasa PDF na nakalakip ang bago.`}</p>
   </div>`;
   return send({
     to: b.order.buyer_email,

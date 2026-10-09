@@ -260,10 +260,30 @@ export interface ConvertTarget {
   shares_stack_with: string | null;
 }
 
+/** A ticket of the order, so staff can pick which ones change. */
+export interface ConvertTicket {
+  id: string;
+  number: string;
+  code: string;
+  type_name: string;
+  holder_name: string | null;
+  shirt_size: string | null;
+  vehicle_plate: string | null;
+  vehicle_model: string | null;
+  /** What it was bought at: the price of its own order line (a free passenger is PHP 0). */
+  price_centavos: number;
+  /** Scanned at the gate: it stays as it is. */
+  redeemed: boolean;
+  /** A free passenger: the plate of the car it moves with. */
+  passenger_of: string | null;
+}
+
 export interface ConvertContext {
   targets: ConvertTarget[];
   /** The order's delivery address, if it already has one. */
   shipping: Shipping | null;
+  /** The order's live and scanned tickets, in issue order. */
+  tickets: ConvertTicket[];
 }
 
 /**
@@ -278,7 +298,7 @@ export async function getConvertTargets(orderId: string): Promise<ConvertContext
   await assertStaff("admin");
   const admin = createAdminClient();
   const { data: order } = await admin.from("orders").select("event_id, shipping").eq("id", orderId).maybeSingle();
-  if (!order) return { targets: [], shipping: null };
+  if (!order) return { targets: [], shipping: null, tickets: [] };
   const { data: types } = await admin
     .from("ticket_types")
     .select("id, code, name, band_color, price_centavos, includes_shirt, requires_vehicle, drifter_family, free_allowance, included_companions, ships_shirt, pool_type_id")
@@ -309,7 +329,39 @@ export async function getConvertTargets(orderId: string): Promise<ConvertContext
         shares_stack_with: t.pool_type_id ? nameOf.get(t.pool_type_id) ?? null : null,
       };
     });
-  return { targets, shipping: (order.shipping as Shipping | null) ?? null };
+
+  // Each ticket is priced from its own line, the way the database does it: the free
+  // passenger from the PHP 0 line, anything else from the priced line of its label.
+  const [{ data: tks }, { data: lines }] = await Promise.all([
+    admin
+      .from("tickets")
+      .select("id, number, status, holder_name, shirt_size, vehicle_plate, vehicle_model, companion_of, included, ticket_type_id, ticket_type:ticket_types(code, name)")
+      .eq("order_id", orderId)
+      .in("status", ["issued", "redeemed"])
+      .order("created_at")
+      .order("number"),
+    admin.from("order_items").select("id, ticket_type_id, unit_price_centavos").eq("order_id", orderId),
+  ]);
+  type Line = { id: string; ticket_type_id: string; unit_price_centavos: number };
+  const priceOf = (typeId: string, included: boolean) =>
+    ((lines ?? []) as Line[])
+      .filter((l) => l.ticket_type_id === typeId)
+      .sort((a, b) =>
+        Number((a.unit_price_centavos === 0) !== included) - Number((b.unit_price_centavos === 0) !== included)
+        || b.unit_price_centavos - a.unit_price_centavos)[0]?.unit_price_centavos ?? 0;
+  type Tk = {
+    id: string; number: string; status: string; holder_name: string | null; shirt_size: string | null; vehicle_plate: string | null;
+    vehicle_model: string | null; companion_of: string | null; included: boolean; ticket_type_id: string; ticket_type: { code: string; name: string } | null;
+  };
+  const tickets: ConvertTicket[] = ((tks ?? []) as unknown as Tk[]).map((t) => ({
+    id: t.id, number: t.number, code: t.ticket_type?.code ?? "", type_name: t.ticket_type?.name ?? "",
+    holder_name: t.holder_name, shirt_size: t.shirt_size, vehicle_plate: t.vehicle_plate, vehicle_model: t.vehicle_model,
+    price_centavos: priceOf(t.ticket_type_id, t.included),
+    redeemed: t.status === "redeemed",
+    passenger_of: t.included ? t.companion_of : null,
+  }));
+
+  return { targets, shipping: (order.shipping as Shipping | null) ?? null, tickets };
 }
 
 const convertSchema = z.object({
@@ -325,6 +377,8 @@ const convertSchema = z.object({
     passengers: z.array(z.string().trim().max(80)).max(12).optional(),
   })).max(50).optional(),
   shipping: shippingSchema.optional(),
+  /** The tickets that change; left out, every live ticket of the order does. */
+  ticketIds: z.array(z.string().uuid()).min(1, "Pick at least one ticket to change").max(100).optional(),
 });
 
 /**
@@ -369,10 +423,20 @@ export async function convertOrder(input: z.input<typeof convertSchema>): Promis
       p_reason: p.reason,
       p_tokens: Array.from({ length: bands }, newQrToken),
       p_shipping: target.ships_shirt && target.includes_shirt && p.shipping ? p.shipping : null,
+      p_ticket_ids: p.ticketIds ?? null,
     });
     if (error) return { ok: false, error: error.message };
 
-    const r = data as { type: string; qty: number; passengers?: number; old_total_centavos: number; new_total_centavos: number; balance_centavos: number };
+    const r = data as {
+      type: string; qty: number; passengers?: number; old_total_centavos: number; new_total_centavos: number; balance_centavos: number;
+      /** The tickets that changed (a car brings its free passengers along). */
+      from?: { number: string; type: string }[];
+      /** Live tickets left as they were. */
+      kept?: number;
+    };
+    const changed = r.from?.length ? r.from : from;
+    const kept = r.kept ?? 0;
+    const what = `Changed ${changed.length} ticket${changed.length === 1 ? "" : "s"} to ${r.qty} x ${r.type}${kept ? `; ${kept} kept as they were` : ""}.`;
     const money = r.balance_centavos > 0
       ? `Refund ${php(r.balance_centavos)} to the buyer.`
       : r.balance_centavos < 0
@@ -382,17 +446,17 @@ export async function convertOrder(input: z.input<typeof convertSchema>): Promis
     // A delivery problem must not look like a failed conversion: the swap is committed.
     let warning: string | undefined;
     try {
-      const sent = await deliverConversion(p.orderId, { from, reason: p.reason, balanceCentavos: r.balance_centavos });
-      if (!sent.emailed) warning = `Converted to ${r.qty} x ${r.type}. ${money} No email was sent (no address on the order).`;
+      const sent = await deliverConversion(p.orderId, { from: changed, reason: p.reason, balanceCentavos: r.balance_centavos, kept });
+      if (!sent.emailed) warning = `${what} ${money} No email was sent (no address on the order).`;
     } catch (e) {
       console.error(`[convert] delivery failed for order ${p.orderId}:`, e);
-      warning = `Converted to ${r.qty} x ${r.type}. ${money} The new ticket email could not be sent - use "Re-send ticket email".`;
+      warning = `${what} ${money} The new ticket email could not be sent - use "Re-send ticket email".`;
     }
 
     revalidatePath("/admin");
     revalidatePath("/admin/orders");
     revalidatePath(`/admin/orders/${p.orderId}`);
-    return warning ? { ok: true, warning } : { ok: true, summary: `Converted to ${r.qty} x ${r.type}. ${money}` };
+    return warning ? { ok: true, warning } : { ok: true, summary: `${what} ${money}` };
   } catch (e) {
     return fail(e);
   }
