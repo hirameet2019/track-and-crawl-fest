@@ -6,6 +6,7 @@ import { assertStaff } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getRules } from "@/lib/rules";
 import type { PaymentMethod } from "@/lib/supabase/types";
+import { gateShipsShirt, shippingSchema, type Shipping } from "@/lib/shipping";
 import type { ActionResult } from "./orders";
 
 function fail(e: unknown): ActionResult {
@@ -25,7 +26,10 @@ export interface RecordWalkinInput {
   clientRef?: string | null;
   /** GCash, Maya and GoTyme sales: the transfer's reference number. */
   paymentRef?: string | null;
+  /** Where the shirt ships, for a label whose shirt is delivered (VIP Pass). Only on a sale, not a take-back. */
+  shipping?: Shipping | null;
 }
+
 
 /**
  * Walk-in tally: +N sales at the gate (or -N to correct a mistake). A sale is one
@@ -48,6 +52,16 @@ export async function recordWalkin(input: RecordWalkinInput): Promise<ActionResu
     const clientRef = input.clientRef ? z.string().uuid().parse(input.clientRef) : null;
     const paymentRef = z.string().trim().max(60).optional().nullable().parse(input.paymentRef) || null;
     const admin = createAdminClient();
+    // A VIP Pass sold at the gate has its shirt made and delivered: no sale without an address.
+    let shipping: Shipping | null = null;
+    if (delta > 0) {
+      const { data: tt } = await admin.from("ticket_types").select("ships_shirt, includes_shirt, requires_vehicle").eq("id", ticketTypeId).maybeSingle();
+      if (tt && gateShipsShirt(tt)) {
+        const parsed = shippingSchema.safeParse(input.shipping ?? {});
+        if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Enter where the shirt ships" };
+        shipping = parsed.data;
+      }
+    }
     const { data, error } = await admin.rpc("record_walkin", {
       p_ticket_type_id: ticketTypeId, p_qty: delta, p_actor: userId, p_method: method, p_shirt_size: shirtSize,
       p_holder_name: holderName, p_vehicle_plate: vehiclePlate, p_client_ref: clientRef, p_payment_ref: paymentRef,
@@ -56,6 +70,13 @@ export async function recordWalkin(input: RecordWalkinInput): Promise<ActionResu
     revalidatePath("/admin");
     revalidatePath("/admin/walkin");
     const d = data as { count: number; sale_id: string; duplicate: boolean } | null;
+    // The sale is in; the address goes onto it. A retry of the same sale writes the same address again.
+    if (shipping && d?.sale_id) {
+      const { error: shipErr } = await admin.from("walkin_sales").update({ shipping }).eq("id", d.sale_id);
+      if (shipErr) {
+        return { ok: true, count: Number(d.count ?? 0), saleId: d.sale_id, duplicate: !!d.duplicate, warning: `Recorded, but the delivery address was not saved (${shipErr.message}). Write it down and tell the organizer.` };
+      }
+    }
     return { ok: true, count: Number(d?.count ?? 0), saleId: d?.sale_id, duplicate: !!d?.duplicate };
   } catch (e) {
     return fail(e);

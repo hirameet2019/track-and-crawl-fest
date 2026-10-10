@@ -1,3 +1,4 @@
+import type { Shipping } from "@/lib/shipping";
 import { LOCALE } from "@/config/site";
 import { requireStaff } from "@/lib/auth";
 import { hasRole } from "@/lib/roles";
@@ -32,7 +33,7 @@ export default async function WalkinPage() {
     admin.from("walkin_sales").select("ticket_type_id, qty, free_qty, unit_price_centavos, payment_method").eq("event_id", event.id).is("drifter_name", null).gte("created_at", dayStart),
     admin
       .from("walkin_sales")
-      .select("id, created_at, qty, free_qty, unit_price_centavos, payment_method, payment_ref, shirt_size, holder_name, vehicle_plate, ticket_type:ticket_types(name, walkin_name, code, band_color), staff:staff(full_name)")
+      .select("id, created_at, qty, free_qty, unit_price_centavos, payment_method, payment_ref, shirt_size, holder_name, vehicle_plate, shipping, ticket_type:ticket_types(name, walkin_name, code, band_color), staff:staff(full_name)")
       .eq("event_id", event.id)
       .is("drifter_name", null)
       .order("created_at", { ascending: false })
@@ -90,7 +91,7 @@ export default async function WalkinPage() {
 
   type RecentRow = {
     id: string; created_at: string; qty: number; free_qty: number; unit_price_centavos: number; payment_method: PaymentMethod; payment_ref: string | null; shirt_size: string | null;
-    holder_name: string | null; vehicle_plate: string | null;
+    holder_name: string | null; vehicle_plate: string | null; shipping: Shipping | null;
     ticket_type: { name: string; walkin_name: string | null; code: string; band_color: string | null } | null;
     staff: { full_name: string } | null;
   };
@@ -105,6 +106,7 @@ export default async function WalkinPage() {
     shirt_size: r.shirt_size,
     holder_name: r.holder_name,
     vehicle_plate: r.vehicle_plate,
+    shipping: r.shipping ?? null,
     type_name: r.ticket_type?.walkin_name ?? r.ticket_type?.name ?? "",
     code: r.ticket_type?.code ?? "",
     band_color: r.ticket_type?.band_color ?? null,

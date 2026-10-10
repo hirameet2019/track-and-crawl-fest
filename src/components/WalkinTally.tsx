@@ -4,6 +4,7 @@ import { LOCALE } from "@/config/site";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { recordWalkin, setWalkinPrice, undoWalkinSale, type RecordWalkinInput } from "@/app/actions/walkin";
+import { COURIERS, gateShipsShirt, type Shipping } from "@/lib/shipping";
 import { php } from "@/lib/money";
 import { useRules } from "@/components/RulesProvider";
 import { staffMethods } from "@/lib/rules-types";
@@ -28,6 +29,8 @@ export interface TallyEntry {
   shirt_size: string | null;
   holder_name: string | null;
   vehicle_plate: string | null;
+  /** Where this sale's shirt ships (VIP Pass at the gate); null when the shirt was handed over. */
+  shipping: Shipping | null;
   type_name: string;
   code: string;
   band_color: string | null;
@@ -126,6 +129,8 @@ export function WalkinTally({
   const [method, setMethod] = useState<PaymentMethod>("cash");
   // The e-wallet reference for the next sale; cleared after every sale.
   const [payRef, setPayRef] = useState("");
+  // Delivery address per label whose shirt ships, typed before the sale.
+  const [shipFor, setShipFor] = useState<Record<string, Shipping>>({});
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
@@ -156,6 +161,15 @@ export function WalkinTally({
 
   const avail = (id: string) => availability.find((a) => a.ticket_type_id === id);
   const whoOf = (id: string) => whoFor[id] ?? { name: "", plate: "" };
+  const blankShip = (): Shipping => ({ name: "", mobile: "", address: "", city: "", province: "", zip: "", courier: "LBC" });
+  const shipOf = (id: string) => shipFor[id] ?? blankShip();
+  const setShip = (id: string, patch: Partial<Shipping>) => { setShipFor((cur) => ({ ...cur, [id]: { ...(cur[id] ?? blankShip()), ...patch } })); setError(null); };
+  /** The address with the recipient defaulting to the name typed for the sale. */
+  const shipFilled = (t: TicketTypeRow): Shipping => { const s = shipOf(t.id); return { ...s, name: s.name.trim() || whoOf(t.id).name.trim() }; };
+  const shipReady = (t: TicketTypeRow) => {
+    const s = shipFilled(t);
+    return s.name.length >= 2 && /^(\+?63|0)?9\d{9}$/.test(s.mobile.replace(/[\s-]/g, "")) && s.address.trim().length >= 5 && s.city.trim().length >= 2 && s.province.trim().length >= 2 && /^\d{4}$/.test(s.zip.trim());
+  };
   const setWho = (id: string, patch: Partial<{ name: string; plate: string }>) => {
     setWhoFor((cur) => ({ ...cur, [id]: { ...(cur[id] ?? { name: "", plate: "" }), ...patch } }));
     setError(null);
@@ -175,6 +189,8 @@ export function WalkinTally({
       return;
     }
     if (t.includes_shirt && !(isNamed && back) && !size) { setError(`Pick the shirt size for ${gateName(t)} first.`); return; }
+    const ships = gateShipsShirt(t) && !back;
+    if (ships && !shipReady(t)) { setError(`Enter where the ${gateName(t)} shirt ships: mobile, address, city, province and 4-digit ZIP.`); return; }
     const ewallet = !back && method !== "cash";
     if (ewallet && payRef.trim().length < 4) { setError(`Enter the ${methodLabel} reference number for this sale.`); return; }
 
@@ -183,13 +199,14 @@ export function WalkinTally({
     const whoText = car
       ? ` · ${who.plate.trim().toUpperCase()}${back ? "" : `, ${who.name.trim()}`}`
       : isNamed ? ` · ${who.name.trim()}` : "";
-    const label = `${back ? "−" : "+"}${what} · ${gateName(t)}${whoText}${size ? ` · ${size} shirt` : ""} · ${php(gatePrice(t) * n)} ${methodLabel.toUpperCase()}${ewallet ? ` ref ${payRef.trim()}` : ""}`;
+    const label = `${back ? "−" : "+"}${what} · ${gateName(t)}${whoText}${size ? ` · ${size} shirt${ships ? " (ships)" : ""}` : ""} · ${back ? "−" : ""}${php(gatePrice(t) * n)} ${methodLabel.toUpperCase()}${ewallet ? ` ref ${payRef.trim()}` : ""}`;
     send({
       t, delta, label,
       input: {
         ticketTypeId: t.id, delta, method, shirtSize: size,
         holderName: sendName ? who.name.trim() : null, vehiclePlate: car ? who.plate.trim() : null,
         paymentRef: ewallet ? payRef.trim() : null,
+        shipping: ships ? shipFilled(t) : null,
         // a fresh id per sale; a retry of this same sale sends it again
         clientRef: crypto.randomUUID(),
       },
@@ -220,6 +237,7 @@ export function WalkinTally({
         else setLast(null);
         setSizeFor((s) => ({ ...s, [t.id]: null }));
         if (t.requires_vehicle || t.gate_needs_name) setWhoFor((c) => ({ ...c, [t.id]: { name: "", plate: "" } }));
+        if (delta > 0) setShipFor((c) => ({ ...c, [t.id]: blankShip() }));
         setMethod("cash");
         setPayRef("");
       }
@@ -328,7 +346,9 @@ export function WalkinTally({
           const who = whoOf(t.id);
           const plateOk = !car || plateKey(who.plate).length >= 3;
           const nameOk = !isNamed || who.name.trim().length >= 2;
-          const canAdd = !needSize && plateOk && nameOk;
+          const ships = gateShipsShirt(t);
+          const shipOk = !ships || shipReady(t);
+          const canAdd = !needSize && plateOk && nameOk && shipOk;
           // a named sale goes back by its plate (cars) or name; other shirt labels need the size
           const canTakeBack = car ? plateOk : isNamed ? nameOk : !needSize;
           const sold = gateSales[t.id] ?? [];
@@ -411,7 +431,7 @@ export function WalkinTally({
               {/* the shirt handed over with this sale; required before + or − */}
               {t.includes_shirt && (
                 <div>
-                  <div className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Shirt size handed over</div>
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">{ships ? "Shirt size to ship" : "Shirt size handed over"}</div>
                   <div className="mt-1 flex flex-wrap gap-1" role="radiogroup" aria-label={`Shirt size for ${gateName(t)}`}>
                     {SHIRT_SIZES.map((s) => (
                       <button
@@ -426,6 +446,25 @@ export function WalkinTally({
                       </button>
                     ))}
                   </div>
+                </div>
+              )}
+
+              {/* VIP Pass: the shirt is made to order and delivered, so take the address before the sale */}
+              {ships && (
+                <div className="space-y-1.5 rounded-lg border border-violet-400/30 bg-violet-400/5 p-2">
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-violet-200">Ship the shirt to</div>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <input className="input py-1.5 text-sm" placeholder={`Recipient: ${who.name.trim() || "same as name"}`} aria-label="Shirt recipient" autoComplete="off" value={shipOf(t.id).name} onChange={(e) => setShip(t.id, { name: e.target.value })} />
+                    <input className="input py-1.5 text-sm" placeholder="Mobile 09…" aria-label="Recipient mobile" inputMode="tel" autoComplete="off" value={shipOf(t.id).mobile} onChange={(e) => setShip(t.id, { mobile: e.target.value })} />
+                    <input className="input col-span-2 py-1.5 text-sm" placeholder="House / unit no., street, barangay" aria-label="Street address" autoComplete="off" value={shipOf(t.id).address} onChange={(e) => setShip(t.id, { address: e.target.value })} />
+                    <input className="input py-1.5 text-sm" placeholder="City / municipality" aria-label="City" autoComplete="off" value={shipOf(t.id).city} onChange={(e) => setShip(t.id, { city: e.target.value })} />
+                    <input className="input py-1.5 text-sm" placeholder="Province" aria-label="Province" autoComplete="off" value={shipOf(t.id).province} onChange={(e) => setShip(t.id, { province: e.target.value })} />
+                    <input className="input py-1.5 text-sm" placeholder="ZIP" aria-label="ZIP code" inputMode="numeric" maxLength={4} autoComplete="off" value={shipOf(t.id).zip} onChange={(e) => setShip(t.id, { zip: e.target.value })} />
+                    <select className="input py-1.5 text-sm" aria-label="Courier" value={shipOf(t.id).courier} onChange={(e) => setShip(t.id, { courier: e.target.value as Shipping["courier"] })}>
+                      {COURIERS.map((c) => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <p className="text-[10px] text-zinc-500">Made to order, about two weeks, then sent by courier; the buyer pays the shipping fee. Do not hand a shirt over.</p>
                 </div>
               )}
 
@@ -454,6 +493,7 @@ export function WalkinTally({
                   {isBusy ? "…"
                     : !nameOk || !plateOk ? <span className="text-sm font-bold">{car ? <>Name &amp; plate first</> : "Name first"}</span>
                     : needSize ? <span className="text-sm font-bold">Pick a size</span>
+                    : !shipOk ? <span className="text-sm font-bold">Address first</span>
                     : perSale > 1 || car ? "+1 car" : "+1"}
                 </button>
                 {/* five at once only where every sale is the same: no package, no shirt size, no name */}
@@ -463,7 +503,7 @@ export function WalkinTally({
               </div>
               {given.length > 0 && (
                 <p className="text-xs text-zinc-500">
-                  Shirts given at the gate: {given.map(([s, n]) => `${s} ${n}`).join(" · ")}
+                  {ships ? "Shirts to ship from gate sales" : "Shirts given at the gate"}: {given.map(([s, n]) => `${s} ${n}`).join(" · ")}
                 </p>
               )}
               {/* named sales in through the gate; tapping one fills its plate or name so − takes it back */}
@@ -540,6 +580,7 @@ export function WalkinTally({
                           {e.holder_name}
                         </span>
                       )}
+                      {e.shipping && <span className="block text-[11px] text-violet-300">Shirt ships to {e.shipping.city} via {e.shipping.courier}</span>}
                     </td>
                     <td className="text-zinc-500"><BandSwatch color={e.band_color} label={false} size={10} /> {e.band_color}</td>
                     <td className="text-right">{php(sales * e.unit_price_centavos)}</td>

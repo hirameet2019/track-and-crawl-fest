@@ -29,6 +29,11 @@ export function shirtShips(type: { ships_shirt?: boolean | null } | null | undef
   return !!type?.ships_shirt && !!order?.shipping;
 }
 
+/** A gate sale of this label ships its shirt (VIP Pass), so the desk takes an address. Cars keep handing theirs over. */
+export function gateShipsShirt(t: { ships_shirt?: boolean | null; includes_shirt?: boolean | null; requires_vehicle?: boolean | null }): boolean {
+  return !!t.ships_shirt && !!t.includes_shirt && !t.requires_vehicle;
+}
+
 /** One-line address for lists, exports and the scanner. */
 export function shippingOneLine(s: Shipping): string {
   return `${s.name}, ${s.mobile} · ${s.address}, ${s.city}, ${s.province} ${s.zip} · ${s.courier}`;
