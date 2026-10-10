@@ -1,5 +1,6 @@
 /* eslint-disable react-hooks/purity -- server component: rendered once per request, Date.now() is intentional */
 import { LOCALE } from "@/config/site";
+import { fetchAll } from "@/lib/fetch-all";
 import Link from "next/link";
 import { LiveOrders } from "@/components/LiveOrders";
 import { humanMinutes } from "@/lib/elapsed";
@@ -30,10 +31,11 @@ export default async function DashboardPage() {
   const drifters = await hasDrifterLabel(event.id);
 
   const admin = createAdminClient();
-  const [availability, { data: paidOrders }, { data: walkins }, { count: queueCount }, { data: oldest }, { data: recent }, { data: voidRows }] = await Promise.all([
+  const [availability, paidOrders, walkins, { count: queueCount }, { data: oldest }, { data: recent }, { data: voidRows }] = await Promise.all([
     getAvailability(event.id),
-    admin.from("orders").select("id, total_centavos, payment_method, channel, paid_at, created_at").eq("status", "paid").eq("event_id", event.id),
-    admin.from("walkin_sales").select("qty, free_qty, drifter_name, unit_price_centavos, payment_method, created_at").eq("event_id", event.id),
+    // Paged: one request stops at 1,000 rows, and the gate passed that on event day.
+    fetchAll((from, to) => admin.from("orders").select("id, total_centavos, payment_method, channel, paid_at, created_at").eq("status", "paid").eq("event_id", event.id).order("id").range(from, to)),
+    fetchAll((from, to) => admin.from("walkin_sales").select("qty, free_qty, drifter_name, unit_price_centavos, payment_method, created_at").eq("event_id", event.id).order("id").range(from, to)),
     admin.from("orders").select("id", { count: "exact", head: true }).eq("status", "awaiting_verification"),
     admin.from("orders").select("proof_submitted_at").eq("status", "awaiting_verification").order("proof_submitted_at").limit(1).maybeSingle(),
     admin.from("orders").select("id, order_no, buyer_name, total_centavos, status, channel, created_at").order("created_at", { ascending: false }).limit(10),

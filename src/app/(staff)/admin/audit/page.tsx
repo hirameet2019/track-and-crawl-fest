@@ -1,4 +1,5 @@
 import { LOCALE } from "@/config/site";
+import { fetchAll } from "@/lib/fetch-all";
 import Link from "next/link";
 import { requireStaff } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -62,11 +63,11 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
     query = query.or([`entity_id.${like}`, `action.${like}`, `entity.${like}`, ...["reference", "reason", "email", "buyer", "method", "item", "prefix"].map((k) => `data->>${k}.${like}`)].join(","));
   }
 
-  const [{ data: rows, count }, { data: staff }, { count: today }, { data: todayRows }] = await Promise.all([
+  const [{ data: rows, count }, { data: staff }, { count: today }, todayRows] = await Promise.all([
     query,
     admin.from("staff").select("id, full_name, role").order("full_name"),
     admin.from("audit_log").select("id", { count: "exact", head: true }).gte("created_at", dayStart),
-    admin.from("audit_log").select("action").gte("created_at", dayStart),
+    fetchAll((from, to) => admin.from("audit_log").select("action").gte("created_at", dayStart).order("id").range(from, to)),
   ]);
 
   const names = new Map((staff ?? []).map((s) => [s.id, s.full_name]));

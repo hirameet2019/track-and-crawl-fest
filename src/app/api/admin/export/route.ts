@@ -1,4 +1,5 @@
 import { LOCALE } from "@/config/site";
+import { fetchAll } from "@/lib/fetch-all";
 import { shirtShips, shippingOneLine, type Shipping } from "@/lib/shipping";
 import { NextResponse, type NextRequest } from "next/server";
 import { getStaff } from "@/lib/auth";
@@ -37,12 +38,15 @@ type TallyRow = {
 
 async function tallyRows(): Promise<TallyRow[]> {
   const admin = createAdminClient();
-  const { data } = await admin
-    .from("walkin_sales")
-    .select("created_at, qty, free_qty, drifter_name, team_name, rules_ack, payment_ref, payment_confirmed, unit_price_centavos, payment_method, shirt_size, holder_name, vehicle_plate, shipping, ticket_type:ticket_types(code, name, walkin_name, band_color, drifter_family), staff:staff(full_name)")
-    .order("created_at")
-    .limit(50000);
-  return (data ?? []) as unknown as TallyRow[];
+  const data = await fetchAll((from, to) =>
+    admin
+      .from("walkin_sales")
+      .select("created_at, qty, free_qty, drifter_name, team_name, rules_ack, payment_ref, payment_confirmed, unit_price_centavos, payment_method, shirt_size, holder_name, vehicle_plate, shipping, ticket_type:ticket_types(code, name, walkin_name, band_color, drifter_family), staff:staff(full_name)")
+      .order("created_at")
+      .order("id")
+      .range(from, to),
+  );
+  return data as unknown as TallyRow[];
 }
 
 /** Bands given away inside a drifter's free allowance are never charged. */
@@ -157,8 +161,8 @@ async function drifterLinksCsv() {
 /** Audit trail, newest first. Admin only. */
 async function auditCsv() {
   const admin = createAdminClient();
-  const [{ data }, { data: staff }] = await Promise.all([
-    admin.from("audit_log").select("id, created_at, actor, action, entity, entity_id, data").order("created_at", { ascending: false }).limit(50000),
+  const [data, { data: staff }] = await Promise.all([
+    fetchAll((from, to) => admin.from("audit_log").select("id, created_at, actor, action, entity, entity_id, data").order("created_at", { ascending: false }).order("id").range(from, to)),
     admin.from("staff").select("id, full_name"),
   ]);
   const names = new Map((staff ?? []).map((s) => [s.id, s.full_name]));
@@ -211,13 +215,16 @@ export async function GET(req: NextRequest) {
   }
 
   const admin = createAdminClient();
-  const { data } = await admin
-    .from("tickets")
-    .select(
-      "number, status, holder_name, shirt_size, vehicle_plate, vehicle_model, vehicle_photo_path, companion_of, included, redeemed_at, ticket_type:ticket_types(code, name, band_color, ships_shirt), order:orders(order_no, receipt_no, status, channel, buyer_name, buyer_email, buyer_mobile, total_centavos, payment_method, payment_reference, paid_at, shipping)",
-    )
-    .order("created_at")
-    .limit(50000);
+  const data = await fetchAll((from, to) =>
+    admin
+      .from("tickets")
+      .select(
+        "number, status, holder_name, shirt_size, vehicle_plate, vehicle_model, vehicle_photo_path, companion_of, included, redeemed_at, ticket_type:ticket_types(code, name, band_color, ships_shirt), order:orders(order_no, receipt_no, status, channel, buyer_name, buyer_email, buyer_mobile, total_centavos, payment_method, payment_reference, paid_at, shipping)",
+      )
+      .order("created_at")
+      .order("id")
+      .range(from, to),
+  );
 
   type Row = {
     number: string; status: string; holder_name: string | null; shirt_size: string | null; vehicle_plate: string | null; vehicle_model: string | null; vehicle_photo_path: string | null; companion_of: string | null; included: boolean; redeemed_at: string | null;

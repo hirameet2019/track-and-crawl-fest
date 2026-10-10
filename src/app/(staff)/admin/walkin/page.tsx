@@ -1,4 +1,5 @@
 import type { Shipping } from "@/lib/shipping";
+import { fetchAll } from "@/lib/fetch-all";
 import { LOCALE } from "@/config/site";
 import { requireStaff } from "@/lib/auth";
 import { hasRole } from "@/lib/roles";
@@ -27,10 +28,10 @@ export default async function WalkinPage() {
   const isAdmin = session.staff.role === "admin";
 
   // Drifter family bands share the table but never the gate tally: they have their own tab.
-  const [types, availability, { data: todayRows }, { data: recentRows }, { data: shirtRows }, { data: carRows }] = await Promise.all([
+  const [types, availability, todayRows, { data: recentRows }, shirtRows, carRows] = await Promise.all([
     getTicketTypes(event.id),
     getAvailability(event.id),
-    admin.from("walkin_sales").select("ticket_type_id, qty, free_qty, unit_price_centavos, payment_method").eq("event_id", event.id).is("drifter_name", null).gte("created_at", dayStart),
+    fetchAll((from, to) => admin.from("walkin_sales").select("ticket_type_id, qty, free_qty, unit_price_centavos, payment_method").eq("event_id", event.id).is("drifter_name", null).gte("created_at", dayStart).order("id").range(from, to)),
     admin
       .from("walkin_sales")
       .select("id, created_at, qty, free_qty, unit_price_centavos, payment_method, payment_ref, shirt_size, holder_name, vehicle_plate, shipping, ticket_type:ticket_types(name, walkin_name, code, band_color), staff:staff(full_name)")
@@ -38,14 +39,18 @@ export default async function WalkinPage() {
       .is("drifter_name", null)
       .order("created_at", { ascending: false })
       .limit(25),
-    admin.from("walkin_sales").select("ticket_type_id, shirt_size, qty, free_qty").eq("event_id", event.id).not("shirt_size", "is", null),
-    admin
-      .from("walkin_sales")
-      .select("ticket_type_id, created_at, qty, free_qty, shirt_size, holder_name, vehicle_plate")
-      .eq("event_id", event.id)
-      .is("drifter_name", null)
-      .not("holder_name", "is", null)
-      .order("created_at"),
+    fetchAll((from, to) => admin.from("walkin_sales").select("ticket_type_id, shirt_size, qty, free_qty").eq("event_id", event.id).not("shirt_size", "is", null).order("id").range(from, to)),
+    fetchAll((from, to) =>
+      admin
+        .from("walkin_sales")
+        .select("ticket_type_id, created_at, qty, free_qty, shirt_size, holder_name, vehicle_plate")
+        .eq("event_id", event.id)
+        .is("drifter_name", null)
+        .not("holder_name", "is", null)
+        .order("created_at")
+        .order("id")
+        .range(from, to),
+    ),
   ]);
 
   // Named gate sales still in (sales minus take-backs), per label, newest first. A car

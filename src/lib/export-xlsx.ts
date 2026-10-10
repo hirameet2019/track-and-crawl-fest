@@ -1,4 +1,5 @@
 import { LOCALE } from "@/config/site";
+import { fetchAll } from "@/lib/fetch-all";
 import { shirtShips, shippingOneLine, type Shipping } from "@/lib/shipping";
 import ExcelJS from "exceljs";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -66,16 +67,19 @@ function bandBlock(ws: ExcelJS.Worksheet, t: TypeRow, hex: string) {
 
 export async function buildTicketsWorkbook(): Promise<Buffer> {
   const admin = createAdminClient();
-  const [{ data: types }, { data: tickets }, { data: walkins }, { data: avail }, { data: event }] = await Promise.all([
+  const [{ data: types }, tickets, walkins, { data: avail }, { data: event }] = await Promise.all([
     admin.from("ticket_types").select("id, code, name, band_color, price_centavos, walkin_price_centavos, sort_order, sell_online, drifter_family, ships_shirt").eq("active", true).order("sort_order"),
-    admin
-      .from("tickets")
-      .select(
-        "number, status, holder_name, shirt_size, vehicle_plate, vehicle_model, vehicle_photo_path, companion_of, included, redeemed_at, void_reason, ticket_type_id, created_at, order:orders(order_no, receipt_no, status, channel, buyer_name, buyer_email, buyer_mobile, total_centavos, payment_method, payment_reference, paid_at, shipping)",
-      )
-      .order("number")
-      .limit(50000),
-    admin.from("walkin_sales").select("created_at, qty, free_qty, drifter_name, unit_price_centavos, payment_method, payment_ref, shirt_size, holder_name, vehicle_plate, ticket_type_id, staff:staff(full_name)").order("created_at").limit(50000),
+    fetchAll((from, to) =>
+      admin
+        .from("tickets")
+        .select(
+          "number, status, holder_name, shirt_size, vehicle_plate, vehicle_model, vehicle_photo_path, companion_of, included, redeemed_at, void_reason, ticket_type_id, created_at, order:orders(order_no, receipt_no, status, channel, buyer_name, buyer_email, buyer_mobile, total_centavos, payment_method, payment_reference, paid_at, shipping)",
+        )
+        .order("number")
+        .order("id")
+        .range(from, to),
+    ),
+    fetchAll((from, to) => admin.from("walkin_sales").select("created_at, qty, free_qty, drifter_name, unit_price_centavos, payment_method, payment_ref, shirt_size, holder_name, vehicle_plate, ticket_type_id, staff:staff(full_name)").order("created_at").order("id").range(from, to)),
     admin.from("v_ticket_type_availability").select("ticket_type_id, pool_type_id, pool_total, pool_available, voided, online_sold, walkin_sold, reserved, sellable, online_revenue_centavos, walkin_revenue_centavos, redeemed"),
     admin.from("events").select("name").limit(1).maybeSingle(),
   ]);
