@@ -4,21 +4,32 @@ import { shirtShips, shippingOneLine, type Shipping } from "@/lib/shipping";
 import ExcelJS from "exceljs";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { bandHex } from "@/lib/bands";
+import { getRules } from "@/lib/rules";
 
 /**
- * Tickets workbook for the organizer: a Summary sheet, then one sheet per
- * wristband label (ticket type) in the organizer's own order. Each tab and its
+ * Tickets workbook for the organizer: a Summary sheet, a Shirts sheet (every shirt
+ * by size, then holder), then one sheet per wristband label (ticket type) in the
+ * organizer's own order. Each tab and its
  * header row take the wristband colour, so "green sheet = VIP Pass" at a
  * glance. Walk-in-only labels list their gate taps instead of tickets.
+ *
+ * Every table sits apart from the titles and labels above it (and from a totals
+ * row below) by an empty row: Excel's Sort and Filter take the block of filled
+ * cells around the selection, so a title touching the header row would be read as
+ * the header and sorted along with the data.
  */
 
-type TypeRow = { id: string; code: string; name: string; band_color: string | null; price_centavos: number; walkin_price_centavos: number | null; sort_order: number; sell_online: boolean; drifter_family: boolean; ships_shirt: boolean };
+type TypeRow = { id: string; code: string; name: string; band_color: string | null; price_centavos: number; walkin_price_centavos: number | null; sort_order: number; sell_online: boolean; drifter_family: boolean; ships_shirt: boolean; includes_shirt: boolean };
 type TicketRow = {
   number: string; status: string; holder_name: string | null; shirt_size: string | null; vehicle_plate: string | null; vehicle_model: string | null;
   vehicle_photo_path: string | null; companion_of: string | null; included: boolean; redeemed_at: string | null; void_reason: string | null; ticket_type_id: string; created_at: string;
+  /** What the gate handed over, ticked on the scanner: {"shirt": true, ...}. */
+  kit_claimed: Record<string, boolean> | null;
   order: { order_no: number; receipt_no: number | null; status: string; channel: string; buyer_name: string; buyer_email: string | null; buyer_mobile: string | null; total_centavos: number; payment_method: string | null; payment_reference: string | null; paid_at: string | null; shipping: Shipping | null } | null;
 };
-type WalkinRow = { created_at: string; qty: number; free_qty: number; drifter_name: string | null; unit_price_centavos: number; payment_method: string; payment_ref: string | null; shirt_size: string | null; holder_name: string | null; vehicle_plate: string | null; ticket_type_id: string; staff: { full_name: string } | null };
+type WalkinRow = { created_at: string; qty: number; free_qty: number; drifter_name: string | null; unit_price_centavos: number; payment_method: string; payment_ref: string | null; shirt_size: string | null; holder_name: string | null; vehicle_plate: string | null; ticket_type_id: string; staff: { full_name: string } | null;
+  /** Where the shirt of a gate VIP Pass ships (since 10 October); null: handed over or no shirt. */
+  shipping: Shipping | null };
 /** Bands inside a drifter's free allowance are handed over, not sold. */
 const tapAmount = (w: WalkinRow) => (w.qty - w.free_qty) * w.unit_price_centavos;
 type AvailRow = { ticket_type_id: string; pool_type_id: string | null; pool_total: number; pool_available: number; voided: number; online_sold: number; walkin_sold: number; reserved: number; sellable: number; online_revenue_centavos: number; walkin_revenue_centavos: number; redeemed: number };
@@ -68,18 +79,18 @@ function bandBlock(ws: ExcelJS.Worksheet, t: TypeRow, hex: string) {
 export async function buildTicketsWorkbook(): Promise<Buffer> {
   const admin = createAdminClient();
   const [{ data: types }, tickets, walkins, { data: avail }, { data: event }] = await Promise.all([
-    admin.from("ticket_types").select("id, code, name, band_color, price_centavos, walkin_price_centavos, sort_order, sell_online, drifter_family, ships_shirt").eq("active", true).order("sort_order"),
+    admin.from("ticket_types").select("id, code, name, band_color, price_centavos, walkin_price_centavos, sort_order, sell_online, drifter_family, ships_shirt, includes_shirt").eq("active", true).order("sort_order"),
     fetchAll((from, to) =>
       admin
         .from("tickets")
         .select(
-          "number, status, holder_name, shirt_size, vehicle_plate, vehicle_model, vehicle_photo_path, companion_of, included, redeemed_at, void_reason, ticket_type_id, created_at, order:orders(order_no, receipt_no, status, channel, buyer_name, buyer_email, buyer_mobile, total_centavos, payment_method, payment_reference, paid_at, shipping)",
+          "number, status, holder_name, shirt_size, vehicle_plate, vehicle_model, vehicle_photo_path, companion_of, included, redeemed_at, void_reason, ticket_type_id, created_at, kit_claimed, order:orders(order_no, receipt_no, status, channel, buyer_name, buyer_email, buyer_mobile, total_centavos, payment_method, payment_reference, paid_at, shipping)",
         )
         .order("number")
         .order("id")
         .range(from, to),
     ),
-    fetchAll((from, to) => admin.from("walkin_sales").select("created_at, qty, free_qty, drifter_name, unit_price_centavos, payment_method, payment_ref, shirt_size, holder_name, vehicle_plate, ticket_type_id, staff:staff(full_name)").order("created_at").order("id").range(from, to)),
+    fetchAll((from, to) => admin.from("walkin_sales").select("created_at, qty, free_qty, drifter_name, unit_price_centavos, payment_method, payment_ref, shirt_size, holder_name, vehicle_plate, ticket_type_id, staff:staff(full_name), shipping").order("created_at").order("id").range(from, to)),
     admin.from("v_ticket_type_availability").select("ticket_type_id, pool_type_id, pool_total, pool_available, voided, online_sold, walkin_sold, reserved, sellable, online_revenue_centavos, walkin_revenue_centavos, redeemed"),
     admin.from("events").select("name").limit(1).maybeSingle(),
   ]);
@@ -94,25 +105,26 @@ export async function buildTicketsWorkbook(): Promise<Buffer> {
   wb.created = new Date();
 
   // ------------------------------------------------------------ Summary
-  const sum = wb.addWorksheet("Summary", { properties: { tabColor: { argb: "FF111111" } }, views: [{ state: "frozen", ySplit: 3 }] });
+  const sum = wb.addWorksheet("Summary", { properties: { tabColor: { argb: "FF111111" } }, views: [{ state: "frozen", ySplit: 4 }] });
   sum.mergeCells("A1:L1");
   sum.getCell("A1").value = `${event?.name ?? "Event"} - ticket export - ${new Date().toLocaleString(LOCALE.locale, { timeZone: LOCALE.timeZone })} (Manila)`;
   sum.getCell("A1").font = { bold: true, size: 13 };
   sum.getCell("A2").value = "One sheet per wristband label follows; the tab colour is the wristband colour. Amounts in PHP.";
   sum.getCell("A2").font = { italic: true, color: { argb: "FF666666" } };
   const sumHeader = ["Code", "Ticket type", "Wristband", "Price", "Pool total", "Online tickets", "Gate / family bands", "Reserved (unpaid)", "Voided", "Left to sell", "Scanned at gate", "Revenue (PHP)"];
-  sum.addRow(sumHeader);
-  styleHeader(sum, 3, "#111111", sumHeader.length);
-  for (const t of T) {
+  sum.getRow(4).values = sumHeader;
+  styleHeader(sum, 4, "#111111", sumHeader.length);
+  for (const [i, t] of T.entries()) {
     const a = availBy.get(t.id);
     const hex = bandHex(t.band_color);
     // A label on another label's stack: its pool and "left" are that stack's, so they
     // go in as text and stay out of the totals.
     const lender = a?.pool_type_id ? T.find((x) => x.id === a.pool_type_id)?.code ?? "another label" : null;
-    const r = sum.addRow([
+    const r = sum.getRow(5 + i);
+    r.values = [
       t.code, t.name, t.band_color ?? "", php(t.price_centavos), lender ? `uses ${lender} bands` : Number(a?.pool_total ?? 0), Number(a?.online_sold ?? 0), Number(a?.walkin_sold ?? 0), Number(a?.reserved ?? 0),
       Number(a?.voided ?? 0), lender ? `${Number(a?.sellable ?? 0)} (shared with ${lender})` : Number(a?.sellable ?? 0), Number(a?.redeemed ?? 0), php(Number(a?.online_revenue_centavos ?? 0) + Number(a?.walkin_revenue_centavos ?? 0)),
-    ]);
+    ];
     const argb = "FF" + hex.slice(1).toUpperCase();
     r.getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb } };
     r.getCell(1).font = { bold: true, color: { argb: fontFor(hex) } };
@@ -122,10 +134,117 @@ export async function buildTicketsWorkbook(): Promise<Buffer> {
     r.getCell(4).numFmt = "#,##0.00";
     r.getCell(12).numFmt = "#,##0.00";
   }
-  const totals = sum.addRow(["", "Total", "", "", ...[5, 6, 7, 8, 9, 10, 11, 12].map((c) => ({ formula: `SUM(${sum.getColumn(c).letter}4:${sum.getColumn(c).letter}${3 + T.length})` }))]);
+  const totals = sum.getRow(5 + T.length + 1);
+  totals.values = ["", "Total", "", "", ...[5, 6, 7, 8, 9, 10, 11, 12].map((c) => ({ formula: `SUM(${sum.getColumn(c).letter}5:${sum.getColumn(c).letter}${4 + T.length})` }))];
   totals.font = { bold: true };
   totals.getCell(12).numFmt = "#,##0.00";
   sum.columns.forEach((c, i) => { c.width = [7, 26, 20, 10, 11, 14, 14, 16, 9, 12, 15, 15][i] ?? 12; });
+
+  // ------------------------------------------------------------- Shirts
+  // Every shirt still to hand over or ship, by size (the order of the size chart in
+  // Settings) and then holder A to Z, so the hand-out table and the courier pile can
+  // be counted off in order. Online: each live ticket with a shirt (free passengers
+  // get none). Gate: sales netted per label, name and size, so a take-back cancels
+  // its sale; a VIP Pass sold at the gate ships its shirt when the sale carries an
+  // address, and the other gate shirts were handed over at the desk (counts only).
+  const sizeOrder = (await getRules()).shirtChart.map((c) => c.size.toUpperCase());
+  const sizeKey = (v: string | null) => (v ?? "").trim().toUpperCase();
+  const sizeRank = (k: string) => (k === "" ? 10_000 : sizeOrder.includes(k) ? sizeOrder.indexOf(k) : 5_000);
+  const bySize = (a: string, b: string) => sizeRank(a) - sizeRank(b) || a.localeCompare(b);
+  const typeOf = new Map(T.map((t) => [t.id, t]));
+
+  type ShirtItem = {
+    size: string; holder: string; number: string; ticket: string; sold: "Online" | "Gate"; ship: Shipping | null;
+    handed: boolean; scanned: string; orderNo: number | string; buyer: string; mobile: string;
+  };
+  const items: ShirtItem[] = allTickets
+    .filter((x) => !x.included && x.status !== "void" && typeOf.get(x.ticket_type_id)?.includes_shirt)
+    .map((x) => {
+      const t = typeOf.get(x.ticket_type_id);
+      const ship = shirtShips(t, x.order) ? x.order!.shipping : null;
+      return {
+        size: sizeKey(x.shirt_size), holder: x.holder_name ?? "", number: x.number, ticket: t?.name ?? "", sold: "Online" as const, ship,
+        handed: !!x.kit_claimed?.shirt, scanned: manila(x.redeemed_at), orderNo: x.order?.order_no ?? "", buyer: x.order?.buyer_name ?? "", mobile: x.order?.buyer_mobile ?? "",
+      };
+    });
+
+  const gateGroups = new Map<string, { t: TypeRow; holder: string; size: string; net: number; ship: Shipping | null }>();
+  for (const w of allWalkins) {
+    const t = typeOf.get(w.ticket_type_id);
+    if (!t?.includes_shirt) continue;
+    const key = `${t.id}|${(w.holder_name ?? "").trim().toLowerCase()}|${sizeKey(w.shirt_size)}`;
+    const g = gateGroups.get(key) ?? { t, holder: w.holder_name ?? "", size: sizeKey(w.shirt_size), net: 0, ship: null };
+    // One shirt per sale: the free passenger of a car package has none.
+    g.net += w.qty - w.free_qty;
+    if (w.qty > 0 && w.shipping) g.ship = w.shipping;
+    gateGroups.set(key, g);
+  }
+  let gateHanded = 0;
+  const gateHandedBySize = new Map<string, number>();
+  for (const g of gateGroups.values()) {
+    if (g.net <= 0) continue;
+    if (!g.ship) { gateHanded += g.net; gateHandedBySize.set(g.size, (gateHandedBySize.get(g.size) ?? 0) + g.net); continue; }
+    for (let i = 0; i < g.net; i++) {
+      items.push({ size: g.size, holder: g.holder, number: "", ticket: g.t.name, sold: "Gate", ship: g.ship, handed: false, scanned: "", orderNo: "", buyer: "", mobile: g.ship.mobile });
+    }
+  }
+  items.sort((a, b) => bySize(a.size, b.size) || a.holder.localeCompare(b.holder, "en", { sensitivity: "base" }) || a.number.localeCompare(b.number));
+
+  const counts = new Map<string, { event: number; ship: number; gateShip: number; gateHanded: number }>();
+  const countOf = (k: string) => counts.get(k) ?? counts.set(k, { event: 0, ship: 0, gateShip: 0, gateHanded: 0 }).get(k)!;
+  for (const x of items) countOf(x.size)[x.sold === "Gate" ? "gateShip" : x.ship ? "ship" : "event"] += 1;
+  for (const [k, n] of gateHandedBySize) countOf(k).gateHanded += n;
+  const sizesUsed = [...counts.entries()].filter(([, c]) => c.event || c.ship || c.gateShip || c.gateHanded).map(([k]) => k).sort(bySize);
+
+  const shirtHex = "#0E7490";
+  const sh = wb.addWorksheet("Shirts", { properties: { tabColor: { argb: "FF0E7490" } } });
+  sh.mergeCells("A1:F1");
+  sh.getCell("A1").value = `${event?.name ?? "Event"} - shirts by size`;
+  sh.getCell("A1").font = { bold: true, size: 13 };
+  sh.getCell("A2").value = "Every shirt to hand over or ship, by size and then holder A to Z. Free passengers have no shirt and void tickets are left out. \"Ships\" shirts go by courier to the address shown, not over the counter. Gate shirts already handed over at the desk are only counted.";
+  sh.getCell("A2").font = { italic: true, color: { argb: "FF666666" } };
+
+  const countHeader = ["Size", "Online: at the event", "Online: ships", "Gate: ships", "Gate: handed over", "Total"];
+  sh.getRow(4).values = countHeader;
+  styleHeader(sh, 4, shirtHex, countHeader.length);
+  let srow = 4;
+  for (const k of sizesUsed) {
+    srow += 1;
+    const c = counts.get(k)!;
+    sh.getRow(srow).values = [k || "(no size)", c.event, c.ship, c.gateShip, c.gateHanded, { formula: `SUM(B${srow}:E${srow})` }];
+    sh.getCell(`A${srow}`).font = { bold: true };
+  }
+  srow += 1;
+  sh.getRow(srow).values = ["Total", ...["B", "C", "D", "E", "F"].map((col) => ({ formula: sizesUsed.length ? `SUM(${col}5:${col}${srow - 1})` : "0" }))];
+  sh.getRow(srow).font = { bold: true };
+  for (let c = 1; c <= countHeader.length; c++) sh.getRow(srow).getCell(c).border = { top: { style: "thin", color: { argb: "FF444444" } } };
+
+  // The list: its label two rows up, then an empty row, then the header.
+  srow += 3;
+  sh.getCell(`A${srow}`).value = `One row per shirt to hand over or ship (${items.length})${gateHanded ? `; ${gateHanded} gate shirt(s) already handed over are not listed` : ""}`;
+  sh.getCell(`A${srow}`).font = { bold: true };
+  srow += 2;
+  const shirtHeader = ["Size", "Holder", "Wristband no.", "Ticket", "Sold", "Hand-out", "Ship to", "Shirt handed", "Scanned at gate", "Order #", "Buyer", "Mobile"];
+  sh.getRow(srow).values = shirtHeader;
+  styleHeader(sh, srow, shirtHex, shirtHeader.length);
+  const listHeaderRow = srow;
+  let lastSize: string | null = null;
+  for (const x of items) {
+    srow += 1;
+    const r = sh.getRow(srow);
+    r.values = [
+      x.size || "(no size)", x.holder, x.number, x.ticket, x.sold,
+      x.ship ? `Ships (${x.ship.courier})` : "At the event", x.ship ? shippingOneLine(x.ship) : "",
+      x.handed ? "yes" : "", x.scanned, x.orderNo, x.buyer, x.mobile,
+    ];
+    r.getCell(1).font = { bold: true };
+    // A thin rule where a new size starts, so the piles are easy to count off.
+    if (lastSize !== null && x.size !== lastSize) for (let c = 1; c <= shirtHeader.length; c++) r.getCell(c).border = { top: { style: "thin", color: { argb: "FF888888" } } };
+    lastSize = x.size;
+  }
+  if (items.length === 0) { srow += 1; sh.getCell(`A${srow}`).value = "No shirts to hand over or ship yet."; sh.getCell(`A${srow}`).font = { italic: true, color: { argb: "FF888888" } }; }
+  sh.autoFilter = { from: { row: listHeaderRow, column: 1 }, to: { row: Math.max(listHeaderRow, srow), column: shirtHeader.length } };
+  sh.columns.forEach((c, i) => { c.width = [11, 30, 14, 26, 8, 16, 48, 12, 19, 9, 28, 14][i] ?? 12; });
 
   // ------------------------------------------------------ per label sheets
   const ticketHeader = ["Wristband no.", "Status", "Holder", "Shirt", "Plate", "Vehicle", "Car photo", "Companion of car", "Ship shirt to", "Scanned at gate", "Void reason", "Order #", "Receipt #", "Order status", "Channel", "Buyer", "Email", "Mobile", "Order total (PHP)", "Payment", "Reference", "Paid at", "Issued at"];
@@ -148,10 +267,11 @@ export async function buildTicketsWorkbook(): Promise<Buffer> {
       : `${mine.length - voidCount} valid online ticket(s)${voidCount ? ` (+${voidCount} void)` : ""}  |  ${Number(a?.walkin_sold ?? 0)} walk-in band(s)  |  ${Number(a?.sellable ?? 0)} left to sell  |  ${Number(a?.redeemed ?? 0)} scanned at gate`;
     ws.getCell("A2").font = { italic: true, color: { argb: "FF555555" } };
 
-    let row = 4;
+    // Section label two rows above its header, an empty row between (see the top of the file).
+    let row = 5;
     if (!t.drifter_family && (mine.length > 0 || t.sell_online)) {
-      ws.getCell(`A${row - 1}`).value = "Online tickets (one row per wristband)";
-      ws.getCell(`A${row - 1}`).font = { bold: true };
+      ws.getCell(`A${row - 2}`).value = "Online tickets (one row per wristband)";
+      ws.getCell(`A${row - 2}`).font = { bold: true };
       ws.getRow(row).values = ticketHeader;
       styleHeader(ws, row, hex, ticketHeader.length);
       const start = row + 1;
@@ -170,13 +290,13 @@ export async function buildTicketsWorkbook(): Promise<Buffer> {
       }
       ws.autoFilter = { from: { row: start - 1, column: 1 }, to: { row: Math.max(start - 1, row), column: ticketHeader.length } };
       ws.views = [{ state: "frozen", ySplit: start - 1 }];
-      row += 3;
+      row += 4;
     }
 
     if (t.drifter_family) {
       // Family bands are booked against a drifter's name, with the free allowance split out.
-      ws.getCell(`A${row - 1}`).value = "Drifter family bands (first bands per drifter are free)";
-      ws.getCell(`A${row - 1}`).font = { bold: true };
+      ws.getCell(`A${row - 2}`).value = "Drifter family bands (first bands per drifter are free)";
+      ws.getCell(`A${row - 2}`).font = { bold: true };
       ws.getRow(row).values = drifterHeader;
       styleHeader(ws, row, hex, drifterHeader.length);
       for (const w of taps) {
@@ -188,8 +308,8 @@ export async function buildTicketsWorkbook(): Promise<Buffer> {
       }
       if (taps.length === 0) { row += 1; ws.getCell(`A${row}`).value = "No family bands handed out yet."; ws.getCell(`A${row}`).font = { italic: true, color: { argb: "FF888888" } }; }
     } else if (taps.length > 0 || !t.sell_online) {
-      ws.getCell(`A${row - 1}`).value = "Walk-in tally at the gate (no names are collected)";
-      ws.getCell(`A${row - 1}`).font = { bold: true };
+      ws.getCell(`A${row - 2}`).value = "Walk-in tally at the gate (no names are collected)";
+      ws.getCell(`A${row - 2}`).font = { bold: true };
       ws.getRow(row).values = walkinHeader;
       styleHeader(ws, row, hex, walkinHeader.length);
       for (const w of taps) {
