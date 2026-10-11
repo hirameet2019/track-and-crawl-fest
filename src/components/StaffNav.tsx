@@ -16,6 +16,7 @@ const LINKS: { href: string; label: string; min: StaffRole; drifters?: true }[] 
   { href: "/admin/walkin", label: "Walk-in", min: "gate" },
   { href: "/admin/drifters", label: "Drifters", min: "staff", drifters: true },
   { href: "/admin/numbers", label: "Numbers", min: "admin" },
+  { href: "/admin/reports", label: "Reports", min: "admin" },
   { href: "/admin/audit", label: "Audit", min: "admin" },
   { href: "/admin/settings", label: "Settings", min: "admin" },
   { href: "/scan", label: "Scan", min: "scanner" },
