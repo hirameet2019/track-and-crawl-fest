@@ -10,7 +10,8 @@ import { neon } from "@/lib/theme";
 
 // `drifters`: shown only when the event sells drifter family bands (see the staff layout).
 // `system`: Numbers, Audit and Settings, only for an admin with system access.
-const LINKS: { href: string; label: string; min: StaffRole; drifters?: true; system?: true }[] = [
+// `scan`: hidden for an account with Scan turned off (staff.can_scan).
+const LINKS: { href: string; label: string; min: StaffRole; drifters?: true; system?: true; scan?: true }[] = [
   { href: "/admin", label: "Dashboard", min: "staff" },
   { href: "/admin/verify", label: "Verify", min: "staff" },
   { href: "/admin/orders", label: "Orders", min: "staff" },
@@ -20,10 +21,10 @@ const LINKS: { href: string; label: string; min: StaffRole; drifters?: true; sys
   { href: "/admin/reports", label: "Reports", min: "admin" },
   { href: "/admin/audit", label: "Audit", min: "admin", system: true },
   { href: "/admin/settings", label: "Settings", min: "admin", system: true },
-  { href: "/scan", label: "Scan", min: "scanner" },
+  { href: "/scan", label: "Scan", min: "scanner", scan: true },
 ];
 
-export function StaffNav({ name, role, system, eventName, drifters, logo, backdrop }: { name: string; role: StaffRole; system: boolean; eventName: string; drifters: boolean; logo: string; backdrop: string }) {
+export function StaffNav({ name, role, system, scan, eventName, drifters, logo, backdrop }: { name: string; role: StaffRole; system: boolean; scan: boolean; eventName: string; drifters: boolean; logo: string; backdrop: string }) {
   const path = usePathname();
   const router = useRouter();
   async function signOut() {
@@ -44,7 +45,7 @@ export function StaffNav({ name, role, system, eventName, drifters, logo, backdr
           <img src={logo} alt={eventName} className="h-9 w-auto sm:h-11" />
           <span className="hidden rounded border border-white/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-zinc-300 xl:inline">Staff</span>
         </Link>
-        {LINKS.filter((l) => hasRole(role, l.min) && (!l.drifters || drifters) && (!l.system || system)).map((l) => {
+        {LINKS.filter((l) => hasRole(role, l.min) && (!l.drifters || drifters) && (!l.system || system) && (!l.scan || scan)).map((l) => {
           const active = l.href === "/admin" ? path === "/admin" : path.startsWith(l.href);
           return (
             <Link prefetch={false}

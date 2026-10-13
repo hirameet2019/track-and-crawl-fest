@@ -1,8 +1,8 @@
-import { requireStaff } from "@/lib/auth";
+import { requireScan } from "@/lib/auth";
 import { Scanner } from "@/components/Scanner";
 
 export default async function ScanPage() {
-  const session = await requireStaff("scanner");
+  const session = await requireScan();
   return (
     <div className="mx-auto max-w-md">
       <h1 className="text-xl font-bold">Gate scanner</h1>

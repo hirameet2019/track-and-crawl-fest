@@ -64,6 +64,20 @@ export async function requireSystem(): Promise<StaffSession> {
   return session;
 }
 
+/** Scan: any role from scanner up, unless the account has Scan turned off (staff.can_scan). */
+export async function requireScan(): Promise<StaffSession> {
+  const session = await requireStaff("scanner");
+  if (session.staff.can_scan === false) redirect(homeFor(session.staff.role));
+  return session;
+}
+
+/** For the scan actions: throws instead of redirecting. */
+export async function assertScan(): Promise<StaffSession> {
+  const session = await assertStaff("scanner");
+  if (session.staff.can_scan === false) throw new Error("Not allowed");
+  return session;
+}
+
 /** For the actions behind Numbers, Audit and Settings: throws instead of redirecting. */
 export async function assertSystem(): Promise<StaffSession> {
   const session = await assertStaff("admin");

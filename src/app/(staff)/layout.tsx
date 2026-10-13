@@ -24,7 +24,7 @@ export default async function StaffLayout({ children }: { children: React.ReactN
         }}
         aria-hidden
       />
-      <StaffNav name={session.staff.full_name} role={session.staff.role} system={!!session.staff.system_access} eventName={event?.name ?? ""} drifters={drifters} logo={site.logo} backdrop={site.backdrop} />
+      <StaffNav name={session.staff.full_name} role={session.staff.role} system={!!session.staff.system_access} scan={session.staff.can_scan !== false} eventName={event?.name ?? ""} drifters={drifters} logo={site.logo} backdrop={site.backdrop} />
       <div className="mx-auto w-full max-w-6xl flex-1 px-4 py-6">{children}</div>
     </div>
   );

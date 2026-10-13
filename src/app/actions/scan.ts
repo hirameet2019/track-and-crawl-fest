@@ -1,6 +1,6 @@
 "use server";
 
-import { assertStaff } from "@/lib/auth";
+import { assertScan } from "@/lib/auth";
 import { shirtShips } from "@/lib/shipping";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { TicketRow, TicketTypeRow } from "@/lib/supabase/types";
@@ -68,7 +68,7 @@ async function loadTicket(ticketId: string): Promise<ScanTicket | null> {
 /** Look up without redeeming (for a confirm step). */
 export async function lookupTicket(raw: string): Promise<ScanResult> {
   try {
-    await assertStaff("scanner");
+    await assertScan();
     const admin = createAdminClient();
     const { data } = await admin.from("tickets").select("id, status").eq("qr_token", extractToken(raw)).maybeSingle();
     if (!data) return { result: "not_found" };
@@ -83,7 +83,7 @@ export async function lookupTicket(raw: string): Promise<ScanResult> {
 /** Redeem: marks the ticket used. Second scans return already_redeemed with the original time. */
 export async function redeemTicket(raw: string): Promise<ScanResult> {
   try {
-    const { userId } = await assertStaff("scanner");
+    const { userId } = await assertScan();
     const admin = createAdminClient();
     const { data, error } = await admin.rpc("redeem_ticket", { p_token: extractToken(raw), p_actor: userId });
     if (error) return { result: "error", message: error.message };
@@ -99,7 +99,7 @@ export async function redeemTicket(raw: string): Promise<ScanResult> {
 
 /** Tick off kit items handed over (shirt, lanyard, sticker, car pass). */
 export async function markKitClaimed(ticketId: string, item: string, claimed: boolean): Promise<Record<string, boolean>> {
-  const { userId } = await assertStaff("scanner");
+  const { userId } = await assertScan();
   const admin = createAdminClient();
   const { data } = await admin.from("tickets").select("kit_claimed").eq("id", ticketId).single();
   const next = { ...(data?.kit_claimed ?? {}), [item]: claimed };
@@ -129,7 +129,7 @@ export interface TicketMatch {
  * an or() string.
  */
 export async function findTickets(query: string): Promise<TicketMatch[]> {
-  await assertStaff("scanner");
+  await assertScan();
   // Strip the LIKE wildcards so a typed % or _ matches literally, not everything.
   const q = query.trim().replace(/[%_]/g, "");
   if (q.length < 2) return [];
@@ -176,7 +176,7 @@ export async function findTickets(query: string): Promise<TicketMatch[]> {
 
 /** Offline support: the scanner page caches this list and validates locally when the network is down. */
 export async function downloadTicketCache(): Promise<{ token: string; number: string; type: string; holder: string | null; status: string }[]> {
-  await assertStaff("scanner");
+  await assertScan();
   const admin = createAdminClient();
   const { data } = await admin
     .from("tickets")

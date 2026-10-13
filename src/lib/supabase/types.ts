@@ -113,6 +113,8 @@ export interface StaffRow {
   active: boolean;
   /** May open Numbers, Audit and Settings and use their actions (on top of the admin role). */
   system_access: boolean;
+  /** May open Scan and use the scan actions (false hides the Scan tab for this account). */
+  can_scan: boolean;
   created_at: string;
 }
 
