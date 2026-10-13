@@ -111,6 +111,8 @@ export interface StaffRow {
   full_name: string;
   role: StaffRole;
   active: boolean;
+  /** May open Numbers, Audit and Settings and use their actions (on top of the admin role). */
+  system_access: boolean;
   created_at: string;
 }
 

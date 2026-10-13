@@ -565,7 +565,6 @@ export function DrifterBands({
         <div className="card overflow-x-auto">
           <div className="flex items-center justify-between">
             <h2 className="font-semibold">Handed out here</h2>
-            <a href="/api/admin/export?type=drifters" className="text-xs text-cyan-300 hover:underline">Export CSV</a>
           </div>
           {drifters.length === 0 ? (
             <p className="mt-2 text-sm text-zinc-500">

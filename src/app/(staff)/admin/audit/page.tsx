@@ -1,7 +1,7 @@
 import { LOCALE } from "@/config/site";
 import { fetchAll } from "@/lib/fetch-all";
 import Link from "next/link";
-import { requireStaff } from "@/lib/auth";
+import { requireSystem } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { CATEGORY_LABEL, actionMeta, actionsInCategory, describe, type AuditCategory } from "@/lib/audit";
 
@@ -35,7 +35,7 @@ function entityHref(entity: string, id: string | null): string | null {
 }
 
 export default async function AuditPage({ searchParams }: { searchParams: Promise<{ q?: string; cat?: string; actor?: string; from?: string; to?: string; page?: string }> }) {
-  await requireStaff("admin");
+  await requireSystem();
   const sp = await searchParams;
   const q = (sp.q ?? "").trim();
   const cat = CATEGORIES.includes(sp.cat as AuditCategory) ? (sp.cat as AuditCategory) : "";
@@ -97,7 +97,6 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
           <h1 className="text-2xl font-bold">Audit log</h1>
           <p className="mt-2 text-sm text-zinc-500">Who did what, and when. Every approval, rejection, gate scan, walk-in tap, wristband import and sign-in is recorded here and cannot be edited from the app.</p>
         </div>
-        <a href="/api/admin/export?type=audit" className="btn-secondary">Export CSV</a>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">

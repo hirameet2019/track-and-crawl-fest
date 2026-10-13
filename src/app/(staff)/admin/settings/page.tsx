@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireStaff } from "@/lib/auth";
+import { requireSystem } from "@/lib/auth";
 import { getEmailSettings } from "@/lib/settings";
 import { EmailSettingsForm } from "@/components/EmailSettingsForm";
 import { SalesScheduleForm } from "@/components/SalesScheduleForm";
@@ -33,7 +33,7 @@ const TABS = [
 type TabId = (typeof TABS)[number]["id"];
 
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
-  const session = await requireStaff("admin");
+  const session = await requireSystem();
   const { tab: raw } = await searchParams;
   const tab: TabId = TABS.some((t) => t.id === raw) ? (raw as TabId) : "overview";
   const current = TABS.find((t) => t.id === tab)!;

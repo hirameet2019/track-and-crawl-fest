@@ -550,7 +550,6 @@ export function WalkinTally({
               </div>
             ))}
           </dl>
-          <a href="/api/admin/export?type=walkin" className="btn-secondary mt-4 w-full">Export walk-in tally (CSV)</a>
         </div>
         <div className="card">
           <h2 className="font-semibold">Recent entries</h2>

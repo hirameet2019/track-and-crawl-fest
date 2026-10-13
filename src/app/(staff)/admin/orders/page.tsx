@@ -181,7 +181,6 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
         <div className="flex flex-wrap items-center gap-3"><h1 className="text-2xl font-bold">Orders</h1><LiveOrders /></div>
         <div className="flex gap-2">
           <a href="/api/admin/export" className="btn-secondary" title="Excel: Summary plus one colour-coded sheet per wristband label">Export Excel</a>
-          <a href="/api/admin/export?type=csv" className="btn-secondary" title="Flat CSV, one row per ticket">CSV</a>
         </div>
       </div>
 

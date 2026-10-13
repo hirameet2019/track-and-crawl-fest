@@ -91,7 +91,7 @@ export function DrifterLinks({ entries, siteUrl, signupSlug }: { entries: Drifte
     const ok = await copy(text);
     setMsg(ok
       ? { ok: true, text: `Copied ${live.length} rows (name, team, car, link). Paste into Excel or a note.` }
-      : { ok: false, text: "Copy was blocked by the browser. Use Export CSV instead." });
+      : { ok: false, text: "Copy was blocked by the browser. Copy each link from the list below instead." });
   }
 
   const signupUrl = signupSlug ? `${siteUrl.replace(/\/$/, "")}/drifters/${signupSlug}` : null;
@@ -159,7 +159,6 @@ export function DrifterLinks({ entries, siteUrl, signupSlug }: { entries: Drifte
         {live.length > 0 && (
           <div className="flex gap-3 whitespace-nowrap text-xs">
             <button type="button" className="text-cyan-300 hover:underline" onClick={copyAll}>Copy all links</button>
-            <a href="/api/admin/export?type=drifter-links" className="text-cyan-300 hover:underline">Export CSV</a>
           </div>
         )}
       </div>

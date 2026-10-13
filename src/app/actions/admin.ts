@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { assertStaff } from "@/lib/auth";
+import { assertStaff, assertSystem } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getOrderBundle } from "@/lib/queries";
 import { audit } from "@/lib/audit";
@@ -87,7 +87,7 @@ export async function resendTickets(orderId: string): Promise<ActionResult> {
  */
 export async function setSalesCutoff(ticketTypeId: string, closeAtIso: string | null): Promise<ActionResult> {
   try {
-    const { userId } = await assertStaff("admin");
+    const { userId } = await assertSystem();
     z.string().uuid().parse(ticketTypeId);
     if (closeAtIso !== null && Number.isNaN(new Date(closeAtIso).getTime())) return { ok: false, error: "Invalid date" };
     const admin = createAdminClient();
@@ -595,7 +595,7 @@ const rangeSchema = z.object({
 
 export async function importNumberRange(formData: FormData): Promise<ActionResult & { inserted?: number }> {
   try {
-    const { userId } = await assertStaff("admin");
+    const { userId } = await assertSystem();
     const parsed = rangeSchema.safeParse(Object.fromEntries(formData));
     if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
     const { start, end } = parsed.data;
@@ -621,7 +621,7 @@ export async function importNumberRange(formData: FormData): Promise<ActionResul
 /** Import an explicit list of numbers (one per line) for non-sequential serials. */
 export async function importNumberList(formData: FormData): Promise<ActionResult & { inserted?: number }> {
   try {
-    const { userId } = await assertStaff("admin");
+    const { userId } = await assertSystem();
     const ticketTypeId = z.string().uuid().parse(formData.get("ticket_type_id"));
     const raw = String(formData.get("numbers") ?? "");
     const numbers = Array.from(new Set(raw.split(/\r?\n|,/).map((s) => s.trim()).filter(Boolean)));
@@ -649,7 +649,7 @@ export async function importNumberList(formData: FormData): Promise<ActionResult
 
 export async function voidNumber(numberId: string, reason: string): Promise<ActionResult> {
   try {
-    const { userId } = await assertStaff("admin");
+    const { userId } = await assertSystem();
     const admin = createAdminClient();
     const { error } = await admin
       .from("ticket_numbers")
@@ -672,7 +672,7 @@ export async function voidNumber(numberId: string, reason: string): Promise<Acti
  */
 export async function unvoidNumber(numberId: string): Promise<ActionResult> {
   try {
-    const { userId } = await assertStaff("admin");
+    const { userId } = await assertSystem();
     const admin = createAdminClient();
     const { data: row, error: readErr } = await admin.from("ticket_numbers").select("number, status, void_reason").eq("id", numberId).maybeSingle();
     if (readErr) return { ok: false, error: readErr.message };

@@ -200,7 +200,7 @@ export async function GET(req: NextRequest) {
     return download(await drifterLinksCsv(), "drifter-links");
   }
   if (type === "audit") {
-    if (session.staff.role !== "admin") return new NextResponse("Forbidden", { status: 403 });
+    if (session.staff.role !== "admin" || !session.staff.system_access) return new NextResponse("Forbidden", { status: 403 });
     return download(await auditCsv(), "audit-log");
   }
 

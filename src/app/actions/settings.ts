@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { assertStaff } from "@/lib/auth";
+import { assertSystem } from "@/lib/auth";
 import { sendTestEmail } from "@/lib/email";
 import { clearEmailSettings, getEmailSettings, saveEmailSettings } from "@/lib/settings";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -20,7 +20,7 @@ const schema = z.object({
 
 export async function saveEmailSettingsAction(formData: FormData): Promise<ActionResult> {
   try {
-    const { userId } = await assertStaff("admin");
+    const { userId } = await assertSystem();
     const parsed = schema.safeParse({
       smtp_host: formData.get("smtp_host") ?? "",
       smtp_port: formData.get("smtp_port") || 587,
@@ -60,7 +60,7 @@ export async function saveEmailSettingsAction(formData: FormData): Promise<Actio
 
 export async function sendTestEmailAction(to: string): Promise<ActionResult> {
   try {
-    await assertStaff("admin");
+    await assertSystem();
     const addr = z.string().trim().email().safeParse(to);
     if (!addr.success) return { ok: false, error: "Enter a valid email address" };
     const settings = await getEmailSettings();

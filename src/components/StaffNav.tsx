@@ -9,20 +9,21 @@ import type { StaffRole } from "@/lib/supabase/types";
 import { neon } from "@/lib/theme";
 
 // `drifters`: shown only when the event sells drifter family bands (see the staff layout).
-const LINKS: { href: string; label: string; min: StaffRole; drifters?: true }[] = [
+// `system`: Numbers, Audit and Settings, only for an admin with system access.
+const LINKS: { href: string; label: string; min: StaffRole; drifters?: true; system?: true }[] = [
   { href: "/admin", label: "Dashboard", min: "staff" },
   { href: "/admin/verify", label: "Verify", min: "staff" },
   { href: "/admin/orders", label: "Orders", min: "staff" },
   { href: "/admin/walkin", label: "Walk-in", min: "gate" },
   { href: "/admin/drifters", label: "Drifters", min: "staff", drifters: true },
-  { href: "/admin/numbers", label: "Numbers", min: "admin" },
+  { href: "/admin/numbers", label: "Numbers", min: "admin", system: true },
   { href: "/admin/reports", label: "Reports", min: "admin" },
-  { href: "/admin/audit", label: "Audit", min: "admin" },
-  { href: "/admin/settings", label: "Settings", min: "admin" },
+  { href: "/admin/audit", label: "Audit", min: "admin", system: true },
+  { href: "/admin/settings", label: "Settings", min: "admin", system: true },
   { href: "/scan", label: "Scan", min: "scanner" },
 ];
 
-export function StaffNav({ name, role, eventName, drifters, logo, backdrop }: { name: string; role: StaffRole; eventName: string; drifters: boolean; logo: string; backdrop: string }) {
+export function StaffNav({ name, role, system, eventName, drifters, logo, backdrop }: { name: string; role: StaffRole; system: boolean; eventName: string; drifters: boolean; logo: string; backdrop: string }) {
   const path = usePathname();
   const router = useRouter();
   async function signOut() {
@@ -43,7 +44,7 @@ export function StaffNav({ name, role, eventName, drifters, logo, backdrop }: { 
           <img src={logo} alt={eventName} className="h-9 w-auto sm:h-11" />
           <span className="hidden rounded border border-white/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-zinc-300 xl:inline">Staff</span>
         </Link>
-        {LINKS.filter((l) => hasRole(role, l.min) && (!l.drifters || drifters)).map((l) => {
+        {LINKS.filter((l) => hasRole(role, l.min) && (!l.drifters || drifters) && (!l.system || system)).map((l) => {
           const active = l.href === "/admin" ? path === "/admin" : path.startsWith(l.href);
           return (
             <Link prefetch={false}

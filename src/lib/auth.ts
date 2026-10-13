@@ -53,3 +53,20 @@ export async function assertStaff(minRole: StaffRole = "scanner"): Promise<Staff
   if (!hasRole(session.staff.role, minRole)) throw new Error("Not allowed");
   return session;
 }
+
+/**
+ * Numbers, Audit and Settings: an admin with system access (staff.system_access).
+ * The organizer's other admins keep every other admin tool.
+ */
+export async function requireSystem(): Promise<StaffSession> {
+  const session = await requireStaff("admin");
+  if (!session.staff.system_access) redirect(homeFor(session.staff.role));
+  return session;
+}
+
+/** For the actions behind Numbers, Audit and Settings: throws instead of redirecting. */
+export async function assertSystem(): Promise<StaffSession> {
+  const session = await assertStaff("admin");
+  if (!session.staff.system_access) throw new Error("Not allowed");
+  return session;
+}
