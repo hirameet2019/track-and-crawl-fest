@@ -25,7 +25,7 @@ type TicketRow = {
   vehicle_photo_path: string | null; companion_of: string | null; included: boolean; redeemed_at: string | null; void_reason: string | null; ticket_type_id: string; created_at: string;
   /** What the gate handed over, ticked on the scanner: {"shirt": true, ...}. */
   kit_claimed: Record<string, boolean> | null;
-  order: { order_no: number; receipt_no: number | null; status: string; channel: string; buyer_name: string; buyer_email: string | null; buyer_mobile: string | null; total_centavos: number; payment_method: string | null; payment_reference: string | null; paid_at: string | null; shipping: Shipping | null } | null;
+  order: { order_no: number; receipt_no: number | null; status: string; channel: string; buyer_name: string; buyer_email: string | null; buyer_mobile: string | null; total_centavos: number; payment_method: string | null; payment_reference: string | null; paid_at: string | null; shipping: Shipping | null; order_items: { ticket_type_id: string; qty: number; unit_price_centavos: number }[] } | null;
 };
 type WalkinRow = { created_at: string; qty: number; free_qty: number; drifter_name: string | null; unit_price_centavos: number; payment_method: string; payment_ref: string | null; shirt_size: string | null; holder_name: string | null; vehicle_plate: string | null; ticket_type_id: string; staff: { full_name: string } | null;
   /** Where the shirt of a gate VIP Pass ships (since 10 October); null: handed over or no shirt. */
@@ -84,7 +84,7 @@ export async function buildTicketsWorkbook(): Promise<Buffer> {
       admin
         .from("tickets")
         .select(
-          "number, status, holder_name, shirt_size, vehicle_plate, vehicle_model, vehicle_photo_path, companion_of, included, redeemed_at, void_reason, ticket_type_id, created_at, kit_claimed, order:orders(order_no, receipt_no, status, channel, buyer_name, buyer_email, buyer_mobile, total_centavos, payment_method, payment_reference, paid_at, shipping)",
+          "number, status, holder_name, shirt_size, vehicle_plate, vehicle_model, vehicle_photo_path, companion_of, included, redeemed_at, void_reason, ticket_type_id, created_at, kit_claimed, order:orders(order_no, receipt_no, status, channel, buyer_name, buyer_email, buyer_mobile, total_centavos, payment_method, payment_reference, paid_at, shipping, order_items(ticket_type_id, qty, unit_price_centavos))",
         )
         .order("number")
         .order("id")
@@ -95,7 +95,15 @@ export async function buildTicketsWorkbook(): Promise<Buffer> {
     admin.from("events").select("name").limit(1).maybeSingle(),
   ]);
 
-  const T = (types ?? []) as TypeRow[];
+  // The VIP labels (VIP Pass, VIP Car Display and their no-shirt versions) are left out
+  // of this export at the organizer's request; their data stays in the system and in the
+  // VIP contacts list. Every sheet below is built from T, so nothing VIP reaches the file.
+  const isVip = (t: { name: string }) => /^VIP\b/i.test(t.name.trim());
+  const T = ((types ?? []) as TypeRow[]).filter((t) => !isVip(t));
+  // An order that mixed VIP and other tickets shows its total without the VIP lines.
+  const vipIds = new Set(((types ?? []) as TypeRow[]).filter(isVip).map((t) => t.id));
+  const orderTotal = (o: NonNullable<TicketRow["order"]>) =>
+    o.total_centavos - (o.order_items ?? []).filter((i) => vipIds.has(i.ticket_type_id)).reduce((n, i) => n + i.qty * i.unit_price_centavos, 0);
   const allTickets = (tickets ?? []) as unknown as TicketRow[];
   const allWalkins = (walkins ?? []) as unknown as WalkinRow[];
   const availBy = new Map(((avail ?? []) as AvailRow[]).map((a) => [a.ticket_type_id, a]));
@@ -109,7 +117,7 @@ export async function buildTicketsWorkbook(): Promise<Buffer> {
   sum.mergeCells("A1:L1");
   sum.getCell("A1").value = `${event?.name ?? "Event"} - ticket export - ${new Date().toLocaleString(LOCALE.locale, { timeZone: LOCALE.timeZone })} (Manila)`;
   sum.getCell("A1").font = { bold: true, size: 13 };
-  sum.getCell("A2").value = "One sheet per wristband label follows; the tab colour is the wristband colour. Amounts in PHP.";
+  sum.getCell("A2").value = "One sheet per wristband label follows; the tab colour is the wristband colour. Amounts in PHP. VIP tickets are left out of this export; an order that also had VIP tickets shows its total without them.";
   sum.getCell("A2").font = { italic: true, color: { argb: "FF666666" } };
   const sumHeader = ["Code", "Ticket type", "Wristband", "Price", "Pool total", "Online tickets", "Gate / family bands", "Reserved (unpaid)", "Voided", "Left to sell", "Scanned at gate", "Revenue (PHP)"];
   sum.getRow(4).values = sumHeader;
@@ -196,55 +204,58 @@ export async function buildTicketsWorkbook(): Promise<Buffer> {
   for (const [k, n] of gateHandedBySize) countOf(k).gateHanded += n;
   const sizesUsed = [...counts.entries()].filter(([, c]) => c.event || c.ship || c.gateShip || c.gateHanded).map(([k]) => k).sort(bySize);
 
-  const shirtHex = "#0E7490";
-  const sh = wb.addWorksheet("Shirts", { properties: { tabColor: { argb: "FF0E7490" } } });
-  sh.mergeCells("A1:F1");
-  sh.getCell("A1").value = `${event?.name ?? "Event"} - shirts by size`;
-  sh.getCell("A1").font = { bold: true, size: 13 };
-  sh.getCell("A2").value = "Every shirt to hand over or ship, by size and then holder A to Z. Free passengers have no shirt and void tickets are left out. \"Ships\" shirts go by courier to the address shown, not over the counter. Gate shirts already handed over at the desk are only counted.";
-  sh.getCell("A2").font = { italic: true, color: { argb: "FF666666" } };
+  // Only when a label left in this file has a shirt (none does once the VIP labels are out).
+  if (items.length > 0 || gateHanded > 0) {
+    const shirtHex = "#0E7490";
+    const sh = wb.addWorksheet("Shirts", { properties: { tabColor: { argb: "FF0E7490" } } });
+    sh.mergeCells("A1:F1");
+    sh.getCell("A1").value = `${event?.name ?? "Event"} - shirts by size`;
+    sh.getCell("A1").font = { bold: true, size: 13 };
+    sh.getCell("A2").value = "Every shirt to hand over or ship, by size and then holder A to Z. Free passengers have no shirt and void tickets are left out. \"Ships\" shirts go by courier to the address shown, not over the counter. Gate shirts already handed over at the desk are only counted.";
+    sh.getCell("A2").font = { italic: true, color: { argb: "FF666666" } };
 
-  const countHeader = ["Size", "Online: at the event", "Online: ships", "Gate: ships", "Gate: handed over", "Total"];
-  sh.getRow(4).values = countHeader;
-  styleHeader(sh, 4, shirtHex, countHeader.length);
-  let srow = 4;
-  for (const k of sizesUsed) {
+    const countHeader = ["Size", "Online: at the event", "Online: ships", "Gate: ships", "Gate: handed over", "Total"];
+    sh.getRow(4).values = countHeader;
+    styleHeader(sh, 4, shirtHex, countHeader.length);
+    let srow = 4;
+    for (const k of sizesUsed) {
+      srow += 1;
+      const c = counts.get(k)!;
+      sh.getRow(srow).values = [k || "(no size)", c.event, c.ship, c.gateShip, c.gateHanded, { formula: `SUM(B${srow}:E${srow})` }];
+      sh.getCell(`A${srow}`).font = { bold: true };
+    }
     srow += 1;
-    const c = counts.get(k)!;
-    sh.getRow(srow).values = [k || "(no size)", c.event, c.ship, c.gateShip, c.gateHanded, { formula: `SUM(B${srow}:E${srow})` }];
+    sh.getRow(srow).values = ["Total", ...["B", "C", "D", "E", "F"].map((col) => ({ formula: sizesUsed.length ? `SUM(${col}5:${col}${srow - 1})` : "0" }))];
+    sh.getRow(srow).font = { bold: true };
+    for (let c = 1; c <= countHeader.length; c++) sh.getRow(srow).getCell(c).border = { top: { style: "thin", color: { argb: "FF444444" } } };
+
+    // The list: its label two rows up, then an empty row, then the header.
+    srow += 3;
+    sh.getCell(`A${srow}`).value = `One row per shirt to hand over or ship (${items.length})${gateHanded ? `; ${gateHanded} gate shirt(s) already handed over are not listed` : ""}`;
     sh.getCell(`A${srow}`).font = { bold: true };
+    srow += 2;
+    const shirtHeader = ["Size", "Holder", "Wristband no.", "Ticket", "Sold", "Hand-out", "Ship to", "Shirt handed", "Scanned at gate", "Order #", "Buyer", "Mobile"];
+    sh.getRow(srow).values = shirtHeader;
+    styleHeader(sh, srow, shirtHex, shirtHeader.length);
+    const listHeaderRow = srow;
+    let lastSize: string | null = null;
+    for (const x of items) {
+      srow += 1;
+      const r = sh.getRow(srow);
+      r.values = [
+        x.size || "(no size)", x.holder, x.number, x.ticket, x.sold,
+        x.ship ? `Ships (${x.ship.courier})` : "At the event", x.ship ? shippingOneLine(x.ship) : "",
+        x.handed ? "yes" : "", x.scanned, x.orderNo, x.buyer, x.mobile,
+      ];
+      r.getCell(1).font = { bold: true };
+      // A thin rule where a new size starts, so the piles are easy to count off.
+      if (lastSize !== null && x.size !== lastSize) for (let c = 1; c <= shirtHeader.length; c++) r.getCell(c).border = { top: { style: "thin", color: { argb: "FF888888" } } };
+      lastSize = x.size;
+    }
+    if (items.length === 0) { srow += 1; sh.getCell(`A${srow}`).value = "No shirts to hand over or ship yet."; sh.getCell(`A${srow}`).font = { italic: true, color: { argb: "FF888888" } }; }
+    sh.autoFilter = { from: { row: listHeaderRow, column: 1 }, to: { row: Math.max(listHeaderRow, srow), column: shirtHeader.length } };
+    sh.columns.forEach((c, i) => { c.width = [11, 30, 14, 26, 8, 16, 48, 12, 19, 9, 28, 14][i] ?? 12; });
   }
-  srow += 1;
-  sh.getRow(srow).values = ["Total", ...["B", "C", "D", "E", "F"].map((col) => ({ formula: sizesUsed.length ? `SUM(${col}5:${col}${srow - 1})` : "0" }))];
-  sh.getRow(srow).font = { bold: true };
-  for (let c = 1; c <= countHeader.length; c++) sh.getRow(srow).getCell(c).border = { top: { style: "thin", color: { argb: "FF444444" } } };
-
-  // The list: its label two rows up, then an empty row, then the header.
-  srow += 3;
-  sh.getCell(`A${srow}`).value = `One row per shirt to hand over or ship (${items.length})${gateHanded ? `; ${gateHanded} gate shirt(s) already handed over are not listed` : ""}`;
-  sh.getCell(`A${srow}`).font = { bold: true };
-  srow += 2;
-  const shirtHeader = ["Size", "Holder", "Wristband no.", "Ticket", "Sold", "Hand-out", "Ship to", "Shirt handed", "Scanned at gate", "Order #", "Buyer", "Mobile"];
-  sh.getRow(srow).values = shirtHeader;
-  styleHeader(sh, srow, shirtHex, shirtHeader.length);
-  const listHeaderRow = srow;
-  let lastSize: string | null = null;
-  for (const x of items) {
-    srow += 1;
-    const r = sh.getRow(srow);
-    r.values = [
-      x.size || "(no size)", x.holder, x.number, x.ticket, x.sold,
-      x.ship ? `Ships (${x.ship.courier})` : "At the event", x.ship ? shippingOneLine(x.ship) : "",
-      x.handed ? "yes" : "", x.scanned, x.orderNo, x.buyer, x.mobile,
-    ];
-    r.getCell(1).font = { bold: true };
-    // A thin rule where a new size starts, so the piles are easy to count off.
-    if (lastSize !== null && x.size !== lastSize) for (let c = 1; c <= shirtHeader.length; c++) r.getCell(c).border = { top: { style: "thin", color: { argb: "FF888888" } } };
-    lastSize = x.size;
-  }
-  if (items.length === 0) { srow += 1; sh.getCell(`A${srow}`).value = "No shirts to hand over or ship yet."; sh.getCell(`A${srow}`).font = { italic: true, color: { argb: "FF888888" } }; }
-  sh.autoFilter = { from: { row: listHeaderRow, column: 1 }, to: { row: Math.max(listHeaderRow, srow), column: shirtHeader.length } };
-  sh.columns.forEach((c, i) => { c.width = [11, 30, 14, 26, 8, 16, 48, 12, 19, 9, 28, 14][i] ?? 12; });
 
   // ------------------------------------------------------ per label sheets
   const ticketHeader = ["Wristband no.", "Status", "Holder", "Shirt", "Plate", "Vehicle", "Car photo", "Companion of car", "Ship shirt to", "Scanned at gate", "Void reason", "Order #", "Receipt #", "Order status", "Channel", "Buyer", "Email", "Mobile", "Order total (PHP)", "Payment", "Reference", "Paid at", "Issued at"];
@@ -281,7 +292,7 @@ export async function buildTicketsWorkbook(): Promise<Buffer> {
         r.values = [
           x.number, x.status, x.holder_name ?? "", x.shirt_size ?? "", x.vehicle_plate ?? "", x.vehicle_model ?? "", x.vehicle_photo_path ? "yes" : "", x.companion_of ?? "",
           !x.included && shirtShips(t, x.order) ? shippingOneLine(x.order!.shipping!) : "", manila(x.redeemed_at), x.void_reason ?? "", x.order?.order_no ?? "", x.order?.receipt_no ?? "", x.order?.status ?? "", x.order?.channel ?? "", x.order?.buyer_name ?? "",
-          x.order?.buyer_email ?? "", x.order?.buyer_mobile ?? "", php(x.order?.total_centavos), x.order?.payment_method ?? "", x.order?.payment_reference ?? "", manila(x.order?.paid_at), manila(x.created_at),
+          x.order?.buyer_email ?? "", x.order?.buyer_mobile ?? "", php(x.order ? orderTotal(x.order) : null), x.order?.payment_method ?? "", x.order?.payment_reference ?? "", manila(x.order?.paid_at), manila(x.created_at),
         ];
         r.getCell(1).font = { bold: true };
         r.getCell(19).numFmt = "#,##0.00";
