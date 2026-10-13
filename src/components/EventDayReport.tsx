@@ -2,11 +2,13 @@ import Link from "next/link";
 import { BandSwatch } from "@/components/BandSwatch";
 
 /**
- * Event-day report for the organizer: why the dashboard showed about ₱390,000 on
- * the evening of 10 October 2026 when ₱470,325 had been recorded (the 1,000-row
- * cap, fixed in 74a183f), the verified gate and online figures, and the entries
- * still to confirm. A snapshot taken on 11 October, not live: the Dashboard has
- * the live numbers. Admin only, since it names staff cash and buyers.
+ * Event-day report for the organizer: why the dashboard showed a lower total on the
+ * evening of 10 October 2026 (the 1,000-row cap, fixed in 74a183f) and the verified
+ * figures. At the organizer's request it covers general admission only: Early Bird,
+ * Early Bird Kids, Adult Walk-in and Kids Walk-in (no VIP labels, no drifter family
+ * bands). The full version is the git tag backup/reports-full-2026-10-13.
+ * A snapshot taken on 11 October, not live: the Dashboard has the live numbers.
+ * Shown on Admin > Reports only (admin role), since it names staff cash and buyers.
  */
 
 type Row = { label: string; band: string; note?: string; price: string; count: string; amount: string; kids?: boolean };
@@ -15,46 +17,28 @@ const GATE: Row[] = [
   { label: "Adult Walk-in", band: "Yellow stripes", note: "yellow stripes", price: "₱150", count: "615", amount: "₱92,250" },
   { label: "Adult Walk-in", band: "Orange stripes", note: "orange stripes", price: "₱150", count: "594", amount: "₱89,100" },
   { label: "Kids Walk-in", band: "Blue stripes", note: "blue stripes", price: "₱75", count: "199", amount: "₱14,925", kids: true },
-  { label: "VIP Pass (no shirt)", band: "Green", price: "₱500", count: "32", amount: "₱16,000" },
-  { label: "VIP Pass", band: "Green", price: "₱850", count: "9", amount: "₱7,650" },
-  { label: "VIP Car (no shirt)", band: "Red stripes", price: "₱850", count: "2", amount: "₱1,700" },
-  { label: "Drifter family bands", band: "Plain Red", note: "129 of 148 free", price: "₱150", count: "148", amount: "₱2,850" },
 ];
 
 const ONLINE: Row[] = [
   { label: "Early Bird", band: "Pink stripes", price: "₱150", count: "370", amount: "₱55,500" },
   { label: "Early Bird Kids", band: "Blue stripes", price: "₱75", count: "78", amount: "₱5,850", kids: true },
-  { label: "VIP Pass", band: "Green", price: "₱950", count: "148", amount: "₱140,600" },
-  { label: "VIP Pass (no shirt)", band: "Green", price: "₱500", count: "27", amount: "₱13,500" },
-  { label: "VIP Car Display", band: "Red stripes", note: "+12 free passengers", price: "₱1,850", count: "15 cars", amount: "₱27,750" },
-  { label: "VIP Car Display (no shirt)", band: "Red stripes", price: "₱850", count: "1 car", amount: "₱850" },
-  { label: "Drifter, Family & Friends", band: "Plain Red", price: "₱150", count: "12", amount: "₱1,800" },
 ];
 
-const STAFF: { account: string; note?: string; cash: string }[] = [
+const STAFF: { account: string; note?: string; cash: string; adjust?: boolean }[] = [
   { account: "Walk-in 1", cash: "₱98,700" },
   { account: "Walk-in 2", cash: "₱97,725" },
-  { account: "Alysa", cash: "₱23,500" },
-  { account: "Tin", note: "drifter family bands", cash: "₱1,500" },
+  { account: "Take-back on an admin account", note: "one Adult Walk-in, 8:21 AM", cash: "−₱150", adjust: true },
 ];
 
 const CONFIRM: { text: string; amount: string }[] = [
-  { text: "₱850 VIP Car (no shirt) recorded on 5 October, 11:46 PM (Alysa). A test?", amount: "₱850" },
-  { text: "Two VIP Pass gate sales for \"Cabuhat, Justin\", 10:17 and 10:20 AM. Two buyers, or a double tap?", amount: "₱1,700" },
-  {
-    text: "Two VIP Pass (no shirt) gate sales 3 seconds apart at 9:36 AM, no names recorded. Two buyers, or a double tap? Together with one Adult Walk-in taken back at 8:21 AM (−₱150), this is the ₱850 under review.",
-    amount: "₱1,000",
-  },
-  { text: "Orders #385, #403 and #426 are paid but have no payment method on record. Check against GoTyme.", amount: "₱4,375" },
-  { text: "Order #49 still owes the buyer a refund.", amount: "₱50" },
+  { text: "Orders #385 (₱225) and #403 (₱450) are paid but have no payment method on record. Check them against GoTyme.", amount: "₱675" },
 ];
 
-function Tile({ label, value, sub, tone }: { label: string; value: string; sub: string; tone: "good" | "muted" | "warn" }) {
-  const color = tone === "good" ? "text-emerald-300" : tone === "warn" ? "text-orange-300" : "text-zinc-400 line-through decoration-2";
+function Tile({ label, value, sub, good }: { label: string; value: string; sub: string; good?: boolean }) {
   return (
-    <div className={`card ${tone === "good" ? "border-emerald-400/50" : ""}`}>
-      <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{label}</div>
-      <div className={`mt-1 text-3xl font-bold tabular-nums ${color}`}>{value}</div>
+    <div className={`card ${good ? "border-emerald-400/50" : ""}`}>
+      <div className={`text-xs font-semibold uppercase tracking-wide ${good ? "text-emerald-300" : "text-zinc-500"}`}>{label}</div>
+      <div className="mt-1 text-3xl font-bold tabular-nums">{value}</div>
       <div className="text-xs text-zinc-500">{sub}</div>
     </div>
   );
@@ -98,25 +82,26 @@ export function EventDayReport() {
         <div className="text-xs font-semibold uppercase tracking-widest text-zinc-500">Report · Event day, 10 October 2026</div>
         <h1 className="mt-1 text-2xl font-bold">The ₱390K on the dashboard</h1>
         <p className="mt-2 text-zinc-300">
-          The ₱390,000 shown on the evening of 10 October was a counting error on the screen. No money is missing: every sale was recorded,
-          and the total is <b className="tabular-nums">₱470,325</b>.
+          The lower total on the dashboard that night was a counting error on the screen. No money is missing: every sale was recorded.
+          Early Bird, Early Bird Kids, Adult Walk-in and Kids Walk-in add up to <b className="tabular-nums">₱257,625</b>.
         </p>
         <p className="mt-1 text-xs text-zinc-500">
-          A snapshot prepared 11 October 2026. These figures do not update on their own; the <Link prefetch={false} href="/admin" className="underline hover:text-zinc-300">Dashboard</Link> has the live numbers.
+          Covers general admission only. The ₱390K on the dashboard counted every ticket type. A snapshot prepared 11 October 2026; these figures do not
+          update on their own, the <Link prefetch={false} href="/admin" className="underline hover:text-zinc-300">Dashboard</Link> has the live numbers.
         </p>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
-        <Tile label="Real total" value="₱470,325" sub="Online ₱245,850 + gate ₱224,475" tone="good" />
-        <Tile label="Shown last night" value="≈ ₱390,000" sub="Changed with each refresh" tone="muted" />
-        <Tile label="Not counted on screen" value="≈ ₱80,300" sub="Still recorded in the system" tone="warn" />
+        <Tile label="Total" value="₱257,625" sub="Gate + online, all recorded" good />
+        <Tile label="Gate, cash" value="₱196,275" sub="1,408 walk-in bands" />
+        <Tile label="Online, GoTyme" value="₱61,350" sub="448 tickets" />
       </div>
 
       <div className="rounded-xl border border-emerald-400/30 bg-emerald-400/10 p-4 text-sm">
         <div className="text-xs font-semibold uppercase tracking-wide text-emerald-300">Sa madaling salita</div>
         <p className="mt-1 text-zinc-200">
-          Walang nawalang pera. Kumpleto ang benta sa system: ₱470,325. Lumampas sa 1,000 ang walk-in entries noong event (1,461 lahat), pero 1,000
-          lang ang kayang bilangin ng dashboard sa isang kuha, kaya mas mababa ang lumabas. Naayos na ito bandang 8:10 PM.
+          Walang nawalang pera. Kumpleto ang benta sa system. Early Bird, Kids at Adult Walk-in: ₱257,625. Lumampas sa 1,000 ang walk-in entries noong
+          event, kaya hindi lahat nabilang ng dashboard. Naayos na ito bandang 8:10 PM.
         </p>
       </div>
 
@@ -147,12 +132,12 @@ export function EventDayReport() {
 
       <section className="space-y-2">
         <h2 className="font-semibold">Gate sales <span className="text-sm font-normal text-zinc-500">as named on the Walk-in tab · all cash</span></h2>
-        <SalesTable head={["Walk-in", "Bands"]} rows={GATE} total={{ label: "Total gate", count: "1,599", amount: "₱224,475" }} />
+        <SalesTable head={["Walk-in", "Bands"]} rows={GATE} total={{ label: "Total gate", count: "1,408", amount: "₱196,275" }} />
       </section>
 
       <section className="space-y-2">
-        <h2 className="font-semibold">Online tickets <span className="text-sm font-normal text-zinc-500">paid through GoTyme · three orders have no payment method on record</span></h2>
-        <SalesTable head={["Ticket", "Tickets"]} rows={ONLINE} total={{ label: "Total online", count: "", amount: "₱245,850" }} />
+        <h2 className="font-semibold">Online tickets <span className="text-sm font-normal text-zinc-500">paid through GoTyme · two orders have no payment method on record</span></h2>
+        <SalesTable head={["Ticket", "Tickets"]} rows={ONLINE} total={{ label: "Total online", count: "448", amount: "₱61,350" }} />
         <p className="rounded-lg border-l-4 border-sky-400 bg-sky-400/10 px-3 py-2 text-sm text-zinc-200">
           <b>Kids Walk-in and Early Bird Kids</b> use the same blue-stripes wristband. Kids Walk-in is the gate sale (199 bands, ₱14,925); Early Bird Kids is
           the online ticket (78, ₱5,850). Together: 277 kids&apos; bands, ₱20,775.
@@ -166,18 +151,16 @@ export function EventDayReport() {
             <thead className="text-left text-xs uppercase text-zinc-500"><tr><th className="py-1">Account</th><th className="text-right">Cash</th></tr></thead>
             <tbody className="tabular-nums">
               {STAFF.map((s) => (
-                <tr key={s.account} className="border-t border-white/10">
+                <tr key={s.account} className={`border-t border-white/10 ${s.adjust ? "bg-orange-400/10" : ""}`}>
                   <td className="py-2">{s.account}{s.note && <span className="ml-1 text-xs text-zinc-500">({s.note})</span>}</td>
                   <td className="text-right">{s.cash}</td>
                 </tr>
               ))}
-              <tr className="border-t-2 border-white/30 font-semibold"><td className="py-2">Staff accounts above</td><td className="text-right">₱221,425</td></tr>
-              <tr className="border-t border-white/10 bg-orange-400/10"><td className="py-2">Under review <span className="text-xs text-zinc-500">(see Please confirm)</span></td><td className="text-right">₱850</td></tr>
-              <tr className="border-t-2 border-white/30 font-semibold"><td className="py-2">Total, 10 October</td><td className="text-right">₱222,275</td></tr>
+              <tr className="border-t-2 border-white/30 font-semibold"><td className="py-2">Total, 10 October</td><td className="text-right">₱196,275</td></tr>
             </tbody>
           </table>
         </div>
-        <p className="text-xs text-zinc-500">Take-backs are already subtracted. The other ₱2,200 of the gate total was recorded before event day (₱1,350 drifter family bands on 9 October, ₱850 on 5 October).</p>
+        <p className="text-xs text-zinc-500">Take-backs are already subtracted. One yellow-stripes band was taken back on an admin account at 8:21 AM, so the total is ₱150 less than the two desks.</p>
       </section>
 
       <section className="space-y-2">
