@@ -255,6 +255,7 @@ const ticketTypeSchema = z.object({
   gate_needs_name: z.boolean(),
   includes_shirt: z.boolean(),
   ships_shirt: z.boolean(),
+  hidden_in_admin: z.boolean(),
   includes_lanyard: z.boolean(),
   includes_sticker: z.boolean(),
   includes_car_pass: z.boolean(),

@@ -30,9 +30,18 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   // Wristband filter: the labels an order can hold (sold online, or reached through a
   // converted order like Drifter Family). Gate-only labels never appear in orders.
   const event = await getActiveEvent();
-  const wristbands = event ? (await getTicketTypes(event.id)).filter((t) => t.sell_online || t.drifter_family) : [];
+  const activeTypes = event ? await getTicketTypes(event.id) : [];
+  // Labels hidden in Settings (hidden_in_admin) are left out of the list, the totals and
+  // the filter: an order shows when it holds at least one label that is not hidden, and
+  // the totals count only those labels' lines. Every order stays in the database.
+  const hiddenTypes = activeTypes.filter((t) => t.hidden_in_admin);
+  const { data: eventTypes } = event ? await admin.from("ticket_types").select("id").eq("event_id", event.id) : { data: [] as { id: string }[] };
+  const shownTypeIds = (eventTypes ?? []).map((t) => t.id as string).filter((id) => !hiddenTypes.some((h) => h.id === id));
+  const wristbands = activeTypes.filter((t) => (t.sell_online || t.drifter_family) && !t.hidden_in_admin);
   const typeRow = wristbands.find((t) => t.id === typeParam) ?? null;
   const type = typeRow?.id ?? "";
+  /** The labels whose lines are counted: the filtered one, or every label not hidden. Null: whole orders. */
+  const scopeIds = type ? [type] : hiddenTypes.length ? shownTypeIds : null;
 
   // Ticket-number search runs once and feeds both queries below.
   const s = q.trim();
@@ -54,14 +63,14 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
 
   /**
    * The search, status and wristband filters, applied identically to the list and to
-   * the totals. The wristband filter is an inner join: only orders holding that label
-   * come back, each with just its lines of that label.
+   * the totals. The label scope is an inner join: only orders holding one of those
+   * labels come back, each with just its lines of those labels.
    */
   const filtered = (columns: string) => {
-    let qb = admin.from("orders").select(type ? `${columns}, order_items!inner(ticket_type_id, qty, unit_price_centavos)` : columns);
+    let qb = admin.from("orders").select(scopeIds ? `${columns}, order_items!inner(ticket_type_id, qty, unit_price_centavos)` : columns);
     if (status) qb = qb.eq("status", status as OrderStatus);
     if (orFilter) qb = qb.or(orFilter);
-    if (type) qb = qb.eq("order_items.ticket_type_id", type);
+    if (scopeIds) qb = qb.in("order_items.ticket_type_id", scopeIds);
     return qb;
   };
 
@@ -76,8 +85,8 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   async function fetchAllForTotals() {
     const rows: {
       id: string; status: OrderStatus; total_centavos: number;
-      /** Only with the wristband filter: this order's lines of that label. */
-      order_items?: { qty: number; unit_price_centavos: number }[];
+      /** Only with a label scope: this order's lines of those labels. */
+      order_items?: { ticket_type_id: string; qty: number; unit_price_centavos: number }[];
     }[] = [];
     for (let from = 0; ; from += PAGE) {
       const { data } = await filtered("id, status, total_centavos")
@@ -94,23 +103,23 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
     listPromise,
     fetchAllForTotals(),
     admin.from("v_order_void_deductions").select("order_id, void_centavos"),
-    // With the wristband filter: that label's voided tickets, netted against its own lines below.
-    type
-      ? admin.from("tickets").select("order_id, included").eq("ticket_type_id", type).eq("status", "void").not("ticket_number_id", "is", null)
-      : Promise.resolve({ data: [] as { order_id: string; included: boolean }[] }),
+    // With a label scope: those labels' voided tickets, netted against their own lines below.
+    scopeIds
+      ? admin.from("tickets").select("order_id, included, ticket_type_id").in("ticket_type_id", scopeIds).eq("status", "void").not("ticket_number_id", "is", null)
+      : Promise.resolve({ data: [] as { order_id: string; included: boolean; ticket_type_id: string }[] }),
   ]);
 
   // A paid order with some tickets voided is worth less than its original total.
   // The dashboard nets the same way, so the two pages agree.
   const voidByOrder = new Map((voidRows ?? []).map((v) => [v.order_id as string, Number(v.void_centavos)]));
 
-  // A voided ticket of the filtered label, priced from its own line the way the
-  // database view does it: the free passenger band at PHP 0, anything else at the
-  // label's price in that order. Only orders that still hold the label count.
+  // A voided ticket of a counted label, priced from its own line the way the database
+  // view does it: the free passenger band at PHP 0, anything else at the label's price
+  // in that order. Only orders that still hold the label count.
   const linesByOrder = new Map(totalRows.map((o) => [o.id, o.order_items ?? []]));
   const typeVoidByOrder = new Map<string, { centavos: number; bands: number }>();
   for (const v of typeVoids ?? []) {
-    const lines = linesByOrder.get(v.order_id);
+    const lines = linesByOrder.get(v.order_id)?.filter((l) => l.ticket_type_id === v.ticket_type_id);
     if (!lines || lines.length === 0) continue;
     const priced = Math.max(0, ...lines.map((l) => l.unit_price_centavos));
     const hasFree = lines.some((l) => l.unit_price_centavos === 0);
@@ -127,14 +136,14 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   };
 
   /**
-   * One tile. Without a wristband filter it totals whole orders. With one it counts
-   * only that wristband (its own lines, less its own voided tickets), so the figure
-   * matches that label's revenue on the Dashboard and in the export; an order often
-   * holds other wristbands too.
+   * One tile. Without a label scope it totals whole orders. With one (a wristband
+   * filter, or labels hidden in Settings) it counts only those labels' lines, less
+   * their voided tickets, so the figure matches the Dashboard and the export; an order
+   * often holds other wristbands too.
    */
   const group = (statuses: OrderStatus[]) => {
     const rows = totalRows.filter((o) => statuses.includes(o.status));
-    if (!typeRow) {
+    if (!scopeIds) {
       const { gross, deducted } = wholeOf(rows);
       return { count: rows.length, centavos: gross - deducted, deducted, bands: 0 };
     }
@@ -160,9 +169,10 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   const filtering = Boolean(status || s || type);
   const scopeNote = typeRow
     ? `Only ${typeRow.name}, in the ${totalRows.length} order${totalRows.length === 1 ? "" : "s"} that hold it`
-    : filtering
-      ? `Across the ${totalRows.length} order${totalRows.length === 1 ? "" : "s"} matching this search`
-      : `Across all ${totalRows.length} orders`;
+    : (filtering
+        ? `Across the ${totalRows.length} order${totalRows.length === 1 ? "" : "s"} matching this search`
+        : `Across all ${totalRows.length} orders`) +
+      (hiddenTypes.length ? `. Labels hidden in Settings are left out of the list and the totals` : "");
   const truncated = (orders?.length ?? 0) >= LIST_LIMIT && totalRows.length > LIST_LIMIT;
 
   return (

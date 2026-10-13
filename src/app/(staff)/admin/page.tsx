@@ -6,7 +6,7 @@ import { LiveOrders } from "@/components/LiveOrders";
 import { humanMinutes } from "@/lib/elapsed";
 import { requireStaff } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getActiveEvent, getAvailability, hasDrifterLabel } from "@/lib/queries";
+import { getActiveEvent, getAvailability, getTicketTypes, hasDrifterLabel } from "@/lib/queries";
 import { php } from "@/lib/money";
 import { PAYMENT_CHANNELS } from "@/config/event";
 import { BandSwatch } from "@/components/BandSwatch";
@@ -31,25 +31,63 @@ export default async function DashboardPage() {
   const drifters = await hasDrifterLabel(event.id);
 
   const admin = createAdminClient();
-  const [availability, paidOrders, walkins, { count: queueCount }, { data: oldest }, { data: recent }, { data: voidRows }] = await Promise.all([
+  // Labels hidden in Settings (hidden_in_admin) are left out of every figure here; their
+  // orders and gate sales stay in the database.
+  const hidden = new Set((await getTicketTypes(event.id)).filter((t) => t.hidden_in_admin).map((t) => t.id));
+  const shownOrder = (lines: { ticket_type_id: string }[] | null | undefined) => !lines?.length || lines.some((l) => !hidden.has(l.ticket_type_id));
+  type PaidLine = { id: string; order_id: string; ticket_type_id: string; qty: number; unit_price_centavos: number; order: { payment_method: string | null; created_at: string } };
+  type VoidTicket = { order_id: string; ticket_type_id: string; included: boolean };
+  type Pending = { proof_submitted_at: string | null; order_items: { ticket_type_id: string }[] };
+  type Recent = { id: string; order_no: number; buyer_name: string; total_centavos: number; status: string; channel: string; created_at: string; order_items: { ticket_type_id: string }[] };
+  const [availabilityAll, paidLines, paidVoids, walkins, { data: pendingRows }, { data: recentRows }] = await Promise.all([
     getAvailability(event.id),
     // Paged: one request stops at 1,000 rows, and the gate passed that on event day.
-    fetchAll((from, to) => admin.from("orders").select("id, total_centavos, payment_method, channel, paid_at, created_at").eq("status", "paid").eq("event_id", event.id).order("id").range(from, to)),
-    fetchAll((from, to) => admin.from("walkin_sales").select("qty, free_qty, drifter_name, unit_price_centavos, payment_method, created_at").eq("event_id", event.id).order("id").range(from, to)),
-    admin.from("orders").select("id", { count: "exact", head: true }).eq("status", "awaiting_verification"),
-    admin.from("orders").select("proof_submitted_at").eq("status", "awaiting_verification").order("proof_submitted_at").limit(1).maybeSingle(),
-    admin.from("orders").select("id, order_no, buyer_name, total_centavos, status, channel, created_at").order("created_at", { ascending: false }).limit(10),
-    admin.from("v_order_void_deductions").select("order_id, void_tickets, void_centavos"),
+    fetchAll((from, to) =>
+      admin.from("order_items").select("id, order_id, ticket_type_id, qty, unit_price_centavos, order:orders!inner(status, event_id, payment_method, created_at)")
+        .eq("order.status", "paid").eq("order.event_id", event.id).order("id").range(from, to)).then((r) => r as unknown as PaidLine[]),
+    fetchAll((from, to) =>
+      admin.from("tickets").select("order_id, ticket_type_id, included, order:orders!inner(status, event_id)")
+        .eq("status", "void").not("ticket_number_id", "is", null).eq("order.status", "paid").eq("order.event_id", event.id).order("id").range(from, to)).then((r) => r as unknown as VoidTicket[]),
+    fetchAll((from, to) => admin.from("walkin_sales").select("ticket_type_id, qty, free_qty, drifter_name, unit_price_centavos, payment_method, created_at").eq("event_id", event.id).order("id").range(from, to)),
+    admin.from("orders").select("proof_submitted_at, order_items(ticket_type_id)").eq("status", "awaiting_verification").order("proof_submitted_at"),
+    admin.from("orders").select("id, order_no, buyer_name, total_centavos, status, channel, created_at, order_items(ticket_type_id)").order("created_at", { ascending: false }).limit(60),
   ]);
+  const availability = availabilityAll.filter((a) => !hidden.has(a.ticket_type_id));
+  const pending = ((pendingRows ?? []) as unknown as Pending[]).filter((o) => shownOrder(o.order_items));
+  const queueCount = pending.length;
+  const oldest = pending[0] ?? null;
+  const recent = ((recentRows ?? []) as unknown as Recent[]).filter((o) => shownOrder(o.order_items)).slice(0, 10);
 
+  // Each paid order is worth its lines of the labels shown here, less those labels'
+  // voided tickets, each priced from its own line the way the database views do it
+  // (the free passenger band at PHP 0). With nothing hidden this is the order total
+  // less its void deductions, as before.
+  const orderSums = new Map<string, { amount: number; voided: number; voidedTickets: number; payment_method: string | null; created_at: string }>();
+  const linesOf = new Map<string, PaidLine[]>();
+  for (const l of paidLines) {
+    if (hidden.has(l.ticket_type_id)) continue;
+    const o = orderSums.get(l.order_id) ?? { amount: 0, voided: 0, voidedTickets: 0, payment_method: l.order.payment_method, created_at: l.order.created_at };
+    o.amount += l.qty * l.unit_price_centavos;
+    orderSums.set(l.order_id, o);
+    const k = `${l.order_id}|${l.ticket_type_id}`;
+    linesOf.set(k, [...(linesOf.get(k) ?? []), l]);
+  }
+  for (const v of paidVoids) {
+    const lines = linesOf.get(`${v.order_id}|${v.ticket_type_id}`);
+    const o = orderSums.get(v.order_id);
+    if (!lines || !o) continue;
+    const line = [...lines].sort((a, b) =>
+      Number((a.unit_price_centavos === 0) !== v.included) - Number((b.unit_price_centavos === 0) !== v.included)
+      || b.unit_price_centavos - a.unit_price_centavos || a.id.localeCompare(b.id))[0];
+    o.voided += line.unit_price_centavos;
+    o.voidedTickets += 1;
+  }
   // Partially voided paid orders: count only the tickets that are still valid.
-  // (Fully voided orders are status 'voided' and are not in `paidOrders` at all.)
-  const voidByOrder = new Map<string, number>();
-  for (const v of voidRows ?? []) voidByOrder.set(v.order_id as string, Number(v.void_centavos));
-  const paid = (paidOrders ?? []).map((o) => ({ ...o, total_centavos: Math.max(0, o.total_centavos - (voidByOrder.get(o.id) ?? 0)) }));
-  const voidedCentavos = (paidOrders ?? []).reduce((s, o) => s + (voidByOrder.get(o.id) ?? 0), 0);
-  const voidedTickets = (voidRows ?? []).filter((v) => (paidOrders ?? []).some((o) => o.id === v.order_id)).reduce((s, v) => s + Number(v.void_tickets), 0);
-  const tally = walkins ?? [];
+  // (Fully voided orders are status 'voided' and are not paid at all.)
+  const paid = [...orderSums.entries()].map(([id, o]) => ({ id, total_centavos: Math.max(0, o.amount - o.voided), payment_method: o.payment_method, created_at: o.created_at }));
+  const voidedCentavos = [...orderSums.values()].reduce((s, o) => s + o.voided, 0);
+  const voidedTickets = [...orderSums.values()].reduce((s, o) => s + o.voidedTickets, 0);
+  const tally = walkins.filter((w) => !hidden.has(w.ticket_type_id));
   // Bands inside a drifter's free allowance are handed over, not sold: they count as
   // wristbands out but never as money. Gate taps and drifter hand-outs are also kept
   // apart so the organizer can see what the grid consumed.
@@ -95,7 +133,7 @@ export default async function DashboardPage() {
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
           <div className="flex flex-wrap items-center gap-3"><h1 className="text-2xl font-bold">{event.name}</h1><LiveOrders /></div>
-          <p className="text-sm text-zinc-500">Sales dashboard</p>
+          <p className="text-sm text-zinc-500">Sales dashboard{hidden.size ? ` · ${hidden.size} label${hidden.size === 1 ? "" : "s"} hidden in Settings left out of every figure` : ""}</p>
         </div>
         <div className="flex gap-2">
           <Link prefetch={false} href="/admin/walkin" className="btn-secondary">Walk-in tally</Link>

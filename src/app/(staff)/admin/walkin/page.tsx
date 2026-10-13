@@ -34,11 +34,12 @@ export default async function WalkinPage() {
     fetchAll((from, to) => admin.from("walkin_sales").select("ticket_type_id, qty, free_qty, unit_price_centavos, payment_method").eq("event_id", event.id).is("drifter_name", null).gte("created_at", dayStart).order("id").range(from, to)),
     admin
       .from("walkin_sales")
-      .select("id, created_at, qty, free_qty, unit_price_centavos, payment_method, payment_ref, shirt_size, holder_name, vehicle_plate, shipping, ticket_type:ticket_types(name, walkin_name, code, band_color), staff:staff(full_name)")
+      .select("id, created_at, qty, free_qty, unit_price_centavos, payment_method, payment_ref, shirt_size, holder_name, vehicle_plate, shipping, ticket_type_id, ticket_type:ticket_types(name, walkin_name, code, band_color), staff:staff(full_name)")
       .eq("event_id", event.id)
       .is("drifter_name", null)
       .order("created_at", { ascending: false })
-      .limit(25),
+      // More than shown: entries of labels hidden in Settings are dropped below.
+      .limit(100),
     fetchAll((from, to) => admin.from("walkin_sales").select("ticket_type_id, shirt_size, qty, free_qty").eq("event_id", event.id).not("shirt_size", "is", null).order("id").range(from, to)),
     fetchAll((from, to) =>
       admin
@@ -73,10 +74,14 @@ export default async function WalkinPage() {
   }
 
   // A sale is qty - free_qty: one band, or one car whose passenger bands are free.
-  const gateTypes = types.filter((t) => t.sell_at_gate && !t.drifter_family);
+  // Labels hidden in Settings (hidden_in_admin) get no card and stay out of today's
+  // totals and the recent entries; their sales are kept in the database.
+  const hidden = new Set(types.filter((t) => t.hidden_in_admin).map((t) => t.id));
+  const gateTypes = types.filter((t) => t.sell_at_gate && !t.drifter_family && !t.hidden_in_admin);
 
   const today: TallyToday = { byType: {}, byMethod: { cash: 0, gotyme: 0, gcash: 0, maya: 0 }, total_centavos: 0, entries: 0 };
   for (const r of todayRows ?? []) {
+    if (hidden.has(r.ticket_type_id)) continue;
     const sales = r.qty - r.free_qty;
     const amt = sales * r.unit_price_centavos;
     const t = (today.byType[r.ticket_type_id] ??= { sales: 0, centavos: 0 });
@@ -96,11 +101,11 @@ export default async function WalkinPage() {
 
   type RecentRow = {
     id: string; created_at: string; qty: number; free_qty: number; unit_price_centavos: number; payment_method: PaymentMethod; payment_ref: string | null; shirt_size: string | null;
-    holder_name: string | null; vehicle_plate: string | null; shipping: Shipping | null;
+    holder_name: string | null; vehicle_plate: string | null; shipping: Shipping | null; ticket_type_id: string;
     ticket_type: { name: string; walkin_name: string | null; code: string; band_color: string | null } | null;
     staff: { full_name: string } | null;
   };
-  const recent: TallyEntry[] = ((recentRows ?? []) as unknown as RecentRow[]).map((r) => ({
+  const recent: TallyEntry[] = ((recentRows ?? []) as unknown as RecentRow[]).filter((r) => !hidden.has(r.ticket_type_id)).slice(0, 25).map((r) => ({
     id: r.id,
     created_at: r.created_at,
     qty: r.qty,

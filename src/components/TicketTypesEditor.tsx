@@ -29,6 +29,7 @@ const toForm = (t: TicketTypeRow): TicketTypeInput => ({
   gate_needs_name: t.gate_needs_name,
   includes_shirt: t.includes_shirt,
   ships_shirt: t.ships_shirt,
+  hidden_in_admin: t.hidden_in_admin,
   includes_lanyard: t.includes_lanyard,
   includes_sticker: t.includes_sticker,
   includes_car_pass: t.includes_car_pass,
@@ -45,7 +46,7 @@ const toForm = (t: TicketTypeRow): TicketTypeInput => ({
 const blank = (sort: number): TicketTypeInput => ({
   id: null, code: "", name: "", description: "", price: 0, walkin_price: null, band_color: "",
   sell_online: true, sell_at_gate: true, walkin_name: "", gate_needs_name: false,
-  includes_shirt: false, ships_shirt: false, includes_lanyard: false, includes_sticker: false, includes_car_pass: false,
+  includes_shirt: false, ships_shirt: false, hidden_in_admin: false, includes_lanyard: false, includes_sticker: false, includes_car_pass: false,
   requires_vehicle: false, included_companions: 0, is_child: false, online_cap: null,
   drifter_family: false, free_allowance: 0, sort_order: sort, active: true,
 });
@@ -138,6 +139,7 @@ function TypeForm({ initial, stock, onDone }: { initial: TicketTypeInput; stock?
         <div className="space-y-2">
           <div className="text-sm font-semibold text-zinc-200">Special</div>
           <Check label="Needs car details" checked={f.requires_vehicle} onChange={(v) => set("requires_vehicle", v)} hint="Plate, model and car photo" />
+          <Check label="Hide from staff pages" checked={f.hidden_in_admin} onChange={(v) => set("hidden_in_admin", v)} hint="Left out of the Dashboard, Walk-in, Orders and Verify. Its orders and sales stay in the system; untick to show them again." />
           <div>
             <label className="label">Free companions per car</label>
             <input className="input h-9" type="number" min={0} max={12} value={f.included_companions} disabled={!f.requires_vehicle} onChange={(e) => set("included_companions", Number(e.target.value))} />
@@ -195,6 +197,7 @@ export function TicketTypesEditor({ types, stock }: { types: TicketTypeRow[]; st
                   <BandSwatch color={t.band_color} className="text-xs text-zinc-400" />
                   <span className="text-sm">{t.sell_online ? php(t.price_centavos) : t.sell_at_gate ? "gate only" : t.drifter_family ? "Drifters tab only" : "not on sale"}</span>
                   {!t.active && <span className="rounded-full bg-zinc-700 px-2 py-0.5 text-[11px]">hidden</span>}
+                  {t.active && t.hidden_in_admin && <span className="rounded-full bg-zinc-700 px-2 py-0.5 text-[11px]" title="Left out of the Dashboard, Walk-in, Orders and Verify">not on staff pages</span>}
                   {st && <span className="text-xs text-zinc-500">{st.shares ? `${st.sold} sold · uses the ${st.shares} wristbands` : `${st.sold} sold of ${st.pool_total} bands`}</span>}
                   <button type="button" className="btn-secondary ml-auto px-3 py-1 text-xs" disabled={open !== null} onClick={() => setOpen(t.id)}>Edit</button>
                 </div>

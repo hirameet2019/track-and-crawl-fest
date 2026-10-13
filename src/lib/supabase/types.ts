@@ -90,6 +90,8 @@ export interface TicketTypeRow {
   gate_needs_name: boolean;
   /** Online orders give a shipping address and the shirt ships instead of being handed over. */
   ships_shirt: boolean;
+  /** Left out of the Dashboard, Walk-in, Orders and Verify; its data is kept (Settings > Tickets). */
+  hidden_in_admin: boolean;
   /** Takes its wristband numbers from this ticket type's stack (VIP Pass without shirt on the VIP Pass's bands). */
   pool_type_id: string | null;
 }
