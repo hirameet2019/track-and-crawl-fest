@@ -204,14 +204,14 @@ export async function GET(req: NextRequest) {
     return download(await auditCsv(), "audit-log");
   }
 
-  // Gate cash per staff account: for the organizer's admins, like the Reports page it sits on.
+  // Walk-in cash per staff account (labels hidden in Settings left out): for the organizer's admins, like the Reports page it sits on.
   if (type === "staff") {
     if (session.staff.role !== "admin") return new NextResponse("Forbidden", { status: 403 });
     const xlsx = await buildStaffSalesWorkbook();
     return new NextResponse(new Uint8Array(xlsx), {
       headers: {
         "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "Content-Disposition": `attachment; filename="gate-sales-by-staff-${new Date().toISOString().slice(0, 10)}.xlsx"`,
+        "Content-Disposition": `attachment; filename="walk-in-sales-by-staff-${new Date().toISOString().slice(0, 10)}.xlsx"`,
         "Cache-Control": "private, no-store",
       },
     });

@@ -6,10 +6,11 @@ import { getActiveEvent } from "@/lib/queries";
 import type { Shipping } from "@/lib/shipping";
 
 /**
- * Gate sales by staff account, for the organizer's cash count: a Summary (per account
+ * Walk-in sales by staff account, for the organizer's cash count: a Summary (per account
  * and wristband, SUMIFS over the account sheets), every entry in one list, then one
- * sheet per account. Built live from walkin_sales, gate taps and drifter family bands
- * alike, so it always matches the Dashboard.
+ * sheet per account. Built live from walkin_sales. Labels hidden in Settings
+ * (hidden_in_admin: the VIP labels and drifter family bands) are left out, so it holds
+ * the walk-ins only and matches the Dashboard and the Walk-in tab.
  *
  * Amount = (bands - free) x price: take-backs are negative bands, drifter family bands
  * inside the free allowance cost nothing. Every formula also carries its computed
@@ -82,17 +83,17 @@ export async function buildStaffSalesWorkbook(): Promise<Buffer> {
         .order("id")
         .range(from, to),
     ),
-    admin.from("ticket_types").select("id, name, walkin_name, band_color, sort_order"),
+    admin.from("ticket_types").select("id, name, walkin_name, band_color, sort_order, hidden_in_admin"),
     admin.from("staff").select("id, full_name"),
   ]);
 
-  const typeOf = new Map((types ?? []).map((t) => [t.id as string, t as { name: string; walkin_name: string | null; band_color: string | null; sort_order: number }]));
+  const typeOf = new Map((types ?? []).map((t) => [t.id as string, t as { name: string; walkin_name: string | null; band_color: string | null; sort_order: number; hidden_in_admin: boolean }]));
   const staffName = new Map((staff ?? []).map((s) => [s.id as string, s.full_name as string]));
   const eventDay = event?.starts_at ? manilaDay(new Date(event.starts_at)) : null;
   const [ey, em, ed] = (eventDay ?? "1970-01-01").split("-").map(Number);
   const dayLabel = eventDay ? new Date(Date.UTC(ey, em - 1, ed)).toLocaleDateString("en-PH", { day: "numeric", month: "short", timeZone: "UTC" }) : "event day";
 
-  const lines: Line[] = entries.map((e) => {
+  const lines: Line[] = entries.filter((e) => !typeOf.get(e.ticket_type_id)?.hidden_in_admin).map((e) => {
     const t = typeOf.get(e.ticket_type_id);
     const raw = (e.sold_by && staffName.get(e.sold_by)) || "(no account)";
     const at = new Date(e.created_at);
@@ -193,7 +194,7 @@ export async function buildStaffSalesWorkbook(): Promise<Buffer> {
     `Amount = (bands - free) x price. Yellow rows were recorded on another day than ${dayLabel}.`;
 
   // --------------------------------------------------------- All entries
-  note(all, "A1", "Every entry by every staff account, by time", true);
+  note(all, "A1", "Every walk-in entry by every staff account, by time", true);
   note(all, "A2", legend);
   // Row 3 stays empty so Excel's Sort and Filter see each table on its own.
   head(all, 4, ["Staff", ...DETAIL]);
@@ -215,12 +216,12 @@ export async function buildStaffSalesWorkbook(): Promise<Buffer> {
   }
 
   // ------------------------------------------------------------- Summary
-  note(summary, "A1", `${event?.name ?? "Event"} - gate sales by staff account`, true);
+  note(summary, "A1", `${event?.name ?? "Event"} - walk-in sales by staff account`, true);
   note(
     summary,
     "A2",
     `Exported ${new Date().toLocaleString(LOCALE.locale, { timeZone: LOCALE.timeZone })} (Manila) from the ticket database. Every figure comes from the account sheets (SUMIFS). ` +
-      "Net bands = bands in minus taken back. Amount counts paid bands only.",
+      "Net bands = bands in minus taken back. Amount counts paid bands only. Walk-ins only: labels hidden in Settings > Tickets are left out.",
   );
   const cols = ["Staff", "Wristband", "Price (PHP)", "Bands in", "Taken back", "Free", "Net bands", "Amount, all days (PHP)", `Amount on ${dayLabel} (PHP)`];
   head(summary, 4, cols);
