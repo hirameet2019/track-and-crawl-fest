@@ -4,5 +4,18 @@ import { EventDayReport } from "@/components/EventDayReport";
 /** Admin > Reports: the event-day report. Admin only: it names staff cash and buyers. */
 export default async function ReportsPage() {
   await requireStaff("admin");
-  return <EventDayReport />;
+  return (
+    <div className="space-y-6">
+      <div className="card mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="font-semibold">Gate sales by staff</h2>
+          <p className="text-xs text-zinc-500">
+            Excel, built from the live data each time you download it: totals per staff account and wristband, every entry in one list, and one sheet per account.
+          </p>
+        </div>
+        <a href="/api/admin/export?type=staff" className="btn-secondary">Download Excel</a>
+      </div>
+      <EventDayReport />
+    </div>
+  );
 }
