@@ -50,7 +50,7 @@ export default async function DrifterLinkPage({ params }: { params: Promise<{ to
     return shell(
       <div className="card text-center">
         <ForgetThisLink token={token} />
-        <h1 className="text-xl font-bold">This link is not active</h1>
+        <h1 className="display-title text-2xl">This link is not active</h1>
         <p className="mt-2 text-sm text-zinc-400">
           Check that you opened the whole link from the organizer&rsquo;s message. If it still does not work, ask the organizer for a new one.
         </p>
@@ -86,7 +86,7 @@ export default async function DrifterLinkPage({ params }: { params: Promise<{ to
     return shell(
       <div className="card text-center">
         <RememberThisLink token={entry.token} name={entry.drifter_name} />
-        <h1 className="text-xl font-bold">{entry.bands_given} of {entry.band_count} collected</h1>
+        <h1 className="display-title text-2xl">{entry.bands_given} of {entry.band_count} collected</h1>
         <p className="mt-2 text-sm text-zinc-400">
           {left} {left === 1 ? "person" : "people"} on {entry.drifter_name}&rsquo;s list can still collect at the registration desk.
           They give your name or the code below.
@@ -105,7 +105,7 @@ export default async function DrifterLinkPage({ params }: { params: Promise<{ to
       <div className="card text-center">
         <RememberThisLink token={entry.token} name={entry.drifter_name} />
         <div className="mx-auto grid h-14 w-14 place-items-center rounded-full border border-emerald-400/40 bg-emerald-400/10 text-2xl text-emerald-300" aria-hidden>&#10003;</div>
-        <h1 className="mt-4 text-xl font-bold">Wristbands handed over</h1>
+        <h1 className="display-title mt-4 text-2xl">Wristbands handed over</h1>
         <p className="mt-2 text-sm text-zinc-400">
           All {entry.band_count} wristband{entry.band_count === 1 ? "" : "s"} for {entry.drifter_name}&rsquo;s group were handed over at the registration desk; the last on{" "}
           {new Date(entry.handed_over_at).toLocaleString(LOCALE.locale, { timeZone: LOCALE.timeZone, dateStyle: "medium", timeStyle: "short" })}.
@@ -122,7 +122,7 @@ export default async function DrifterLinkPage({ params }: { params: Promise<{ to
     <>
       <RememberThisLink token={entry.token} name={entry.drifter_name} />
       <div className="mb-5">
-        <h1 className="text-2xl font-bold">Drifter wristbands</h1>
+        <h1 className="display-title text-3xl">Drifter wristbands</h1>
         <p className="mt-1 text-sm text-zinc-400">
           List the people coming with you and confirm the rules. Your wristbands will be ready at the registration desk on event day.
         </p>

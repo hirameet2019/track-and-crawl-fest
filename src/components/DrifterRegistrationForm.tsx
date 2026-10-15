@@ -130,7 +130,7 @@ export function DrifterRegistrationForm({
         <div className="mx-auto grid h-14 w-14 place-items-center rounded-full border border-emerald-400/40 bg-emerald-400/10 text-2xl text-emerald-300" aria-hidden>
           &#10003;
         </div>
-        <h2 className="mt-4 text-xl font-bold">You&rsquo;re on the list</h2>
+        <h2 className="display-title mt-4 text-2xl">You&rsquo;re on the list</h2>
         <p className="mx-auto mt-2 max-w-sm text-sm text-zinc-400">
           Show this screen at the registration desk on event day. Your wristbands will be waiting.
           <span className="mt-1 block text-zinc-500">Ipakita ito sa registration desk sa araw ng event.</span>

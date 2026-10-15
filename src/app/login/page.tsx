@@ -27,7 +27,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
       <div className="w-full max-w-sm">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={site.logo} alt={event?.name ?? ""} className="mx-auto mb-6 w-64 drop-shadow-[0_6px_24px_rgba(0,0,0,0.7)]" />
-        <h1 className="text-center text-xl font-bold">Staff login</h1>
+        <h1 className="display-title text-center text-2xl">Staff login</h1>
         <p className="mb-6 text-center text-sm text-zinc-300">For organizer staff, verifiers, and gate scanners.</p>
         {notStaff && (
           <div className="mb-4 rounded-xl border border-amber-400/40 bg-amber-400/10 p-3 text-sm text-amber-200">

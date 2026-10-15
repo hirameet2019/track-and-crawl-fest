@@ -49,13 +49,10 @@ export default async function HomePage() {
     <main className="flex-1 overflow-x-clip bg-brand">
       <EventHero event={event} prices={prices} />
 
-      <section id="tickets" className="dark-zone mx-auto max-w-3xl px-4 pb-16 pt-6 sm:px-8">
-        <Reveal className="mb-8 flex items-end justify-between" from="left">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-cyan-300">Tickets</p>
-            <h2 className="reveal-title text-2xl font-black uppercase italic sm:text-3xl">Secure your spot</h2>
-          </div>
-          <p className="hidden text-right text-xs text-zinc-400 sm:block">
+      <section id="tickets" className="dark-zone mx-auto max-w-5xl px-4 pb-16 pt-8 sm:px-8">
+        <Reveal className="mb-10 flex items-end justify-between gap-6" from="left">
+          <h2 className="reveal-title display-title text-[1.9rem] sm:text-[2.6rem]">Secure your spot</h2>
+          <p className="hidden text-right text-sm text-zinc-400 sm:block">
             Pay via {primaryChannel(event, rules.channels).payVia}.<br />Tickets emailed after verification (check Spam too).
           </p>
         </Reveal>
@@ -63,10 +60,10 @@ export default async function HomePage() {
         {open ? (
           <OrderForm types={types} availability={publicAvailability(availability, types)} channel={primaryChannel(event, rules.channels)} />
         ) : (
-          <Reveal from="zoom" className="card text-center">
-            <h2 className="text-xl font-bold">Online ticket sales are closed</h2>
-            <p className="mt-2 text-zinc-400">{lastClose ? `Online sales ended ${fmtCutoff(lastClose)}. ` : ""}Tickets may still be available at the venue gate.</p>
-            <p className="mt-1 text-xs text-zinc-500">Sarado na ang online ticket sales. Maaaring may tickets pa sa gate ng venue.</p>
+          <Reveal from="up" className="border-y border-white/10 py-10 text-center sm:py-14">
+            <h3 className="display-title text-[1.7rem] text-white sm:text-[2.4rem]" style={{ textShadow: "0 0 32px color-mix(in srgb, var(--neon-pink) 40%, transparent)" }}>Online sales are closed</h3>
+            <p className="mx-auto mt-4 max-w-xl text-zinc-300">{lastClose ? `Online sales ended ${fmtCutoff(lastClose)}. ` : ""}Tickets may still be available at the venue gate.</p>
+            <p className="mt-1 text-sm text-zinc-500">Sarado na ang online ticket sales. Maaaring may tickets pa sa gate ng venue.</p>
           </Reveal>
         )}
 

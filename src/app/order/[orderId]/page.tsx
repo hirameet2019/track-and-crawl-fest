@@ -39,19 +39,19 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ or
   ]);
 
   return (
-    <main className="flex-1">
+    <main className="flex-1 bg-brand dark-zone">
     <EventBanner event={event} />
     <div className="mx-auto w-full max-w-3xl px-4 py-8">
       <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-bold">Order #{order.order_no}</h1>
+        <h1 className="display-title text-3xl sm:text-4xl">Order #{order.order_no}</h1>
         <OrderStatusBadge status={order.status} />
       </div>
       <p className="text-sm text-zinc-600">{order.buyer_name} &middot; {order.buyer_email}</p>
 
       {order.status === "awaiting_verification" && (
-        <div className="card mt-6 border-blue-200 bg-blue-50">
-          <h2 className="font-semibold text-blue-900">We received your proof of payment</h2>
-          <p className="mt-1 text-sm text-blue-900">
+        <div className="card callout-info mt-6">
+          <h2 className="font-semibold text-violet-100">We received your proof of payment</h2>
+          <p className="mt-1 text-sm text-violet-100">
             Reference {order.payment_reference} via {order.payment_method?.toUpperCase()}. A team member is now checking it against the account history.
             Your receipt and QR tickets will be emailed to <b>{order.buyer_email}</b> <b>within 24 hours</b>, usually much sooner.
             If it does not show up in your inbox, check your Spam or Junk folder and mark it as Not spam. Bookmark this page; it updates the moment your payment is confirmed.
@@ -59,14 +59,14 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ or
         </div>
       )}
       {order.status === "rejected" && (
-        <div className="card mt-6 border-red-200 bg-red-50">
-          <h2 className="font-semibold text-red-900">Payment could not be verified</h2>
-          <p className="mt-1 text-sm text-red-900">Reason: {order.rejection_reason}</p>
-          <p className="mt-2 text-sm text-red-900">Reply to the email we sent with your payment details, or <Link href="/" className="underline">place a new order</Link>.</p>
+        <div className="card callout-danger mt-6">
+          <h2 className="font-semibold text-rose-100">Payment could not be verified</h2>
+          <p className="mt-1 text-sm text-rose-100">Reason: {order.rejection_reason}</p>
+          <p className="mt-2 text-sm text-rose-100">Reply to the email we sent with your payment details, or <Link href="/" className="underline">place a new order</Link>.</p>
         </div>
       )}
       {order.status === "expired" && (
-        <div className="card mt-6 border-zinc-300 bg-zinc-100">
+        <div className="card mt-6">
           <h2 className="font-semibold">This order expired before payment was submitted</h2>
           <p className="mt-1 text-sm">
             The wristbands were released back to the pool, so this order can no longer be paid.{" "}
@@ -83,7 +83,7 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ or
       )}
 
       {order.balance_centavos !== 0 && (
-        <div className={`card mt-6 ${order.balance_centavos > 0 ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50"}`}>
+        <div className={`card mt-6 ${order.balance_centavos > 0 ? "callout-ok" : "callout-warn"}`}>
           <h2 className="font-semibold">{order.balance_centavos > 0 ? "A refund is on its way" : "There is still a balance to pay"}</h2>
           <p className="mt-1 text-sm">
             Your order was changed to a different ticket.{" "}
@@ -96,20 +96,20 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ or
       )}
 
       {(order.status === "voided" || tickets.some((t) => t.status === "void")) && (
-        <div className="card mt-6 border-red-200 bg-red-50">
-          <h2 className="font-semibold text-red-900">{order.status === "voided" ? "This order was voided" : "Some tickets in this order were voided"}</h2>
-          <p className="mt-1 text-sm text-red-900">
+        <div className="card callout-danger mt-6">
+          <h2 className="font-semibold text-rose-100">{order.status === "voided" ? "This order was voided" : "Some tickets in this order were voided"}</h2>
+          <p className="mt-1 text-sm text-rose-100">
             Voided tickets are marked below and will not be accepted at the gate.
             {order.status === "voided" ? "" : " Your other tickets stay valid."} Reason: {tickets.find((t) => t.void_reason)?.void_reason ?? "see the email we sent"}.
           </p>
-          <p className="mt-1 text-xs text-red-900/80">Hindi na tatanggapin sa gate ang mga naka-VOID na ticket. Kung may tanong o refund, kontakin ang organizer.</p>
+          <p className="mt-1 text-xs text-rose-200/80">Hindi na tatanggapin sa gate ang mga naka-VOID na ticket. Kung may tanong o refund, kontakin ang organizer.</p>
         </div>
       )}
 
       {order.status !== "paid" && <SupportContact event={event} />}
 
       <div className="card mt-6">
-        <h2 className="font-semibold">Summary</h2>
+        <h2 className="holder-title">Summary</h2>
         <ul className="mt-2 divide-y text-sm">
           {items.map((it) => (
             <li key={it.id} className="flex justify-between py-2">
@@ -126,7 +126,7 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ or
 
       {shipping && (
         <div className="card mt-6 border-violet-400/30">
-          <h2 className="font-semibold">Shirt delivery</h2>
+          <h2 className="holder-title">Shirt delivery</h2>
           <p className="mt-1 text-sm text-zinc-600">
             {shipping.name} · {shipping.mobile}<br />
             {shipping.address}<br />
@@ -140,19 +140,19 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ or
 
       {(order.status === "paid" || order.status === "voided") && (
         <section className="mt-6">
-          <h2 className="text-lg font-bold">Your tickets</h2>
+          <h2 className="display-title text-2xl">Your tickets</h2>
           <p className="text-sm text-zinc-600">Show each QR code at the gate. Each one admits one person once.</p>
           <div className="mt-3 grid gap-4 sm:grid-cols-2">
             {tickets.map((t, i) => (
               <div key={t.id} className={`card flex flex-col items-center text-center ${t.status === "void" ? "opacity-60 grayscale" : ""}`}>
                 <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{t.ticket_type.name}</div>
-                <div className="text-3xl font-black">{t.number}</div>
+                <div className="ticket-no mt-1 text-3xl">{t.number}</div>
                 {t.ticket_type.band_color && <div className="text-xs text-zinc-500">{t.ticket_type.band_color} wristband</div>}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 {t.status === "void" ? (
-                  <div className="my-3 flex h-48 w-48 items-center justify-center rounded-lg border-2 border-dashed border-red-300 text-3xl font-black text-red-600">VOID</div>
+                  <div className="my-3 flex h-48 w-48 items-center justify-center rounded-lg border-2 border-dashed border-rose-400/60 text-3xl font-black text-rose-400">VOID</div>
                 ) : (
-                  <img src={qrs[i]} alt={`QR for ticket ${t.number}`} className="my-3 h-48 w-48" />
+                  <img src={qrs[i]} alt={`QR for ticket ${t.number}`} className="my-3 h-48 w-48 rounded-xl bg-white p-2" />
                 )}
                 <div className="text-sm font-medium">{t.holder_name}</div>
                 <div className="text-xs text-zinc-500">
@@ -165,7 +165,7 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ or
                   <img src={photos[i]!} alt={`Car ${t.vehicle_plate ?? ""}`} className="mt-2 h-24 w-36 rounded-lg border border-white/10 object-cover" />
                 )}
                 <div className="mt-2"><TicketStatusBadge status={t.status} /></div>
-                {t.status === "void" && t.void_reason && <div className="mt-1 text-xs text-red-700">{t.void_reason}</div>}
+                {t.status === "void" && t.void_reason && <div className="mt-1 text-xs text-rose-300">{t.void_reason}</div>}
               </div>
             ))}
           </div>

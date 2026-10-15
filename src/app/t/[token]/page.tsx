@@ -29,19 +29,19 @@ export default async function TicketPage({ params }: { params: Promise<{ token: 
   const qr = await QRCode.toDataURL(ticketUrl(t.qr_token), { margin: 1, width: 320 });
 
   return (
-    <main className="mx-auto w-full max-w-md flex-1 px-4 py-8">
+    <main className="dark-zone flex-1 bg-brand"><div className="mx-auto w-full max-w-md px-4 py-10">
       <div className="card text-center">
         <p className="text-xs font-semibold uppercase tracking-widest text-zinc-500">{t.order.event.name}</p>
-        <h1 className="mt-1 text-xl font-bold">{t.ticket_type.name}</h1>
-        <div className="mt-4 text-4xl font-black">{t.number}</div>
+        <h1 className="display-title mt-2 text-2xl">{t.ticket_type.name}</h1>
+        <div className="ticket-no mt-4 text-5xl">{t.number}</div>
         {t.ticket_type.band_color && <p className="text-xs text-zinc-500">{t.ticket_type.band_color} wristband</p>}
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={qr} alt="Ticket QR" className="mx-auto my-4 h-56 w-56" />
+        <img src={qr} alt="Ticket QR" className="mx-auto my-5 h-56 w-56 rounded-2xl bg-white p-3" />
         <p className="font-medium">{t.holder_name ?? t.order.buyer_name}</p>
         <p className="text-sm text-zinc-500">Order #{t.order.order_no}</p>
         <div className="mt-3"><TicketStatusBadge status={t.status} /></div>
         {t.status === "void" && (
-          <p className="mt-1 text-xs text-red-700">Not valid for entry{t.void_reason ? `: ${t.void_reason}` : ""}. Contact the organizer with order #{t.order.order_no} if this is unexpected.</p>
+          <p className="mt-1 text-xs text-rose-300">Not valid for entry{t.void_reason ? `: ${t.void_reason}` : ""}. Contact the organizer with order #{t.order.order_no} if this is unexpected.</p>
         )}
         {t.status === "redeemed" && t.redeemed_at && (
           <p className="mt-1 text-xs text-zinc-500">Entered {new Date(t.redeemed_at).toLocaleString(LOCALE.locale, { timeZone: LOCALE.timeZone })}</p>
@@ -50,6 +50,6 @@ export default async function TicketPage({ params }: { params: Promise<{ token: 
       <p className="mt-4 text-center text-xs text-zinc-400">
         Staff: open the <Link href="/scan" className="underline">scanner</Link> to admit this ticket.
       </p>
-    </main>
+    </div></main>
   );
 }

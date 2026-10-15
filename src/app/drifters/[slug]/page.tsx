@@ -39,7 +39,7 @@ export default async function DrifterSignupPage({ params }: { params: Promise<{ 
           <>
             <RememberedDrifterLinks />
             <div className="card text-center">
-              <h1 className="text-xl font-bold">This sign-up link is closed</h1>
+              <h1 className="display-title text-2xl">This sign-up link is closed</h1>
               <p className="mt-2 text-sm text-zinc-400">
                 The organizer may have replaced it with a new one. Ask them for the current drifter sign-up link.
               </p>
@@ -51,7 +51,7 @@ export default async function DrifterSignupPage({ params }: { params: Promise<{ 
           <>
             <RememberedDrifterLinks />
             <div className="mb-5">
-              <h1 className="text-2xl font-bold">Drifter sign-up</h1>
+              <h1 className="display-title text-3xl">Drifter sign-up</h1>
               <p className="mt-1 text-sm text-zinc-400">
                 For drivers competing at {event?.name ?? "the event"}. Tell us who you are, list the people coming with you and confirm the rules.
                 Your wristbands will be ready at the registration desk; bring your competitor pass.

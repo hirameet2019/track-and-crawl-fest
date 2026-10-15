@@ -120,7 +120,7 @@ function Card({ o, onDone }: { o: QueueOrder; onDone: (id: string, warning?: str
         {error && <p className="text-sm text-red-600">{error}</p>}
         {!rejecting ? (
           <div className="flex gap-2">
-            <button className="btn-success flex-1" disabled={pending} onClick={() => start(async () => { const r = await approveOrder(o.id); if (r.ok) onDone(o.id, r.warning); else setError(r.error); })}>
+            <button className="btn-go flex-1" disabled={pending} onClick={() => start(async () => { const r = await approveOrder(o.id); if (r.ok) onDone(o.id, r.warning); else setError(r.error); })}>
               {pending ? "Issuing tickets..." : "Approve & issue tickets"}
             </button>
             <button className="btn-danger" disabled={pending} onClick={() => setRejecting(true)}>Reject</button>

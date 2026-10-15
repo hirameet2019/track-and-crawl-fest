@@ -327,69 +327,81 @@ export function OrderForm({ types, availability, channel }: { types: TicketTypeR
     });
   }
 
+  // Poster billing: dearest tier on top; the three dearest prices get the three
+  // biggest sizes and every cheaper tier shares the smallest.
+  const billed = [...types].sort((a, b) => b.price_centavos - a.price_centavos);
+  const priceRank = [...new Set(billed.map((t) => t.price_centavos))];
+  const billSize = (t: TicketTypeRow) => (["xl", "lg", "md"] as const)[priceRank.indexOf(t.price_centavos)] ?? "sm";
+
   return (
     <>
-    <form onSubmit={submit} className="space-y-6">
-      <section className="space-y-3">
-        <Reveal as="h2" className="text-lg font-bold" delay={80}>1. Choose your tickets <span className="block text-sm font-normal text-zinc-500">Piliin kung ilang ticket ang bibilhin. Pindutin ang + or -.</span></Reveal>
-        {types.map((t, idx) => {
-          const left = addable(t);
-          const closed = isTypeClosed(t);
-          const soldOut = closed || left <= 0;
-          const hrs = hoursUntilCutoff(t);
-          const closingSoon = !closed && hrs !== null && hrs <= 24 * 7;
-          const n = qty[t.id] ?? 0;
-          return (
-            <Reveal key={t.id} delay={160 + idx * 110} from={idx % 2 ? "right" : "left"} className={`card ticket-card flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between ${soldOut ? "opacity-60" : ""}`}>
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="font-semibold">{t.name}</h3>
-                  <BandSwatch color={t.band_color} className="rounded-full border border-white/15 bg-black/30 px-2 py-0.5 text-[11px] text-zinc-300" />
-                </div>
-                {t.description && <p className="mt-1 text-sm text-zinc-400">{t.description}</p>}
-                {t.includes_shirt && (
-                  <div className="mt-1 flex flex-wrap items-center gap-1 text-[11px]">
-                    <span className="rounded bg-cyan-400/15 px-1.5 py-0.5 font-semibold text-cyan-300">Includes event t-shirt</span>
-                    {t.ships_shirt && <span className="rounded bg-violet-400/15 px-1.5 py-0.5 font-semibold text-violet-200">Shirt ships to you in {SHIRT_PROCESSING}</span>}
-                    <ShirtSizeChartButton label="View size chart" />
+    <form onSubmit={submit} className="space-y-10">
+      {/* The tiers are billed like the event poster's lineup: the dearest tier first and
+          biggest, each line stepping down a size, so the page reads as the poster continued. */}
+      <section aria-labelledby="tiers-title">
+        <Reveal as="h2" className="form-step" delay={80}>
+          <span id="tiers-title"><span className="form-step-no">1</span> Choose your tickets</span>
+          <span className="form-step-sub">Piliin kung ilang ticket ang bibilhin. Pindutin ang + or -.</span>
+        </Reveal>
+        <div className="mt-2">
+          {billed.map((t, idx) => {
+            const left = addable(t);
+            const closed = isTypeClosed(t);
+            const soldOut = closed || left <= 0;
+            const hrs = hoursUntilCutoff(t);
+            const closingSoon = !closed && hrs !== null && hrs <= 24 * 7;
+            const n = qty[t.id] ?? 0;
+            const max = Math.min(MAX_QTY_PER_TYPE, left - (t.id === companionType?.id ? paidCompanionCount : 0));
+            return (
+              <Reveal key={t.id} as="article" delay={140 + idx * 90} from="up" className={`bill-line bill-${billSize(t)} ${n > 0 ? "is-picked" : ""} ${soldOut ? "is-out" : ""}`}>
+                <div className="min-w-0">
+                  <h3 className="bill-name">{t.name}</h3>
+                  <div className="bill-tags">
+                    <BandSwatch color={t.band_color} size={16} className="bill-tag" />
+                    {t.includes_shirt && <span className="bill-tag bill-tag-cyan">Event t-shirt</span>}
+                    {t.ships_shirt && <span className="bill-tag bill-tag-violet">Ships to you in {SHIRT_PROCESSING}</span>}
+                    {t.requires_vehicle && <span className="bill-tag bill-tag-amber">Car photo, plate and model needed</span>}
+                    {t.includes_shirt && <ShirtSizeChartButton label="Size chart" />}
                   </div>
-                )}
-                {t.requires_vehicle && (
-                  <p className="mt-1 flex flex-wrap gap-1 text-[11px]">
-                    {["Car photo", "Plate number", "Car model"].map((x) => (
-                      <span key={x} className="rounded bg-amber-400/15 px-1.5 py-0.5 font-semibold text-amber-300">{x} required</span>
-                    ))}
-                  </p>
-                )}
-                {t.requires_vehicle && companionType && (
-                  <p className="mt-1 text-xs text-emerald-300">
-                    {t.included_companions > 0
-                      ? <>Includes a wristband for <b>{t.included_companions} passenger{t.included_companions === 1 ? "" : "s"}</b>. Bringing more people? Add companions inside this ticket at {php(companionPrice)} each, each a {companionType.name} with event t-shirt.</>
-                      : <>Bringing passengers? Add companions inside this ticket, {php(companionPrice)} each: a {companionType.name} wristband with event t-shirt, linked to your car.</>}
-                  </p>
-                )}
-                <p className="mt-1 text-sm">
-                  <span className="font-bold">{php(t.price_centavos)}</span>
-                  {closed ? <span className="ml-2 font-semibold text-red-500">Online sales closed {fmtCutoff(t.sales_close_at!, { withTime: false })}</span> : soldOut ? <span className="ml-2 font-semibold text-red-600">Sold out</span> : left <= 20 ? <span className="ml-2 text-amber-700">Only {left} left</span> : null}
-                  {!closed && t.sales_close_at && <span className={`ml-2 text-xs ${closingSoon ? "font-semibold text-amber-300" : "text-zinc-400"}`}>Online sales until {fmtCutoff(t.sales_close_at)}</span>}
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <button type="button" className="btn-secondary h-9 w-9 px-0" onClick={() => setQuantity(t, n - 1)} disabled={n === 0} aria-label="Decrease">-</button>
-                <input className="input w-14 text-center" inputMode="numeric" value={n} onChange={(e) => setQuantity(t, Number(e.target.value) || 0)} disabled={soldOut} aria-label={`${t.name} quantity`} />
-                <button type="button" className="btn-secondary h-9 w-9 px-0" onClick={() => setQuantity(t, n + 1)} disabled={soldOut || n >= Math.min(MAX_QTY_PER_TYPE, left - (t.id === companionType?.id ? paidCompanionCount : 0))} aria-label="Increase">+</button>
-              </div>
-            </Reveal>
-          );
-        })}
+                  {t.description && <p className="bill-desc">{t.description}</p>}
+                  {t.requires_vehicle && companionType && (
+                    <p className="bill-desc text-emerald-300">
+                      {t.included_companions > 0
+                        ? <>Includes a wristband for <b>{t.included_companions} passenger{t.included_companions === 1 ? "" : "s"}</b>. Bringing more people? Add companions inside this ticket at {php(companionPrice)} each, each a {companionType.name} with event t-shirt.</>
+                        : <>Bringing passengers? Add companions inside this ticket, {php(companionPrice)} each: a {companionType.name} wristband with event t-shirt, linked to your car.</>}
+                    </p>
+                  )}
+                  {(closed || soldOut || left <= 20 || t.sales_close_at) && (
+                    <p className="bill-status">
+                      {closed ? <span className="font-semibold text-rose-400">Online sales closed {fmtCutoff(t.sales_close_at!, { withTime: false })}</span> : soldOut ? <span className="font-semibold text-rose-400">Sold out</span> : left <= 20 ? <span className="font-semibold text-amber-300">Only {left} left</span> : null}
+                      {!closed && t.sales_close_at && <span className={closingSoon ? "font-semibold text-amber-300" : "text-zinc-400"}>Online sales until {fmtCutoff(t.sales_close_at)}</span>}
+                    </p>
+                  )}
+                </div>
+                <div className="bill-buy">
+                  <div className="bill-price">{php(t.price_centavos)}</div>
+                  <div className="stepper" role="group" aria-label={`${t.name} quantity`}>
+                    <button type="button" onClick={() => setQuantity(t, n - 1)} disabled={n === 0} aria-label={`One fewer ${t.name}`}>
+                      <svg viewBox="0 0 24 24" aria-hidden><path d="M5 12h14" /></svg>
+                    </button>
+                    <input inputMode="numeric" value={n} onChange={(e) => setQuantity(t, Number(e.target.value) || 0)} disabled={soldOut} aria-label={`${t.name} quantity`} />
+                    <button type="button" onClick={() => setQuantity(t, n + 1)} disabled={soldOut || n >= max} aria-label={`One more ${t.name}`}>
+                      <svg viewBox="0 0 24 24" aria-hidden><path d="M12 5v14M5 12h14" /></svg>
+                    </button>
+                  </div>
+                </div>
+              </Reveal>
+            );
+          })}
+        </div>
       </section>
 
       {anySelected && (
         <section className="enter space-y-3">
-          <h2 className="text-lg font-bold">2. Ticket holder details <span className="block text-sm font-normal text-zinc-500">Pangalan ng gagamit ng bawat ticket. Ito ang lalabas sa wristband record.</span></h2>
+          <h2 className="form-step"><span><span className="form-step-no">2</span> Ticket holder details</span><span className="form-step-sub">Pangalan ng gagamit ng bawat ticket. Ito ang lalabas sa wristband record.</span></h2>
           {types.filter((t) => (qty[t.id] ?? 0) > 0).map((t) => (
             <div key={t.id} className="card space-y-4">
-              <h3 className="font-semibold">{t.name} <span className="text-zinc-500">x {qty[t.id]}</span></h3>
+              <h3 className="holder-title">{t.name} <span className="text-zinc-400">× {qty[t.id]}</span></h3>
               {(attendees[t.id] ?? []).map((a, i) => (
                 <div key={i} className="grid gap-3 rounded-lg border border-white/10 bg-black/30 p-3 sm:grid-cols-2">
                   <div className="sm:col-span-2 text-xs font-semibold text-zinc-500">Ticket {i + 1}</div>
@@ -503,7 +515,7 @@ export function OrderForm({ types, availability, channel }: { types: TicketTypeR
       )}
 
       <Reveal as="section" className="space-y-3" delay={120}>
-        <h2 className="text-lg font-bold">{anySelected ? "3." : "2."} Your details <span className="block text-sm font-normal text-zinc-500">Dito ipapadala ang tickets. Siguraduhing tama ang email at cellphone number.</span></h2>
+        <h2 className="form-step"><span><span className="form-step-no">{anySelected ? 3 : 2}</span> Your details</span><span className="form-step-sub">Dito ipapadala ang tickets. Siguraduhing tama ang email at cellphone number.</span></h2>
         <div className="card grid gap-3 sm:grid-cols-2">
           <div className="sm:col-span-2">
             <label className="label">Full name *</label>
@@ -595,7 +607,7 @@ export function OrderForm({ types, availability, channel }: { types: TicketTypeR
 
       {needsShipping && (
         <Reveal as="section" className="space-y-3" delay={120}>
-          <h2 className="text-lg font-bold">4. Shirt delivery <span className="block text-sm font-normal text-zinc-500">Saan ipapadala ang shirt.</span></h2>
+          <h2 className="form-step"><span><span className="form-step-no">4</span> Shirt delivery</span><span className="form-step-sub">Saan ipapadala ang shirt.</span></h2>
           <div className="card space-y-3">
             <div className="rounded-lg border border-violet-400/30 bg-violet-400/10 p-3 text-sm text-violet-100">
               {SHIPPING_NOTE}
@@ -658,11 +670,11 @@ export function OrderForm({ types, availability, channel }: { types: TicketTypeR
 
       {error && <p className="enter rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p>}
 
-      <Reveal from="zoom" delay={200} className="sticky bottom-0 -mx-4 border-t border-white/10 bg-zinc-950/90 p-4 text-white backdrop-blur-md sm:static sm:mx-0 sm:rounded-2xl sm:border sm:border-white/10 sm:bg-white/[0.06]">
+      <Reveal from="zoom" delay={200} className="total-bar">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-400">Total</div>
-            <div className="mt-0.5 text-3xl font-black tabular-nums text-white">{php(total)}</div>
+            <div className="text-xs font-semibold text-zinc-400">Total</div>
+            <div className="total-amount">{php(total)}</div>
             {anySelected && <div className="text-xs text-zinc-400">{count} ticket{count === 1 ? "" : "s"}</div>}
           </div>
           <button className="btn-neon" disabled={!anySelected || pending}>

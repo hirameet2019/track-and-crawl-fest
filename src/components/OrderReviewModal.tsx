@@ -96,7 +96,7 @@ export function OrderReviewModal({
         <header className="relative flex items-start justify-between gap-4 px-5 pt-5 sm:px-7">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-cyan-300">Step 1 of 3 · Review</p>
-            <h2 id={titleId} className="mt-1 text-2xl font-black uppercase italic leading-tight">Check your order</h2>
+            <h2 id={titleId} className="display-title mt-1 text-2xl leading-tight">Check your order</h2>
             <p className="mt-1 text-sm text-zinc-400">Nothing is reserved yet. Make sure every name is spelled the way it should appear on the ticket.</p>
           </div>
           <button type="button" onClick={onClose} disabled={pending} className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-white/15 bg-white/5 text-zinc-300 hover:bg-white/10 hover:text-white" aria-label="Close and keep editing">
@@ -205,7 +205,7 @@ export function OrderReviewModal({
           <div className="flex items-center justify-between gap-4 sm:justify-end">
             <div className="text-right">
               <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-400">Total</div>
-              <div className="text-2xl font-black tabular-nums">{php(total)}</div>
+              <div className="total-amount">{php(total)}</div>
             </div>
             <button type="button" onClick={onConfirm} disabled={!agreed || pending} className="btn-neon">
               {pending ? "Reserving…" : "Confirm & reserve"}

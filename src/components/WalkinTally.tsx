@@ -485,7 +485,7 @@ export function WalkinTally({
                 </button>
                 <button
                   type="button"
-                  className="btn-primary h-14 flex-1 text-2xl font-black"
+                  className="btn-go h-14 flex-1 text-2xl font-black"
                   disabled={isBusy || noPrice || left <= 0 || !canAdd}
                   onClick={() => tap(t, 1)}
                   aria-label={`Add one ${gateName(t)}${size ? `, ${size} shirt` : ""}`}

@@ -40,15 +40,15 @@ export default async function PayPage({ params }: { params: Promise<{ orderId: s
   const methods: OnlinePaymentMethod[] = channels.length ? channels.map((c) => c.key) : ["gotyme"];
 
   return (
-    <main className="flex-1">
+    <main className="flex-1 bg-brand dark-zone">
     <EventBanner event={event} />
     <div className="mx-auto w-full max-w-3xl px-4 py-8">
-      <h1 className="text-2xl font-bold">Pay {php(order.total_centavos)}</h1>
-      <p className="text-sm text-zinc-600">
+      <h1 className="display-title text-3xl sm:text-4xl">Pay <span className="tabular">{php(order.total_centavos)}</span></h1>
+      <p className="mt-3 text-sm text-zinc-400">
         Order #{order.order_no} for {order.buyer_name}. Your wristbands are held for {PAYMENT_WINDOW_MINUTES} minutes, and{" "}
         {order.expires_at ? <Countdown until={order.expires_at} /> : "a limited time"} of that is left.
         {/* Expiry is final, so say so plainly while the buyer can still act on it. */}
-        <span className="block text-xs font-semibold text-amber-800">
+        <span className="mt-2 block text-xs font-semibold text-amber-300">
           Pay and upload before the timer ends. When it runs out the order is cancelled, the wristbands go back to the pool, and this
           page stops accepting payment.
         </span>
@@ -59,7 +59,7 @@ export default async function PayPage({ params }: { params: Promise<{ orderId: s
       </p>
 
       <div className="card mt-6">
-        <h2 className="font-semibold">Order summary</h2>
+        <h2 className="holder-title">Order summary</h2>
         <ul className="mt-2 divide-y text-sm">
           {items.map((it) => (
             <li key={it.id} className="flex justify-between py-2">
@@ -71,8 +71,8 @@ export default async function PayPage({ params }: { params: Promise<{ orderId: s
         </ul>
       </div>
 
-      <section className="mt-6">
-        <h2 className="text-lg font-bold">Step 1. Scan and pay the exact amount</h2>
+      <section className="mt-10">
+        <h2 className="form-step"><span><span className="form-step-no">1</span> Scan and pay the exact amount</span></h2>
         <p className="text-sm text-zinc-500">Open your {pc.app} app{pc.scanHint ? ` (${pc.scanHint})` : ""}, scan the code, and pay the exact amount. <span className="text-zinc-400">Buksan ang {pc.app} app, i-scan ang QR, at bayaran ang eksaktong halaga.</span></p>
         <div className={`mt-3 grid gap-4 ${channels.length > 1 ? "sm:grid-cols-2" : "mx-auto max-w-sm"}`}>
           {channels.map((c) => {
@@ -87,21 +87,21 @@ export default async function PayPage({ params }: { params: Promise<{ orderId: s
             );
           })}
         </div>
-        <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+        <p className="callout callout-warn mt-3">
           Pay exactly <b>{php(order.total_centavos)}</b>. Put <b>Order #{order.order_no}</b> in the message or note if your app allows it. Take a screenshot of the confirmation.
           Any InstaPay transfer fee is charged by your own bank on top, so the amount received must still be the full ticket price.
-          <span className="mt-1 block text-xs text-amber-800">Eksaktong <b>{php(order.total_centavos)}</b> ang ipadala. Pagkatapos magbayad, i-screenshot ang confirmation screen.</span>
+          <span className="mt-1 block text-xs text-amber-200/80">Eksaktong <b>{php(order.total_centavos)}</b> ang ipadala. Pagkatapos magbayad, i-screenshot ang confirmation screen.</span>
         </p>
       </section>
 
-      <section className="mt-6">
-        <h2 className="text-lg font-bold">Step 2. Submit your proof of payment</h2>
+      <section className="mt-10">
+        <h2 className="form-step"><span><span className="form-step-no">2</span> Submit your proof of payment</span></h2>
         <p className="text-sm text-zinc-500">Type the reference number and upload the screenshot of your confirmation. <span className="text-zinc-400">Ilagay ang reference number at i-upload ang screenshot ng confirmation.</span></p>
         <div className="mt-3">
           <ProofForm orderId={order.id} methods={methods} />
         </div>
-        <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
-          <div className="text-[11px] font-semibold uppercase tracking-wide text-amber-700">After you submit</div>
+        <div className="callout callout-info mt-4">
+          <div className="font-semibold text-white">After you submit</div>
           <p className="mt-1">
             Every payment is checked by a real person against the account history, so your tickets are not instant.
             Please allow <b>up to 24 hours</b> for your receipt and QR tickets to arrive at <b>{order.buyer_email}</b>. Most are sent much sooner.
@@ -110,7 +110,7 @@ export default async function PayPage({ params }: { params: Promise<{ orderId: s
             If nothing arrives, look in your <b>Spam or Junk folder</b> first and mark the message as Not spam. You can also check your order any time at{" "}
             <Link href={`/order/${order.id}`} className="font-semibold underline">this status page</Link>; it updates the moment your payment is confirmed.
           </p>
-          <p className="mt-2 text-xs text-amber-800">Pagkatapos i-submit, hintayin ang email na may receipt at QR tickets, hanggang 24 oras. Tingnan din ang Spam folder.</p>
+          <p className="mt-2 text-xs text-violet-200/80">Pagkatapos i-submit, hintayin ang email na may receipt at QR tickets, hanggang 24 oras. Tingnan din ang Spam folder.</p>
         </div>
         <SupportContact event={event} />
       </section>
