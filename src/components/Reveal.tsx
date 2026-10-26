@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, type ElementType, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, type ElementType, type ReactNode } from "react";
 
 /**
  * Scroll-reveal wrapper. Children start hidden (see `.reveal` in globals.css) and
@@ -14,6 +14,11 @@ import { useEffect, useRef, type ElementType, type ReactNode } from "react";
  *
  * With prefers-reduced-motion the CSS shows everything immediately, so both
  * classes are added at once.
+ *
+ * React rewrites the whole class attribute whenever the className prop changes
+ * (a ticket line turning "is-picked" when its quantity goes up), which drops the
+ * two classes and would leave an already revealed element at opacity 0 for good.
+ * So they are also kept in a ref and put back after every render, before paint.
  */
 export function Reveal({
   children,
@@ -31,6 +36,14 @@ export function Reveal({
   once?: boolean;
 }) {
   const ref = useRef<HTMLElement | null>(null);
+  const state = useRef({ in: false, settled: false });
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.classList.toggle("in", state.current.in);
+    el.classList.toggle("settled", state.current.settled);
+  });
 
   useEffect(() => {
     const el = ref.current;
@@ -38,26 +51,31 @@ export function Reveal({
 
     const reduced = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
     let settleTimer: number | undefined;
+    const mark = (cls: "in" | "settled", on: boolean) => {
+      state.current[cls] = on;
+      el.classList.toggle(cls, on);
+    };
 
     const show = () => {
-      el.classList.add("in");
+      mark("in", true);
       if (reduced) {
-        el.classList.add("settled");
+        mark("settled", true);
         return;
       }
       // Fallback in case transitionend never fires (tab hidden, transition
       // cancelled): the reveal + stagger delay never exceed ~1.5s.
       window.clearTimeout(settleTimer);
-      settleTimer = window.setTimeout(() => el.classList.add("settled"), 1500 + delay);
+      settleTimer = window.setTimeout(() => mark("settled", true), 1500 + delay);
     };
     const hide = () => {
       window.clearTimeout(settleTimer);
-      el.classList.remove("in", "settled");
+      mark("in", false);
+      mark("settled", false);
     };
     const onEnd = (ev: TransitionEvent) => {
-      if (ev.target === el && ev.propertyName === "opacity" && el.classList.contains("in")) {
+      if (ev.target === el && ev.propertyName === "opacity" && state.current.in) {
         window.clearTimeout(settleTimer);
-        el.classList.add("settled");
+        mark("settled", true);
       }
     };
     el.addEventListener("transitionend", onEnd);
