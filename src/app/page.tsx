@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { OrderForm } from "@/components/OrderForm";
 import { EventHero } from "@/components/EventHero";
 import { EventInfo } from "@/components/EventInfo";
+import { vehicleWords } from "@/lib/vehicle";
 import { Reveal } from "@/components/Reveal";
 import { SupportContact } from "@/components/SupportContact";
 import { getActiveEvent, getAvailability, getTicketTypes, isSalesOpen, publicAvailability, publicOrder } from "@/lib/queries";
@@ -39,7 +40,7 @@ export default async function HomePage() {
   const lastClose = types.map((t) => t.sales_close_at).filter((x): x is string => !!x).sort().pop() ?? null;
 
   // Registration fees in the hero: every type sold online, e.g. "₱500 per car".
-  const prices = types.map((t) => ({ label: t.requires_vehicle ? "per car" : t.name, price: php(t.price_centavos) }));
+  const prices = types.map((t) => ({ label: t.requires_vehicle ? `per ${vehicleWords(t).noun}` : t.name, price: php(t.price_centavos) }));
 
   // overflow-x-clip (not hidden): off-screen reveal transforms and hero glows
   // must not create a sideways scroll on phones, and clip keeps the sticky
@@ -51,7 +52,7 @@ export default async function HomePage() {
 
       <section id="tickets" className="dark-zone mx-auto max-w-5xl px-4 pb-16 pt-8 sm:px-8">
         <Reveal className="mb-10 flex items-end justify-between gap-6" from="left">
-          <h2 className="reveal-title display-title text-[2.4rem] sm:text-[3.4rem]">Register your car</h2>
+          <h2 className="reveal-title display-title text-[2.4rem] sm:text-[3.4rem]">Register your ride</h2>
           <p className="hidden text-right text-sm text-zinc-400 sm:block">
             Pay via {primaryChannel(event, rules.channels).payVia}.<br />Your QR pass is emailed after we check your payment (check Spam too).
           </p>

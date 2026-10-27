@@ -12,6 +12,7 @@ import type { TicketTypeRow } from "@/lib/supabase/types";
 import type { PublicAvailability } from "@/lib/queries";
 import { BandSwatch } from "@/components/BandSwatch";
 import { bandSwatchStyle } from "@/lib/bands";
+import { vehicleWords } from "@/lib/vehicle";
 import { Reveal } from "@/components/Reveal";
 import { ShirtSizeChartButton, ShirtSizeHint } from "@/components/ShirtSizeChart";
 import { emailProblem, emailsMatch, mobileProblem, normalizeEmail, normalizeMobile, suggestEmail } from "@/lib/contact";
@@ -40,7 +41,7 @@ const emptyAttendee = (included = 0): Attendee => ({
  * can pick an existing photo from the gallery. Desktop browsers ignore
  * `capture` and show the normal file dialog for both.
  */
-function CarPhotoField({ preview, fileName, onPick }: { preview: string | null; fileName: string | null; onPick: (file: File | null) => void }) {
+function CarPhotoField({ preview, fileName, onPick, noun = "car" }: { preview: string | null; fileName: string | null; onPick: (file: File | null) => void; noun?: string }) {
   const cameraRef = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
   const handle = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -53,7 +54,7 @@ function CarPhotoField({ preview, fileName, onPick }: { preview: string | null; 
       <div className="relative h-36 w-full shrink-0 overflow-hidden rounded-xl border border-white/10 bg-black/40 sm:h-28 sm:w-44">
         {preview ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={preview} alt="Selected car photo" className="h-full w-full object-cover" />
+          <img src={preview} alt={`Selected ${noun} photo`} className="h-full w-full object-cover" />
         ) : (
           <div className="grid h-full w-full place-items-center text-center text-xs text-zinc-500">
             <div>
@@ -85,7 +86,7 @@ function CarPhotoField({ preview, fileName, onPick }: { preview: string | null; 
         </div>
         <p className="mt-2 text-xs text-zinc-500">
           {fileName ? <>Selected: <span className="text-zinc-300">{fileName}</span>. </> : null}
-          On your phone, <b>Take photo</b> opens the camera. A clear shot of the whole car you will display; it is compressed automatically before upload.
+          On your phone, <b>Take photo</b> opens the camera. A clear shot of the whole {noun}; it is compressed automatically before upload.
         </p>
       </div>
     </div>
@@ -211,7 +212,7 @@ export function OrderForm({ types, availability, channel }: { types: TicketTypeR
       if (!t.requires_vehicle) continue;
       for (const [i, a] of (attendees[t.id] ?? []).entries()) {
         if (!a.vehicle_photo) {
-          setError(`Add a photo of the car for ${t.name} ticket ${i + 1}`);
+          setError(`Add a photo of the ${vehicleWords(t).noun} for ${t.name} ${i + 1}`);
           return;
         }
         if (a.companions.length > 0 && a.vehicle_plate.trim().length < 3) {
@@ -308,13 +309,13 @@ export function OrderForm({ types, availability, channel }: { types: TicketTypeR
         for (const [i, a] of (attendees[t.id] ?? []).entries()) {
           if (!a.vehicle_photo) {
             setReview(false);
-            setError(`Add a photo of the car for ${t.name} ticket ${i + 1}`);
+            setError(`Add a photo of the ${vehicleWords(t).noun} for ${t.name} ${i + 1}`);
             return;
           }
           const small = await shrinkImage(a.vehicle_photo);
           if (small.size > 8 * 1024 * 1024) {
             setReview(false);
-            setError(`The car photo for ${t.name} ticket ${i + 1} is too large. Please use a smaller photo.`);
+            setError(`The ${vehicleWords(t).noun} photo for ${t.name} ${i + 1} is too large. Please use a smaller photo.`);
             return;
           }
           fd.set(`photo:${t.id}:${i}`, small);
@@ -341,8 +342,8 @@ export function OrderForm({ types, availability, channel }: { types: TicketTypeR
           biggest, each line stepping down a size, so the page reads as the poster continued. */}
       <section aria-labelledby="tiers-title">
         <Reveal as="h2" className="form-step" delay={80}>
-          <span id="tiers-title"><span className="form-step-no">1</span> How many cars?</span>
-          <span className="form-step-sub">One registration per car. Ilang sasakyan ang irerehistro? Pindutin ang + o -.</span>
+          <span id="tiers-title"><span className="form-step-no">1</span> What are you bringing?</span>
+          <span className="form-step-sub">One registration per car or motorcycle. Ilang sasakyan ang irerehistro? Pindutin ang + o -.</span>
         </Reveal>
         <div className="mt-2">
           {billed.map((t, idx) => {
@@ -362,7 +363,7 @@ export function OrderForm({ types, availability, channel }: { types: TicketTypeR
                     <BandSwatch color={t.band_color} size={16} className="bill-tag" />
                     {t.includes_shirt && <span className="bill-tag bill-tag-cyan">Event t-shirt</span>}
                     {t.ships_shirt && <span className="bill-tag bill-tag-violet">Ships to you in {SHIRT_PROCESSING}</span>}
-                    {t.requires_vehicle && <span className="bill-tag bill-tag-amber">Car photo, plate and model needed</span>}
+                    {t.requires_vehicle && <span className="bill-tag bill-tag-amber">Photo, plate and model of the {vehicleWords(t).noun} needed</span>}
                     {t.includes_shirt && <ShirtSizeChartButton label="Size chart" />}
                   </div>
                   {t.description && <p className="bill-desc">{t.description}</p>}
@@ -400,7 +401,7 @@ export function OrderForm({ types, availability, channel }: { types: TicketTypeR
 
       {anySelected && (
         <section className="enter space-y-3">
-          <h2 className="form-step"><span><span className="form-step-no">2</span> Car and driver details</span><span className="form-step-sub">Driver, plate, make/model at litrato ng bawat sasakyan.</span></h2>
+          <h2 className="form-step"><span><span className="form-step-no">2</span> Vehicle details</span><span className="form-step-sub">Driver o rider, plate, make/model at litrato ng bawat sasakyan.</span></h2>
           {types.filter((t) => (qty[t.id] ?? 0) > 0).map((t) => (
             <div key={t.id} className="card space-y-4">
               <h3 className="holder-title">{t.name} <span className="text-zinc-400">× {qty[t.id]}</span></h3>
@@ -408,8 +409,8 @@ export function OrderForm({ types, availability, channel }: { types: TicketTypeR
                 <div key={i} className="grid gap-3 rounded-lg border border-white/10 bg-black/30 p-3 sm:grid-cols-2">
                   <div className="sm:col-span-2 text-xs font-semibold text-zinc-500">Ticket {i + 1}</div>
                   <div>
-                    <label className="label">{t.requires_vehicle ? "Driver full name *" : "Holder full name *"}</label>
-                    <input className="input" value={a.holder_name} onChange={(e) => updateAttendee(t.id, i, { holder_name: e.target.value })} placeholder={t.requires_vehicle ? "Name of the driver" : "Name of the person using this ticket"} required minLength={2} />
+                    <label className="label">{t.requires_vehicle ? `${vehicleWords(t).person[0].toUpperCase()}${vehicleWords(t).person.slice(1)} full name *` : "Holder full name *"}</label>
+                    <input className="input" value={a.holder_name} onChange={(e) => updateAttendee(t.id, i, { holder_name: e.target.value })} placeholder={t.requires_vehicle ? `Name of the ${vehicleWords(t).person}` : "Name of the person using this ticket"} required minLength={2} />
                   </div>
                   {t.includes_shirt && (
                     <div>
@@ -435,15 +436,16 @@ export function OrderForm({ types, availability, channel }: { types: TicketTypeR
                         <input className="input uppercase" value={a.vehicle_plate} onChange={(e) => updateAttendee(t.id, i, { vehicle_plate: e.target.value.toUpperCase() })} placeholder="ABC 1234" required minLength={3} />
                       </div>
                       <div>
-                        <label className="label">Car make / model *</label>
-                        <input className="input" value={a.vehicle_model} onChange={(e) => updateAttendee(t.id, i, { vehicle_model: e.target.value })} placeholder="Nissan Silvia S15" required minLength={2} />
+                        <label className="label">Make / model *</label>
+                        <input className="input" value={a.vehicle_model} onChange={(e) => updateAttendee(t.id, i, { vehicle_model: e.target.value })} placeholder={vehicleWords(t).example} required minLength={2} />
                       </div>
                       <div className="sm:col-span-2">
-                        <label className="label">Photo of the car *</label>
+                        <label className="label">Photo of the {vehicleWords(t).noun} *</label>
                         <CarPhotoField
                           preview={a.photo_preview}
                           fileName={a.vehicle_photo?.name ?? null}
                           onPick={(file) => setPhoto(t.id, i, file)}
+                          noun={vehicleWords(t).noun}
                         />
                       </div>
                       {companionType && (
