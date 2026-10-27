@@ -1,6 +1,6 @@
 import { cache } from "react";
 import { z } from "zod";
-import { BRAND, HERO, NOTES, THEME, type HeroSlide } from "@/config/site";
+import { BRAND, HERO, INFO, NOTES, THEME, type HeroSlide } from "@/config/site";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 /**
@@ -31,6 +31,8 @@ export interface SiteSettings {
     neon: { pink: string; violet: string; cyan: string; green: string };
   };
   salesScheduleNote: string | null;
+  /** The information block under the hero. */
+  info: { endTime: string; presentedBy: string; sponsors: string };
 }
 
 const KEY = "site";
@@ -59,6 +61,7 @@ export const SITE_DEFAULTS: SiteSettings = {
     neon: { ...THEME.neon },
   },
   salesScheduleNote: NOTES.salesSchedule,
+  info: { ...INFO },
 };
 
 /* ------------------------------------------------------------- validation */
@@ -81,7 +84,8 @@ const slide = z.object({
 
 export const siteSettingsSchema = z.object({
   titleSuffix: z.string().trim().max(40),
-  logo: asset,
+  /** Blank: the event name is set as a type lockup instead (SiteLogo). */
+  logo: asset.or(z.literal("")),
   backdrop: asset,
   shareImage: asset,
   pdfLogo: asset.nullable(),
@@ -99,6 +103,11 @@ export const siteSettingsSchema = z.object({
     neon: z.object({ pink: hex, violet: hex, cyan: hex, green: hex }),
   }),
   salesScheduleNote: z.string().trim().max(600).nullable(),
+  info: z.object({
+    endTime: z.string().trim().regex(/^(([01]\d|2[0-3]):[0-5]\d)?$/, "End time looks wrong, e.g. 17:00"),
+    presentedBy: asset.or(z.literal("")),
+    sponsors: asset.or(z.literal("")),
+  }),
 });
 
 /**
@@ -135,6 +144,7 @@ export function mergeSiteSettings(stored: unknown): SiteSettings {
       neon: pick(shape.theme.shape.neon, theme.neon, d.theme.neon),
     },
     salesScheduleNote: "salesScheduleNote" in s ? pick(shape.salesScheduleNote, s.salesScheduleNote, d.salesScheduleNote) : d.salesScheduleNote,
+    info: pick(shape.info, s.info, d.info),
   };
 }
 

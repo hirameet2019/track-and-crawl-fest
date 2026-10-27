@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Orbitron } from "next/font/google";
+import { Barlow, Barlow_Condensed } from "next/font/google";
 import { LOCALE } from "@/config/site";
 import { SITE_URL, primaryChannel } from "@/config/event";
 import { getActiveEvent } from "@/lib/queries";
@@ -9,7 +9,10 @@ import { RulesProvider } from "@/components/RulesProvider";
 import { themeCss } from "@/lib/theme";
 import "./globals.css";
 
-const orbitron = Orbitron({ subsets: ["latin"], weight: ["700", "900"], variable: "--font-orbitron", display: "swap" });
+// Display: a heavy condensed italic, the poster's "TARLAC CIRCUIT HILL / NOV 7" voice.
+// Body: its plain sibling, so the two read as one family.
+const display = Barlow_Condensed({ subsets: ["latin"], weight: ["600", "700", "800", "900"], style: ["normal", "italic"], variable: "--font-display", display: "swap" });
+const body = Barlow({ subsets: ["latin"], weight: ["400", "500", "600", "700"], variable: "--font-body", display: "swap" });
 
 /**
  * Title and description come from the active event row, so a new event names
@@ -38,7 +41,7 @@ export async function generateViewport(): Promise<Viewport> {
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const [site, rules] = await Promise.all([getSiteSettings(), getRules()]);
   return (
-    <html lang={LOCALE.locale.split("-")[0]} className={`${orbitron.variable} h-full antialiased`}>
+    <html lang={LOCALE.locale.split("-")[0]} className={`${display.variable} ${body.variable} h-full antialiased`}>
       <head>
         {/* Brand palette from Admin > Settings, read by globals.css and the components. */}
         <style>{themeCss(site.theme)}</style>

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { SiteLogo } from "@/components/SiteLogo";
 import { useEffect, useState, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -141,8 +142,7 @@ export function StaffShell({
 
   const brand = (
     <Link prefetch={false} href={homeFor(role)} className="flex items-center gap-3 px-5 pb-5 pt-5" aria-label={eventName ? `${eventName} staff home` : "Staff home"}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={logo} alt={eventName} className="h-10 w-auto max-w-[150px] object-contain" />
+      <SiteLogo src={logo} name={eventName} size="sm" className="h-10 w-auto max-w-[150px] object-contain" />
       <span className="rounded-md border border-zinc-300 px-1.5 py-0.5 text-[11px] font-semibold text-zinc-500">Staff</span>
     </Link>
   );
@@ -161,8 +161,7 @@ export function StaffShell({
         <button type="button" onClick={() => setOpen(true)} className="grid h-10 w-10 place-items-center rounded-xl border border-zinc-200 text-zinc-800" aria-label="Open menu" aria-expanded={open}>
           <Icon name="menu" className="h-5 w-5" />
         </button>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={logo} alt={eventName} className="h-8 w-auto max-w-[110px] object-contain" />
+        <SiteLogo src={logo} name={eventName} size="sm" className="h-8 w-auto max-w-[110px] object-contain" />
         <span className="ml-auto truncate text-sm font-semibold text-zinc-800">{current?.label ?? "Staff"}</span>
       </header>
       {open && (

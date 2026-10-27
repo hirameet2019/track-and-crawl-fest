@@ -2,7 +2,8 @@
  * SITE DEFAULTS. Admins change the look of the site in Admin > Settings; what
  * they save is stored in the database (app_settings, key "site") and wins over
  * the values here. Anything never saved falls back to this file, so these are
- * the factory settings: they reproduce Meet & Drift 3 exactly.
+ * the factory settings: they reproduce Track & Crawl Fest 2026 (forked from the
+ * Meet & Drift 3 build).
  *
  * Editable in Admin > Settings: BRAND (except pdf.palette), HERO, THEME (except
  * palette) and NOTES.salesSchedule. The rest is code-only on purpose: LOCALE is
@@ -17,17 +18,21 @@
 /* ------------------------------------------------------------------ brand */
 
 export const BRAND = {
-  /** Wordmark shown in the hero, the slim page banner, login, staff nav and 404. */
-  logo: "/logo.png",
+  /**
+   * Wordmark shown in the hero, the slim page banner, login, staff nav and 404.
+   * Blank sets the event name as a type lockup (SiteLogo) until a transparent PNG
+   * of the poster's brush logo is uploaded in Admin > Settings.
+   */
+  logo: "",
   /**
    * Artwork washed behind the inner pages (payment, order, login, staff nav).
    * The sales page uses HERO.slides instead.
    */
-  backdrop: "/poster.jpg",
+  backdrop: "/tcf/hero-track.jpg",
   /** Image shown when the site link is shared on Facebook, Messenger, Viber. */
-  shareImage: "/poster.jpg",
-  /** Added after the event name in the browser tab: "Meet & Drift 3 · Tickets". */
-  titleSuffix: "Tickets",
+  shareImage: "/tcf/share.jpg",
+  /** Added after the event name in the browser tab: "Track & Crawl Fest 2026 · Registration". */
+  titleSuffix: "Registration",
   /**
    * Files the PDF ticket embeds. Paths are from the project root, because the PDF
    * is built on the server from disk; next.config.ts reads them from here so they
@@ -35,8 +40,10 @@ export const BRAND = {
    * missing, the PDF draws the event name as a text wordmark instead.
    */
   pdf: {
-    logo: "src/lib/pdf/logo-pdf.png",
-    banner: "public/poster-1x.jpg",
+    // No file here yet: the PDF writes the event name as its wordmark until a
+    // logo is uploaded in Settings (the Meet & Drift logo must not print on these).
+    logo: "src/lib/pdf/logo-event.png",
+    banner: "public/tcf/hero-track.jpg",
     /**
      * Optional hex overrides for the PDF's colour stripe and text wordmark, e.g.
      * `{ pink: "#ff3fd1" }`. Left empty, the PDF keeps the colours it was designed
@@ -68,13 +75,10 @@ export interface HeroSlide {
 export const HERO = {
   /** Artwork behind the sales hero, in order. Drop a file in /public and add a line. */
   slides: [
-    { src: "/poster.jpg", label: "event poster", position: "center 35%" },
-    // 4.6s cut from the event reel, silent and looping. Taken from the stretch with
-    // no burned-in titles, so it does not fight the headline sitting on top of it.
-    { src: "/hero-drift.jpg", label: "drift reel", video: "/hero-drift.mp4", position: "center 45%" },
-    // Wide sponsor banner: centred, so the logos along the top and bottom edges
-    // survive the crop on a tall screen.
-    { src: "/poster-sponsors.jpg", label: "sponsors", position: "center center" },
+    // The circuit scene from the poster, below its title block, so no baked-in text
+    // fights the headline. Swap for the photographer's originals when they arrive.
+    { src: "/tcf/hero-track.jpg", label: "Tarlac Circuit Hill at sunset", position: "center 55%" },
+    { src: "/tcf/hero-title.jpg", label: "Track & Crawl Fest 2026 poster", position: "center 70%" },
   ] satisfies readonly HeroSlide[] as readonly HeroSlide[],
   /** How long each slide stays before the next fades in. */
   intervalMs: 7000,
@@ -82,7 +86,8 @@ export const HERO = {
    * Decorative motion layered over the artwork. The smoke and speed streaks suit a
    * motorsport event; switch them off for anything else. The neon glow is generic.
    */
-  effects: { glow: true, smoke: true, streaks: true },
+  // Tyre smoke and speed streaks suit a circuit day; the white glow would wash out the sunset.
+  effects: { glow: false, smoke: true, streaks: true },
 } as const;
 
 /* ------------------------------------------------------------------ theme */
@@ -92,28 +97,48 @@ export const HERO = {
  * gradient underlines, the hero glow and the staff screens. Any CSS colour works.
  */
 export const THEME = {
-  /** Page background behind the hero and the dark staff screens. */
-  background: "#0a0a0c",
-  /** Top of the hero's fallback gradient, shown while artwork loads. */
-  backgroundDeep: "#14061f",
+  /** Page background: the poster's night-black, warmed toward ember. */
+  background: "#0b0908",
+  /** Top of the hero's fallback gradient: the sunset's last ember. */
+  backgroundDeep: "#2a1206",
   /** Browser address-bar colour on phones. */
-  browserChrome: "#0a0a0a",
-  /** The four stops of the signature neon gradient, left to right. */
+  browserChrome: "#0b0908",
+  /**
+   * The four accent slots (the names are slots from the first build, not colours):
+   * bone white, sunset amber, the poster's CRAWL red, and orange. Buttons run
+   * red to orange; underlines run white, amber, red, orange like the brush stroke.
+   */
   neon: {
-    pink: "#ff3fd1",
-    violet: "#b34cff",
-    cyan: "#2fd8ff",
-    green: "#6dff5c",
+    pink: "#f5efe6",
+    violet: "#ffa21f",
+    cyan: "#e8252b",
+    green: "#ff6a1a",
   },
   /**
-   * Optional: re-tint a whole Tailwind colour family across the app without editing
-   * components. The interface uses `cyan` as its accent in about 90 places, so
-   * overriding it here recolours buttons, links and highlights everywhere.
-   * Leave empty to keep Tailwind's own colours, which is what Meet & Drift 3 uses.
-   *
-   *   palette: { cyan: { 300: "#ffb347", 400: "#ff9f1c", 500: "#f08700", ... } }
+   * Re-tints whole Tailwind families across the app. The interface uses `cyan` as
+   * its accent in about 90 places, so pointing it at red recolours links, tags,
+   * focus and highlights everywhere; fuchsia follows it and violet becomes amber.
    */
-  palette: {} as Partial<Record<"cyan" | "fuchsia" | "violet", Partial<Record<50 | 100 | 200 | 300 | 400 | 500 | 600 | 700 | 800 | 900 | 950, string>>>>,
+  palette: {
+    cyan: { 50: "#fff1f1", 100: "#ffdfe0", 200: "#ffc5c6", 300: "#ff9b9d", 400: "#ff6467", 500: "#f8353a", 600: "#e5181e", 700: "#c11015", 800: "#a01116", 900: "#841519", 950: "#480507" },
+    fuchsia: { 300: "#ff9b9d", 400: "#ff6467", 500: "#f8353a", 600: "#e5181e" },
+    violet: { 50: "#fff8eb", 100: "#ffecc6", 200: "#ffd888", 300: "#ffbe4a", 400: "#ffa21f", 500: "#f98007", 600: "#dd5b02", 700: "#b73d06", 800: "#942f0c", 900: "#7a280d" },
+  } as Partial<Record<"cyan" | "fuchsia" | "violet", Partial<Record<50 | 100 | 200 | 300 | 400 | 500 | 600 | 700 | 800 | 900 | 950, string>>>>,
+} as const;
+
+/* ------------------------------------------------------------------- info */
+
+/**
+ * The event information block between the hero and the registration form.
+ * Date, venue and tagline come from the event row; these fill the rest.
+ */
+export const INFO = {
+  /** When the day ends, "17:00"; blank shows the start time only. */
+  endTime: "17:00",
+  /** Strip of presenter logos ("Presented by"); blank hides the row. */
+  presentedBy: "/tcf/presented-by.png",
+  /** Sponsor logo strip; blank hides it. */
+  sponsors: "/tcf/sponsors.jpg",
 } as const;
 
 /* ----------------------------------------------------------------- locale */

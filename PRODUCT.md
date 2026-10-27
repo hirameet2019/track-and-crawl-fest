@@ -6,6 +6,10 @@
 
 web
 
+## Current event
+
+**Track & Crawl Fest 2026** (fork of the Meet & Drift 3 build, own Supabase and Vercel): Tarlac Circuit Hill, Tarlac, Philippines, Nov 7 2026, 7AM-5PM. "Big cars. Small rigs. Same passion." Presented by 2S06, NoInvite and Philippine RC Expo. The site is a registration: PHP 500 per car (driver, plate, make/model and a car photo), 300 slots to start, paid by bank QR with proof upload and staff verification, as in Meet & Drift. Page order (user, 2026-10-27): event information with the hero first, then the registration and payment.
+
 ## Users
 
 - **Buyers** of event tickets, on phones and laptops in about equal measure. They pick tickets, give holder details (shirt size, car plate where needed, delivery address for shipped shirts), pay by bank QR (GoTyme InstaPay; GCash and Maya can be re-enabled), upload proof, and later open their tickets and receipt from email.
@@ -45,6 +49,9 @@ A small-organizer ticketing system built around physical wristbands: each ticket
 - Redesign work lives on branch `redesign/impeccable`, not merged to `main` until approved.
 
 ## Brand Commitments
+
+- **Track & Crawl look** (user, 2026-10-27): follow the event poster, not the Meet & Drift neon: night-black ground, CRAWL red, bone white, sunset orange/amber, checkered flags, brush strokes, heavy condensed italic type, the Tarlac Circuit Hill photo. Placeholder art is cropped from the poster in public/tcf/ until the organizer sends originals (transparent logo, clean photos, sponsor logos).
+
 
 - **Keep the current theme and colorway** (user, 2026-10-15): dark near-black background with a deep violet top (`#0a0a0c` / `#14061f` defaults) and the four-stop neon gradient pink `#ff3fd1` → violet `#b34cff` → cyan `#2fd8ff` → green `#6dff5c`, all still editable in Settings.
 - **White-label** (user, 2026-10-15): the system will be reused for any event and other organizers, so event identity (name, logo, artwork, poster, sponsors) comes only from Settings; the product chrome stays neutral.

@@ -341,8 +341,8 @@ export function OrderForm({ types, availability, channel }: { types: TicketTypeR
           biggest, each line stepping down a size, so the page reads as the poster continued. */}
       <section aria-labelledby="tiers-title">
         <Reveal as="h2" className="form-step" delay={80}>
-          <span id="tiers-title"><span className="form-step-no">1</span> Choose your tickets</span>
-          <span className="form-step-sub">Piliin kung ilang ticket ang bibilhin. Pindutin ang + or -.</span>
+          <span id="tiers-title"><span className="form-step-no">1</span> How many cars?</span>
+          <span className="form-step-sub">One registration per car. Ilang sasakyan ang irerehistro? Pindutin ang + o -.</span>
         </Reveal>
         <div className="mt-2">
           {billed.map((t, idx) => {
@@ -400,7 +400,7 @@ export function OrderForm({ types, availability, channel }: { types: TicketTypeR
 
       {anySelected && (
         <section className="enter space-y-3">
-          <h2 className="form-step"><span><span className="form-step-no">2</span> Ticket holder details</span><span className="form-step-sub">Pangalan ng gagamit ng bawat ticket. Ito ang lalabas sa wristband record.</span></h2>
+          <h2 className="form-step"><span><span className="form-step-no">2</span> Car and driver details</span><span className="form-step-sub">Driver, plate, make/model at litrato ng bawat sasakyan.</span></h2>
           {types.filter((t) => (qty[t.id] ?? 0) > 0).map((t) => (
             <div key={t.id} className="card space-y-4">
               <h3 className="holder-title">{t.name} <span className="text-zinc-400">× {qty[t.id]}</span></h3>
@@ -408,8 +408,8 @@ export function OrderForm({ types, availability, channel }: { types: TicketTypeR
                 <div key={i} className="grid gap-3 rounded-lg border border-white/10 bg-black/30 p-3 sm:grid-cols-2">
                   <div className="sm:col-span-2 text-xs font-semibold text-zinc-500">Ticket {i + 1}</div>
                   <div>
-                    <label className="label">Holder full name *</label>
-                    <input className="input" value={a.holder_name} onChange={(e) => updateAttendee(t.id, i, { holder_name: e.target.value })} placeholder="Name of the person using this ticket" required minLength={2} />
+                    <label className="label">{t.requires_vehicle ? "Driver full name *" : "Holder full name *"}</label>
+                    <input className="input" value={a.holder_name} onChange={(e) => updateAttendee(t.id, i, { holder_name: e.target.value })} placeholder={t.requires_vehicle ? "Name of the driver" : "Name of the person using this ticket"} required minLength={2} />
                   </div>
                   {t.includes_shirt && (
                     <div>
@@ -517,7 +517,7 @@ export function OrderForm({ types, availability, channel }: { types: TicketTypeR
       )}
 
       <Reveal as="section" className="space-y-3" delay={120}>
-        <h2 className="form-step"><span><span className="form-step-no">{anySelected ? 3 : 2}</span> Your details</span><span className="form-step-sub">Dito ipapadala ang tickets. Siguraduhing tama ang email at cellphone number.</span></h2>
+        <h2 className="form-step"><span><span className="form-step-no">{anySelected ? 3 : 2}</span> Your details</span><span className="form-step-sub">Dito ipapadala ang confirmation at QR pass. Siguraduhing tama ang email at cellphone number.</span></h2>
         <div className="card grid gap-3 sm:grid-cols-2">
           <div className="sm:col-span-2">
             <label className="label">Full name *</label>

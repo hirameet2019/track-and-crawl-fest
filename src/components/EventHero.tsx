@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SiteLogo } from "@/components/SiteLogo";
 import { LOCALE } from "@/config/site";
 import { HeroSlides } from "@/components/HeroSlides";
 import { getSiteSettings } from "@/lib/site-settings";
@@ -64,8 +65,7 @@ export async function EventHero({ event, prices }: { event: EventRow; prices: { 
 
       <div className="mx-auto flex min-h-[78vh] max-w-5xl flex-col justify-end px-5 pb-14 pt-24 sm:min-h-[84vh] sm:px-8">
         <h1 className="m-0">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={site.logo} alt={event.name} className="w-full max-w-[680px] drop-shadow-[0_6px_24px_rgba(0,0,0,0.6)]" />
+          <SiteLogo src={site.logo} name={event.name} size="xl" className="w-full max-w-[680px] drop-shadow-[0_6px_24px_rgba(0,0,0,0.6)]" />
         </h1>
 
         <div className="mt-6 flex flex-wrap gap-3 text-sm">
@@ -76,7 +76,7 @@ export async function EventHero({ event, prices }: { event: EventRow; prices: { 
 
         <div className="mt-8 flex flex-wrap items-end justify-between gap-6">
           <div>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-400">Admission</div>
+            <div className="info-fact-label">Registration</div>
             <div className="mt-1 flex flex-wrap gap-x-6 gap-y-1">
               {prices.map((p) => (
                 <div key={p.label} className="text-lg font-bold">
@@ -85,9 +85,9 @@ export async function EventHero({ event, prices }: { event: EventRow; prices: { 
               ))}
             </div>
           </div>
-          <a href="#tickets" className="btn-neon pulse">Get tickets</a>
+          <a href="#tickets" className="btn-neon pulse">Register now</a>
         </div>
-        <a href="#tickets" aria-label="Scroll down to tickets" className="hero-cue mx-auto mt-8 flex w-fit flex-col items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.3em] text-zinc-400 hover:text-white">
+        <a href="#info" aria-label="Scroll down to the event details" className="hero-cue mx-auto mt-8 flex w-fit flex-col items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.3em] text-zinc-400 hover:text-white">
           Scroll
           <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden><path d="M6 9l6 6 6-6" /></svg>
         </a>
@@ -97,7 +97,7 @@ export async function EventHero({ event, prices }: { event: EventRow; prices: { 
 }
 
 /** Slim banner for payment / order pages. */
-export async function EventBanner({ event, backHref = "/", backLabel = "Back to tickets" }: { event: EventRow; backHref?: string; backLabel?: string }) {
+export async function EventBanner({ event, backHref = "/", backLabel = "Back to registration" }: { event: EventRow; backHref?: string; backLabel?: string }) {
   const { day } = fmtDate(event.starts_at);
   const site = await getSiteSettings();
   return (
@@ -109,8 +109,7 @@ export async function EventBanner({ event, backHref = "/", backLabel = "Back to 
       <div className="flex w-full items-center justify-between gap-4 px-4 py-6 sm:px-6">
         <div>
           <Link href={backHref} className="text-xs text-zinc-300 hover:underline">&larr; {backLabel}</Link>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={site.logo} alt={event.name} className="mt-1 h-16 w-auto sm:h-24" />
+          <SiteLogo src={site.logo} name={event.name} size="sm" className="mt-1 h-16 w-auto sm:h-24" />
           <div className="mt-1 text-xs text-zinc-300">{day}{event.venue ? ` · ${event.venue}` : ""}</div>
         </div>
       </div>

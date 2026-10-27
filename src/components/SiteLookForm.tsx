@@ -107,7 +107,7 @@ export function SiteLookForm({ current, defaults, customised }: { current: SiteS
           <p className="mt-1 text-xs text-zinc-500">The tab reads &ldquo;Event name · {s.titleSuffix || "…"}&rdquo;. The event name comes from Event details.</p>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
-          <AssetField label="Logo" value={s.logo} onChange={(v) => set("logo", v)} hint="Transparent PNG works best. Hero, page banner, login, staff bar." />
+          <AssetField label="Logo" value={s.logo} onChange={(v) => set("logo", v)} hint="Transparent PNG works best. Blank sets the event name in type. Hero, page banner, login, staff bar." />
           <AssetField label="Backdrop" value={s.backdrop} onChange={(v) => set("backdrop", v)} hint="Washed behind the payment, order, login and staff pages." />
           <AssetField label="Share image" value={s.shareImage} onChange={(v) => set("shareImage", v)} hint="Preview when the link is shared on Facebook, Messenger, Viber. About 1200 x 630." />
         </div>
@@ -228,6 +228,21 @@ export function SiteLookForm({ current, defaults, customised }: { current: SiteS
               </div>
             );
           })}
+        </div>
+      </section>
+
+      {/* ---------------------------------------------------------- info */}
+      <section className="space-y-4 border-t border-white/10 pt-5">
+        <h3 className="text-sm font-semibold text-white/90">Event information block</h3>
+        <p className="text-xs text-zinc-500">Shown under the hero, before the registration form. Date, venue and tagline come from Event details.</p>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <div>
+            <label className="label" htmlFor="info-end">Ends at</label>
+            <input id="info-end" type="time" className="input" value={s.info.endTime} onChange={(e) => set("info", { ...s.info, endTime: e.target.value })} />
+            <p className="mt-1 text-xs text-zinc-500">Blank shows the start time only.</p>
+          </div>
+          <AssetField label="Presented by" value={s.info.presentedBy} onChange={(v) => set("info", { ...s.info, presentedBy: v })} hint="Strip of presenter logos. Blank hides the row." />
+          <AssetField label="Sponsors" value={s.info.sponsors} onChange={(v) => set("info", { ...s.info, sponsors: v })} hint="Sponsor logo strip. Blank hides it." />
         </div>
       </section>
 

@@ -34,7 +34,7 @@ export function EventLogo({ className = "", subtitle = "FINAL ROUND" }: { classN
       role="img"
       aria-label={`Meet & Drift 3 ${subtitle ?? ""}`.trim()}
       className={className}
-      style={{ fontFamily: "var(--font-orbitron), 'Arial Black', Impact, sans-serif", fontWeight: 900, overflow: "visible" }}
+      style={{ fontFamily: "var(--font-display), 'Arial Black', Impact, sans-serif", fontWeight: 900, overflow: "visible" }}
     >
       <defs>
         <linearGradient id="ml-pink" x1="0" y1="0" x2="0" y2="1">

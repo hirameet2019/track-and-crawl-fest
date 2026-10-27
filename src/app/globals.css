@@ -16,7 +16,7 @@
 }
 
 body {
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  font-family: var(--font-body), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
 }
 
 /* ---------- Hero motion (transform/opacity only; disabled for reduced-motion) ---------- */
@@ -167,17 +167,17 @@ body {
    `--color-white` stays white (text-white keeps meaning white); bg-white panels are
    pointed at the raised surface below.                                            */
 .staff-shell {
-  --color-zinc-50: oklch(17.5% 0.012 300);
-  --color-zinc-100: oklch(21% 0.014 300);
-  --color-zinc-200: oklch(28% 0.016 300);
-  --color-zinc-300: oklch(34% 0.018 300);
-  --color-zinc-400: oklch(65% 0.018 300);
-  --color-zinc-500: oklch(71% 0.016 300);
-  --color-zinc-600: oklch(79% 0.012 300);
-  --color-zinc-700: oklch(86% 0.009 300);
-  --color-zinc-800: oklch(92% 0.006 300);
-  --color-zinc-900: oklch(96.5% 0.004 300);
-  --color-zinc-950: oklch(98.5% 0.002 300);
+  --color-zinc-50: oklch(17.5% 0.012 45);
+  --color-zinc-100: oklch(21% 0.014 45);
+  --color-zinc-200: oklch(28% 0.016 45);
+  --color-zinc-300: oklch(34% 0.018 45);
+  --color-zinc-400: oklch(65% 0.018 45);
+  --color-zinc-500: oklch(71% 0.016 45);
+  --color-zinc-600: oklch(79% 0.012 45);
+  --color-zinc-700: oklch(86% 0.009 45);
+  --color-zinc-800: oklch(92% 0.006 45);
+  --color-zinc-900: oklch(96.5% 0.004 45);
+  --color-zinc-950: oklch(98.5% 0.002 45);
   --color-emerald-50: oklch(42% 0.09 162 / 0.16);
   --color-emerald-100: oklch(48% 0.1 162 / 0.24);
   --color-emerald-200: oklch(62% 0.13 162 / 0.38);
@@ -206,30 +206,30 @@ body {
   --color-blue-900: oklch(88% 0.07 255);
   --color-sky-50: oklch(50% 0.11 230 / 0.16);
   --color-sky-100: oklch(55% 0.12 230 / 0.24);
-  --color-violet-50: oklch(45% 0.15 300 / 0.16);
-  --color-violet-100: oklch(50% 0.16 300 / 0.24);
-  --color-violet-800: oklch(85% 0.1 300);
-  --color-violet-900: oklch(88% 0.08 300);
+  --color-violet-50: oklch(45% 0.15 70 / 0.16);
+  --color-violet-100: oklch(50% 0.16 70 / 0.24);
+  --color-violet-800: oklch(85% 0.1 70);
+  --color-violet-900: oklch(88% 0.08 70);
   color-scheme: dark;
 }
 .staff-shell .bg-white { background-color: var(--color-zinc-50); }
 .staff-shell .shadow-sm { box-shadow: 0 1px 0 rgb(255 255 255 / 0.03) inset, 0 8px 24px rgb(0 0 0 / 0.25); }
 .staff-shell .card { border-color: var(--color-zinc-200); background-color: var(--color-zinc-50); backdrop-filter: none; }
-.staff-shell .input { border-color: var(--color-zinc-300); background-color: oklch(14% 0.01 300); color: var(--color-zinc-900); }
+.staff-shell .input { border-color: var(--color-zinc-300); background-color: oklch(14% 0.01 45); color: var(--color-zinc-900); }
 .staff-shell .input::placeholder { color: var(--color-zinc-400); }
 .staff-shell .input:focus { border-color: var(--neon-cyan); box-shadow: 0 0 0 3px color-mix(in srgb, var(--neon-cyan) 20%, transparent); }
-.staff-shell select.input option { background: oklch(17.5% 0.012 300); color: var(--color-zinc-900); }
+.staff-shell select.input option { background: oklch(17.5% 0.012 45); color: var(--color-zinc-900); }
 .staff-shell input[type="file"].input::file-selector-button { background: var(--color-zinc-200); color: var(--color-zinc-900); border: 0; border-radius: 6px; padding: 2px 8px; margin-right: 8px; }
 .staff-shell .label { color: var(--color-zinc-500); }
 .staff-shell .btn-secondary { border-color: var(--color-zinc-300); background-color: var(--color-zinc-100); color: var(--color-zinc-900); }
 .staff-shell .btn-secondary:hover:not(:disabled) { background-color: var(--color-zinc-200); }
-.staff-shell .btn-primary { background-color: var(--color-zinc-900); color: oklch(15% 0.01 300); }
+.staff-shell .btn-primary { background-color: var(--color-zinc-900); color: oklch(15% 0.01 45); }
 .staff-shell .btn-primary:hover:not(:disabled) { background-color: var(--color-zinc-950); }
 .staff-shell table { font-variant-numeric: tabular-nums; }
 .staff-shell th { color: var(--color-zinc-500); font-weight: 600; }
 /* Page titles: the event's display voice, sized for a working screen */
 .staff-shell main h1 {
-  font-family: var(--font-orbitron), "Arial Black", sans-serif;
+  font-family: var(--font-display), "Arial Black", sans-serif;
   font-weight: 900; font-style: italic; text-transform: uppercase; letter-spacing: 0.01em;
   font-size: 1.6rem; line-height: 1.1; color: #fff;
 }
@@ -346,13 +346,13 @@ table, .tabular { font-variant-numeric: tabular-nums; }
 /* ---------- Public: display type, form steps, poster billing, stepper, total bar ---------- */
 @layer components {
   .display-title {
-    font-family: var(--font-orbitron), "Arial Black", sans-serif;
+    font-family: var(--font-display), "Arial Black", sans-serif;
     font-weight: 900; font-style: italic; text-transform: uppercase; letter-spacing: 0.01em; line-height: 1;
   }
   .form-step { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 1rem; }
   .form-step > span:first-child {
     display: flex; align-items: center; gap: 0.75rem; color: #fff;
-    font-family: var(--font-orbitron), "Arial Black", sans-serif;
+    font-family: var(--font-display), "Arial Black", sans-serif;
     font-weight: 900; font-style: italic; text-transform: uppercase; font-size: 1.15rem; line-height: 1.1;
   }
   @media (min-width: 640px) { .form-step > span:first-child { font-size: 1.35rem; } }
@@ -363,7 +363,7 @@ table, .tabular { font-variant-numeric: tabular-nums; }
   }
   .form-step-sub { font-size: 0.875rem; font-weight: 400; color: #a1a1aa; }
   .holder-title {
-    font-family: var(--font-orbitron), "Arial Black", sans-serif;
+    font-family: var(--font-display), "Arial Black", sans-serif;
     font-weight: 900; font-style: italic; text-transform: uppercase; font-size: 1.05rem;
   }
 
@@ -377,7 +377,7 @@ table, .tabular { font-variant-numeric: tabular-nums; }
   .bill-line.is-picked { background: linear-gradient(90deg, color-mix(in srgb, var(--neon-cyan) 10%, transparent), transparent 75%); }
   .bill-line.is-out { opacity: 0.55; }
   .bill-name {
-    font-family: var(--font-orbitron), "Arial Black", sans-serif;
+    font-family: var(--font-display), "Arial Black", sans-serif;
     font-weight: 900; font-style: italic; text-transform: uppercase; line-height: 0.98; letter-spacing: 0.005em;
     overflow-wrap: anywhere; color: #fff;
   }
@@ -398,7 +398,7 @@ table, .tabular { font-variant-numeric: tabular-nums; }
   .bill-buy { display: flex; align-items: center; justify-content: space-between; gap: 1.25rem; }
   @media (min-width: 768px) { .bill-buy { justify-content: flex-end; } }
   .bill-price {
-    font-family: var(--font-orbitron), "Arial Black", sans-serif; font-weight: 700;
+    font-family: var(--font-display), "Arial Black", sans-serif; font-weight: 700;
     font-size: clamp(1.3rem, 2.2vw, 1.7rem); font-variant-numeric: tabular-nums; white-space: nowrap;
   }
 
@@ -416,7 +416,7 @@ table, .tabular { font-variant-numeric: tabular-nums; }
   .stepper svg { width: 1.1rem; height: 1.1rem; fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; }
   .stepper input {
     width: 3.25rem; border: 0; background: transparent; text-align: center; color: #fff; outline: none;
-    font-family: var(--font-orbitron), "Arial Black", sans-serif; font-weight: 700; font-size: 1.15rem;
+    font-family: var(--font-display), "Arial Black", sans-serif; font-weight: 700; font-size: 1.15rem;
   }
   .is-picked .stepper {
     border-color: color-mix(in srgb, var(--neon-cyan) 70%, transparent);
@@ -442,7 +442,7 @@ table, .tabular { font-variant-numeric: tabular-nums; }
     box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.25);
   }
   .total-amount {
-    font-family: var(--font-orbitron), "Arial Black", sans-serif; font-weight: 900;
+    font-family: var(--font-display), "Arial Black", sans-serif; font-weight: 900;
     font-size: 2rem; line-height: 1.1; font-variant-numeric: tabular-nums;
   }
 }
@@ -460,12 +460,12 @@ table, .tabular { font-variant-numeric: tabular-nums; }
   .dark-zone .card.callout-danger { border-color: rgb(244 63 94 / 0.4); background-color: rgb(244 63 94 / 0.1); }
   .dark-zone .card.callout-ok { border-color: rgb(16 185 129 / 0.4); background-color: rgb(16 185 129 / 0.1); }
   .dark-zone .card.callout-warn { border-color: rgb(245 158 11 / 0.35); background-color: rgb(245 158 11 / 0.09); }
-  .ticket-no { font-family: var(--font-orbitron), "Arial Black", sans-serif; font-weight: 900; letter-spacing: 0.02em; font-variant-numeric: tabular-nums; }
+  .ticket-no { font-family: var(--font-display), "Arial Black", sans-serif; font-weight: 900; letter-spacing: 0.02em; font-variant-numeric: tabular-nums; }
 }
 
 /* ---------- Staff shell: sidebar, top bar, nav ---------- */
 .staff-sidebar {
-  background: linear-gradient(180deg, color-mix(in srgb, var(--brand-bg-deep) 70%, oklch(15% 0.012 300)) 0%, oklch(13.5% 0.01 300) 38%);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--brand-bg-deep) 70%, oklch(15% 0.012 45)) 0%, oklch(13.5% 0.01 45) 38%);
   border-right: 1px solid var(--color-zinc-200);
   position: relative;
 }
@@ -477,7 +477,7 @@ table, .tabular { font-variant-numeric: tabular-nums; }
 .staff-drawer { animation: drawer-in 0.32s cubic-bezier(0.22, 1, 0.36, 1) both; box-shadow: 24px 0 60px rgb(0 0 0 / 0.5); }
 @keyframes drawer-in { from { transform: translate3d(-100%, 0, 0); } to { transform: none; } }
 .staff-topbar {
-  background: color-mix(in srgb, oklch(13.5% 0.01 300) 88%, transparent);
+  background: color-mix(in srgb, oklch(13.5% 0.01 45) 88%, transparent);
   backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--color-zinc-200);
 }
@@ -506,4 +506,67 @@ table, .tabular { font-variant-numeric: tabular-nums; }
   }
   .btn-go:hover:not(:disabled) { filter: brightness(1.07); box-shadow: 0 8px 28px color-mix(in srgb, var(--neon-green) 32%, transparent); }
   .btn-go:active:not(:disabled) { transform: translateY(1px); }
+}
+
+/* ---------- Track & Crawl: the poster's grunge world ----------
+   Night-black ground, CRAWL red, bone white, checkered flags and a red brush
+   stroke. The brush is one authored path used as a mask, so its colour follows
+   the accent saved in Settings.                                                   */
+:root {
+  --brush: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 28' preserveAspectRatio='none'%3E%3Cpath d='M3 15c30-7 68-10 110-9 22-3 47-2 74 0 40-4 92-3 140 1 25-2 46-1 70 3l-2 7c-18 0-37 3-58 2-30 4-70 3-108 1-36 4-88 4-128 1-30 3-66 3-96 2L2 21l9-2-8-2z'/%3E%3Cpath d='M40 23c40 2 90 1 130-1 50 2 110 0 160-2l-8 5c-50 3-100 2-150 2-45 1-90 0-132-2z' opacity='.7'/%3E%3C/svg%3E");
+}
+.reveal-title::after {
+  height: 12px; bottom: -14px; border-radius: 0; background: var(--neon-cyan);
+  -webkit-mask: var(--brush) center / 100% 100% no-repeat; mask: var(--brush) center / 100% 100% no-repeat;
+}
+.display-title, .form-step > span:first-child, .holder-title, .bill-name, .total-amount, .bill-price, .ticket-no, .staff-shell main h1 {
+  letter-spacing: 0.005em;
+}
+.display-title { font-weight: 900; }
+.checker {
+  height: 18px; transform: skewX(-18deg);
+  background: repeating-conic-gradient(var(--neon-pink) 0 25%, var(--brand-bg) 0 50%) 0 0 / 18px 18px;
+  -webkit-mask: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent); mask: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+  opacity: 0.85;
+}
+
+/* The event name as a type lockup until a transparent logo is uploaded */
+.site-logo {
+  display: inline-block; font-family: var(--font-display), "Arial Narrow", sans-serif;
+  font-weight: 900; font-style: italic; text-transform: uppercase; line-height: 0.86; letter-spacing: -0.005em;
+  color: var(--neon-pink); -webkit-text-stroke: 2px var(--brand-bg); paint-order: stroke fill;
+  text-shadow: 0 4px 0 rgb(0 0 0 / 0.55), 0 0 30px rgb(0 0 0 / 0.5);
+}
+.site-logo-accent { color: var(--neon-cyan); }
+.site-logo-sm { font-size: 1.45rem; -webkit-text-stroke-width: 1px; }
+.site-logo-md { font-size: 2.6rem; }
+.site-logo-xl { font-size: clamp(3.6rem, 10vw, 7.6rem); -webkit-text-stroke-width: 3px; }
+.site-logo-xl .site-logo-accent { display: block; }
+img.site-logo-sm, img.site-logo-md, img.site-logo-xl { -webkit-text-stroke: 0; }
+
+/* Event information block */
+.info-section {
+  position: relative; isolation: isolate;
+  background:
+    radial-gradient(900px 420px at 85% 0%, color-mix(in srgb, var(--neon-green) 16%, transparent), transparent 65%),
+    linear-gradient(180deg, var(--brand-bg), color-mix(in srgb, var(--brand-bg-deep) 55%, var(--brand-bg)) 100%);
+  color: #fff;
+}
+.info-fact { display: grid; grid-template-columns: 3.25rem minmax(0, 1fr); gap: 1rem; align-items: start; }
+.info-fact-icon { width: 2.75rem; height: 2.75rem; color: var(--neon-cyan); margin-top: 0.35rem; }
+.info-fact-label { font-size: 0.8rem; font-weight: 600; letter-spacing: 0.22em; text-transform: uppercase; color: #d6cfc4; }
+.info-fact-value {
+  font-family: var(--font-display), "Arial Narrow", sans-serif; font-weight: 900; font-style: italic; text-transform: uppercase;
+  font-size: clamp(2.2rem, 5vw, 3.4rem); line-height: 0.95; color: #fff; overflow-wrap: anywhere;
+}
+.info-fact-sub { margin-top: 0.3rem; font-size: 0.95rem; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: #d6cfc4; }
+.info-link { font-weight: 600; color: var(--color-cyan-300); text-decoration: underline; text-underline-offset: 4px; }
+.info-link:hover { color: #fff; }
+.info-tagline {
+  font-family: var(--font-display), "Arial Narrow", sans-serif; font-weight: 800; font-style: italic; text-transform: uppercase;
+  font-size: clamp(2rem, 4.6vw, 3.2rem); line-height: 1; letter-spacing: 0.04em; color: #fff;
+}
+.info-tagline::after {
+  content: ""; display: block; width: min(100%, 24rem); height: 16px; margin-top: 0.7rem; background: var(--neon-cyan);
+  -webkit-mask: var(--brush) center / 100% 100% no-repeat; mask: var(--brush) center / 100% 100% no-repeat;
 }

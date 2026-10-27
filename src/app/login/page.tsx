@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SiteLogo } from "@/components/SiteLogo";
 import { redirect } from "next/navigation";
 import { LoginForm } from "@/components/LoginForm";
 import { getStaff } from "@/lib/auth";
@@ -22,11 +23,10 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
       <div className="absolute inset-0 -z-20 bg-cover bg-[position:center_40%] opacity-50" style={{ backgroundImage: `url(${site.backdrop})` }} aria-hidden />
       <div className="absolute inset-0 -z-10 bg-gradient-to-b from-black/70 via-black/60 to-brand" aria-hidden />
       <Link href="/" className="absolute left-4 top-4 inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-black/40 px-3 py-1.5 text-sm text-zinc-200 backdrop-blur-sm transition hover:bg-white/10 hover:text-white sm:left-6 sm:top-6">
-        <span aria-hidden>&larr;</span> Back to tickets
+        <span aria-hidden>&larr;</span> Back to registration
       </Link>
       <div className="w-full max-w-sm">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={site.logo} alt={event?.name ?? ""} className="mx-auto mb-6 w-64 drop-shadow-[0_6px_24px_rgba(0,0,0,0.7)]" />
+        <SiteLogo src={site.logo} name={event?.name ?? ""} size="md" className="mx-auto mb-6 block w-64 text-center drop-shadow-[0_6px_24px_rgba(0,0,0,0.7)]" />
         <h1 className="display-title text-center text-2xl">Staff login</h1>
         <p className="mb-6 text-center text-sm text-zinc-300">For organizer staff, verifiers, and gate scanners.</p>
         {notStaff && (
