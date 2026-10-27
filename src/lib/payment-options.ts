@@ -61,6 +61,16 @@ export function paymentOptions(event: EventPay, rules: Pick<Rules, "channels" | 
 }
 
 /**
+ * What the proof form offers and the server accepts: the channels above, or GoTyme
+ * alone while nothing is set up yet (the page has always fallen back to it). The
+ * payment page and submitPaymentProof both use this, so they never disagree.
+ */
+export function offeredOptions(event: EventPay, rules: Pick<Rules, "channels" | "extraChannels">): PaymentOption[] {
+  const options = paymentOptions(event, rules);
+  return options.length ? options : [{ ...rules.channels.gotyme, id: "gotyme", method: "gotyme", qr: null, accountName: null, accountNumber: null }];
+}
+
+/**
  * How an order's payment reads on staff screens, receipts and exports: the channel
  * name saved with the proof ("BPI bank transfer"), else the method key as before.
  */

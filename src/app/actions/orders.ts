@@ -11,7 +11,7 @@ import { IMAGE_MIME, MAX_UPLOAD_BYTES } from "@/lib/image";
 import { MOBILE_RE, emailProblem, normalizeEmail, normalizeMobile } from "@/lib/contact";
 import { audit } from "@/lib/audit";
 import { shippingSchema } from "@/lib/shipping";
-import { paymentOptions } from "@/lib/payment-options";
+import { offeredOptions } from "@/lib/payment-options";
 
 export type ActionResult = { ok: true; warning?: string } | { ok: false; error: string };
 
@@ -272,7 +272,7 @@ export async function submitPaymentProof(formData: FormData): Promise<ActionResu
     admin.from("events").select("gotyme_qr_url, gotyme_account_name, gcash_qr_url, gcash_account_name, maya_qr_url, maya_account_name").eq("id", order.event_id).single(),
     getRules(),
   ]);
-  const option = event ? paymentOptions(event, rules).find((o) => o.id === parsed.data.payment_channel) : undefined;
+  const option = event ? offeredOptions(event, rules).find((o) => o.id === parsed.data.payment_channel) : undefined;
   if (!option) return { ok: false, error: "That payment channel is not available any more. Reload the page and choose again." };
 
   // Reject reference numbers already used on another live order through the same channel

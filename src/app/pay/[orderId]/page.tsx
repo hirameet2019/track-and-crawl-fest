@@ -10,7 +10,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { php } from "@/lib/money";
 import { primaryChannel } from "@/config/event";
 import { getRules } from "@/lib/rules";
-import { paymentOptions } from "@/lib/payment-options";
+import { offeredOptions, paymentOptions } from "@/lib/payment-options";
 import { SupportContact } from "@/components/SupportContact";
 
 export const dynamic = "force-dynamic";
@@ -29,8 +29,9 @@ export default async function PayPage({ params }: { params: Promise<{ orderId: s
   const t = rules.payPage;
   const show = t.show;
   const pc = primaryChannel(event, rules.channels, rules.extraChannels);
-  // Every channel switched on in Settings: built-ins with a QR, then added ones
-  // with a QR or account number. None set up yet still shows GoTyme in the form.
+  // Cards for every channel switched on in Settings: built-ins with a QR, then added
+  // ones with a QR or account number. The form's choices come from offeredOptions,
+  // which falls back to GoTyme while none is set up, exactly as the server accepts.
   const options = paymentOptions(event, rules);
   const vars = {
     amount: php(order.total_centavos),
@@ -108,7 +109,7 @@ export default async function PayPage({ params }: { params: Promise<{ orderId: s
         <div className="mt-3">
           <ProofForm
             orderId={order.id}
-            options={options.length ? options.map((o) => ({ id: o.id, label: o.label, app: o.app, referenceImage: o.referenceImage })) : [{ id: "gotyme", label: rules.channels.gotyme.label, app: rules.channels.gotyme.app, referenceImage: rules.channels.gotyme.referenceImage }]}
+            options={offeredOptions(event, rules).map((o) => ({ id: o.id, label: o.label, app: o.app, referenceImage: o.referenceImage }))}
             vars={vars}
           />
         </div>
