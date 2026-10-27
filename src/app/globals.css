@@ -467,7 +467,8 @@ table, .tabular { font-variant-numeric: tabular-nums; }
 .staff-sidebar {
   background: linear-gradient(180deg, color-mix(in srgb, var(--brand-bg-deep) 70%, oklch(15% 0.012 45)) 0%, oklch(13.5% 0.01 45) 38%);
   border-right: 1px solid var(--color-zinc-200);
-  position: relative;
+  /* No position here: this rule is unlayered, so it would beat the utilities' sticky
+     (desktop) and absolute (phone drawer). Both already anchor the ::after. */
 }
 /* the event's four-stop gradient as a hairline down the sidebar edge */
 .staff-sidebar::after {
