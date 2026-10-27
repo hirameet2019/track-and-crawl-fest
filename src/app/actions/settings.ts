@@ -45,6 +45,11 @@ export async function saveEmailSettingsAction(formData: FormData): Promise<Actio
     if (!v.resend_api_key && current.source === "database") v.resend_api_key = current.resend_api_key;
 
     if (v.smtp_host && !v.from) return { ok: false, error: "Enter the sender address (From)" };
+    // "Name <address>" or a bare address. A website in the brackets makes the mail server refuse or rewrite it.
+    const fromAddr = v.from.match(/<([^>]*)>\s*$/)?.[1] ?? v.from;
+    if (v.from && !z.string().email().safeParse(fromAddr.trim()).success) {
+      return { ok: false, error: `From must be an email address, e.g. Track & Crawl Fest <${v.smtp_user.includes("@") ? v.smtp_user : "you@gmail.com"}>` };
+    }
     if (!v.smtp_host && !v.resend_api_key) {
       await clearEmailSettings();
     } else {
