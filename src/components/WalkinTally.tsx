@@ -280,7 +280,7 @@ export function WalkinTally({
                 key={m.key}
                 type="button"
                 onClick={() => { setMethod(m.key); setError(null); }}
-                className={`rounded-md px-4 py-1.5 text-sm font-semibold transition ${method === m.key ? "bg-gradient-to-r from-cyan-300 to-green-300 text-zinc-950" : "text-zinc-300 hover:bg-white/10"}`}
+                className={`rounded-md px-4 py-1.5 text-sm font-semibold transition ${method === m.key ? "bg-white/[0.12] text-white ring-1 ring-inset ring-cyan-300/70" : "text-white/75 hover:bg-white/10"}`}
               >
                 {m.label}
               </button>
@@ -440,7 +440,7 @@ export function WalkinTally({
                         role="radio"
                         aria-checked={size === s}
                         onClick={() => { setSizeFor((cur) => ({ ...cur, [t.id]: cur[t.id] === s ? null : s })); setError(null); }}
-                        className={`min-w-10 rounded-md border px-2 py-1 text-xs font-semibold transition ${size === s ? "border-transparent bg-gradient-to-r from-cyan-300 to-green-300 text-zinc-950" : "border-white/15 text-zinc-300 hover:bg-white/10"}`}
+                        className={`min-w-10 rounded-md border px-2 py-1 text-xs font-semibold transition ${size === s ? "border-transparent bg-white/[0.12] text-white ring-1 ring-inset ring-cyan-300/70" : "border-white/15 text-white/75 hover:bg-white/10"}`}
                       >
                         {s}
                       </button>
@@ -509,7 +509,7 @@ export function WalkinTally({
               {/* named sales in through the gate; tapping one fills its plate or name so − takes it back */}
               {isNamed && sold.length > 0 && (
                 <details className="rounded-lg border border-white/10 bg-black/20 text-xs">
-                  <summary className="cursor-pointer px-2 py-1.5 font-semibold text-zinc-300">
+                  <summary className="cursor-pointer px-2 py-1.5 font-semibold text-white/75">
                     {car ? `${soldCount} car${soldCount === 1 ? "" : "s"}` : soldCount} sold at the gate
                   </summary>
                   <ul className="max-h-48 divide-y divide-white/10 overflow-y-auto">
@@ -521,8 +521,8 @@ export function WalkinTally({
                           onClick={() => setWho(t.id, car ? { plate: x.plate ?? "", name: "" } : { name: x.name })}
                           title={car ? "Fill this plate, then tap − to take the car back" : "Fill this name, then tap − to take the sale back"}
                         >
-                          {car && <span className="font-mono font-semibold text-zinc-100">{x.plate}</span>}
-                          <span className={`truncate ${car ? "text-zinc-400" : "text-zinc-100"}`}>{x.name}</span>
+                          {car && <span className="font-mono font-semibold text-white">{x.plate}</span>}
+                          <span className={`truncate ${car ? "text-zinc-400" : "text-white"}`}>{x.name}</span>
                           <span className="text-zinc-500">{x.size ?? ""}{x.count > 1 ? ` ×${x.count}` : ""}</span>
                         </button>
                       </li>
@@ -542,11 +542,11 @@ export function WalkinTally({
           <h2 className="font-semibold">Today&apos;s walk-in total</h2>
           <div className="mt-2 text-3xl font-black">{php(today.total_centavos)}</div>
           <div className="text-xs text-zinc-500">{today.entries} entr{today.entries === 1 ? "y" : "ies"} recorded today</div>
-          <dl className="mt-3 grid grid-cols-3 gap-2 text-sm">
+          <dl className="mt-4 divide-y divide-zinc-200 border-y border-zinc-200 text-sm">
             {METHODS.map((m) => (
-              <div key={m.key} className="rounded-lg bg-black/30 p-2">
-                <dt className="text-[10px] uppercase tracking-wide text-zinc-500">{m.label}</dt>
-                <dd className="font-bold">{php(today.byMethod[m.key] ?? 0)}</dd>
+              <div key={m.key} className="flex items-center justify-between py-2">
+                <dt className="text-zinc-500">{m.label}</dt>
+                <dd className="font-semibold tabular-nums text-white">{php(today.byMethod[m.key] ?? 0)}</dd>
               </div>
             ))}
           </dl>
@@ -570,8 +570,8 @@ export function WalkinTally({
                       {e.free_qty !== 0 && <span className="ml-1 text-[10px] font-normal text-zinc-500">car ({Math.abs(e.qty)} bands)</span>}
                     </td>
                     <td>
-                      <span className="mr-1 rounded bg-white/10 px-1 font-black">{e.code}</span>{e.type_name}
-                      {e.shirt_size && <span className="ml-1 rounded border border-white/15 px-1 text-[10px] font-semibold text-zinc-300">{e.shirt_size}</span>}
+                      <span className="mr-1 rounded bg-white/10 px-1 font-black">{e.code}</span><BandSwatch color={e.band_color} label={false} size={10} className="mr-1 align-middle" />{e.type_name}
+                      {e.shirt_size && <span className="ml-1 rounded border border-white/15 px-1 text-[10px] font-semibold text-white/75">{e.shirt_size}</span>}
                       {(e.vehicle_plate || e.holder_name) && (
                         <span className="block text-xs text-zinc-500">
                           {e.vehicle_plate && <span className="font-mono">{e.vehicle_plate}</span>}
@@ -581,13 +581,12 @@ export function WalkinTally({
                       )}
                       {e.shipping && <span className="block text-[11px] text-violet-300">Shirt ships to {e.shipping.city} via {e.shipping.courier}</span>}
                     </td>
-                    <td className="text-zinc-500"><BandSwatch color={e.band_color} label={false} size={10} /> {e.band_color}</td>
                     <td className="text-right">{php(sales * e.unit_price_centavos)}</td>
-                    <td className="text-right text-xs uppercase text-zinc-500">
-                      {e.payment_method}
-                      {e.payment_ref && <span className="block font-mono normal-case text-[10px]">{e.payment_ref}</span>}
+                    <td className="text-right text-xs text-zinc-500">
+                      <span className="uppercase">{e.payment_method}</span>
+                      {e.payment_ref && <span className="block font-mono text-[10px]">{e.payment_ref}</span>}
+                      {e.staff && <span className="block truncate">{e.staff}</span>}
                     </td>
-                    <td className="text-right text-xs text-zinc-500">{e.staff ?? ""}</td>
                   </tr>
                   );
                 })}

@@ -81,13 +81,13 @@ export function EventDayReport() {
       <div>
         <div className="text-xs font-semibold uppercase tracking-widest text-zinc-500">Report · Event day, 10 October 2026</div>
         <h1 className="mt-1 text-2xl font-bold">The ₱390K on the dashboard</h1>
-        <p className="mt-2 text-zinc-300">
+        <p className="mt-2 text-white/75">
           The lower total on the dashboard that night was a counting error on the screen. No money is missing: every sale was recorded.
           Early Bird, Early Bird Kids, Adult Walk-in and Kids Walk-in add up to <b className="tabular-nums">₱257,625</b>.
         </p>
         <p className="mt-1 text-xs text-zinc-500">
           Covers general admission only. The ₱390K on the dashboard counted every ticket type. A snapshot prepared 11 October 2026; these figures do not
-          update on their own, the <Link prefetch={false} href="/admin" className="underline hover:text-zinc-300">Dashboard</Link> has the live numbers.
+          update on their own, the <Link prefetch={false} href="/admin" className="underline hover:text-white/75">Dashboard</Link> has the live numbers.
         </p>
       </div>
 
@@ -99,7 +99,7 @@ export function EventDayReport() {
 
       <div className="rounded-xl border border-emerald-400/30 bg-emerald-400/10 p-4 text-sm">
         <div className="text-xs font-semibold uppercase tracking-wide text-emerald-300">Sa madaling salita</div>
-        <p className="mt-1 text-zinc-200">
+        <p className="mt-1 text-white/90">
           Walang nawalang pera. Kumpleto ang benta sa system. Early Bird, Kids at Adult Walk-in: ₱257,625. Lumampas sa 1,000 ang walk-in entries noong
           event, kaya hindi lahat nabilang ng dashboard. Naayos na ito bandang 8:10 PM.
         </p>
@@ -107,17 +107,17 @@ export function EventDayReport() {
 
       <section className="card space-y-3">
         <h2 className="font-semibold">What happened</h2>
-        <p className="text-sm text-zinc-300">
+        <p className="text-sm text-white/75">
           The dashboard could only add up <b>1,000 gate entries at a time</b>. At 5:21 PM the gate passed 1,000 entries, and by closing there were 1,461.
           From 5:21 PM until the fix at about 8:10 PM, the dashboard and the Walk-in screen showed totals that were too low. Online orders were never affected.
         </p>
         <div role="img" aria-label="1,000 of 1,461 gate entries were counted; 461 were left off the screen">
           <div className="flex h-6 overflow-hidden rounded border border-white/15">
-            <div className="bg-zinc-300" style={{ width: "68.4%" }} />
+            <div className="bg-white/70" style={{ width: "68.4%" }} />
             <div className="flex-1 border-l-2 border-orange-400" style={{ background: "repeating-linear-gradient(135deg, rgba(251,146,60,0.25) 0 6px, transparent 6px 12px)" }} />
           </div>
           <div className="mt-1 flex flex-wrap justify-between gap-2 text-xs text-zinc-400">
-            <span><b className="text-zinc-200">1,000</b> entries counted</span>
+            <span><b className="text-white/90">1,000</b> entries counted</span>
             <span><b className="text-orange-300">461</b> not counted on screen (still recorded)</span>
           </div>
         </div>
@@ -138,7 +138,7 @@ export function EventDayReport() {
       <section className="space-y-2">
         <h2 className="font-semibold">Online tickets <span className="text-sm font-normal text-zinc-500">paid through GoTyme · two orders have no payment method on record</span></h2>
         <SalesTable head={["Ticket", "Tickets"]} rows={ONLINE} total={{ label: "Total online", count: "448", amount: "₱61,350" }} />
-        <p className="rounded-lg border-l-4 border-sky-400 bg-sky-400/10 px-3 py-2 text-sm text-zinc-200">
+        <p className="callout callout-info">
           <b>Kids Walk-in and Early Bird Kids</b> use the same blue-stripes wristband. Kids Walk-in is the gate sale (199 bands, ₱14,925); Early Bird Kids is
           the online ticket (78, ₱5,850). Together: 277 kids&apos; bands, ₱20,775.
         </p>
@@ -177,11 +177,11 @@ export function EventDayReport() {
 
       <section className="card space-y-2 text-sm">
         <h2 className="font-semibold">What changed</h2>
-        <p className="text-zinc-300">
+        <p className="text-white/75">
           Every total that adds up individual sales now reads them in batches of 1,000 until none are left: the dashboard, the Walk-in desk, the Audit page
           and the Excel and CSV exports. Live since about 8:10 PM on 10 October.
         </p>
-        <p className="text-zinc-300"><b>For the next event:</b> test the dashboard and exports with more than 1,000 gate entries before event day.</p>
+        <p className="text-white/75"><b>For the next event:</b> test the dashboard and exports with more than 1,000 gate entries before event day.</p>
       </section>
     </div>
   );

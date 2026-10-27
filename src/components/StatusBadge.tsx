@@ -5,8 +5,8 @@ const ORDER: Record<OrderStatus, { label: string; cls: string }> = {
   awaiting_verification: { label: "For verification", cls: "border-sky-400/35 bg-sky-400/12 text-sky-200" },
   paid: { label: "Paid", cls: "border-emerald-400/35 bg-emerald-400/12 text-emerald-200" },
   rejected: { label: "Rejected", cls: "border-rose-400/40 bg-rose-400/12 text-rose-200" },
-  expired: { label: "Expired", cls: "border-white/15 bg-white/[0.06] text-zinc-300" },
-  cancelled: { label: "Cancelled", cls: "border-white/15 bg-white/[0.06] text-zinc-300" },
+  expired: { label: "Expired", cls: "border-white/15 bg-white/[0.06] text-white/75" },
+  cancelled: { label: "Cancelled", cls: "border-white/15 bg-white/[0.06] text-white/75" },
   voided: { label: "Voided", cls: "border-rose-400/40 bg-rose-400/12 text-rose-200" },
 };
 

@@ -138,7 +138,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
                     className={`block rounded-xl px-3 py-2 text-sm transition lg:border-l-2 ${
                       active
                         ? "bg-white/10 font-semibold text-white lg:border-cyan-300"
-                        : "text-zinc-400 hover:bg-white/5 hover:text-zinc-100 lg:border-transparent"
+                        : "text-zinc-400 hover:bg-white/5 hover:text-white lg:border-transparent"
                     }`}
                   >
                     {t.label}

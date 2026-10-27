@@ -42,7 +42,7 @@ export function ShirtSizeChartButton({ highlight, className = "", label = "Size 
         onKeyDown={(e) => { if (e.key === "Escape") { e.preventDefault(); setOpen(false); } }}
         onClick={(e) => { if (e.target === e.currentTarget) setOpen(false); }}
         aria-labelledby={titleId}
-        className="sheet m-auto w-[min(100vw-1.5rem,52rem)] max-h-[92vh] overflow-hidden rounded-2xl border border-white/10 bg-zinc-950 p-0 text-zinc-100 shadow-2xl"
+        className="sheet m-auto w-[min(100vw-1.5rem,52rem)] max-h-[92vh] overflow-hidden rounded-2xl border border-white/10 bg-[#0d0c12] p-0 text-white shadow-2xl"
       >
           <div className="flex max-h-[92vh] flex-col">
             <div className="flex items-start justify-between gap-4 border-b border-white/10 px-5 py-4">
@@ -119,7 +119,7 @@ export function ShirtSizeChartButton({ highlight, className = "", label = "Size 
 export function ShirtSizeHint({ size }: { size: string }) {
   const summary = shirtSummary(useRules().shirtChart, size);
   if (size && summary) {
-    return <p className="mt-1 text-xs text-zinc-400"><span className="font-semibold text-zinc-300">{size}:</span> {summary}</p>;
+    return <p className="mt-1 text-xs text-zinc-400"><span className="font-semibold text-white/75">{size}:</span> {summary}</p>;
   }
   return <p className="mt-1 text-xs text-zinc-500">Measurements are in inches. Open the size chart if you are unsure.</p>;
 }

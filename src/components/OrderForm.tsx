@@ -11,6 +11,7 @@ import { fmtCutoff, hoursUntilCutoff, isTypeClosed } from "@/lib/cutoff";
 import type { TicketTypeRow } from "@/lib/supabase/types";
 import type { PublicAvailability } from "@/lib/queries";
 import { BandSwatch } from "@/components/BandSwatch";
+import { bandSwatchStyle } from "@/lib/bands";
 import { Reveal } from "@/components/Reveal";
 import { ShirtSizeChartButton, ShirtSizeHint } from "@/components/ShirtSizeChart";
 import { emailProblem, emailsMatch, mobileProblem, normalizeEmail, normalizeMobile, suggestEmail } from "@/lib/contact";
@@ -356,6 +357,7 @@ export function OrderForm({ types, availability, channel }: { types: TicketTypeR
               <Reveal key={t.id} as="article" delay={140 + idx * 90} from="up" className={`bill-line bill-${billSize(t)} ${n > 0 ? "is-picked" : ""} ${soldOut ? "is-out" : ""}`}>
                 <div className="min-w-0">
                   <h3 className="bill-name">{t.name}</h3>
+                  {t.band_color && <span aria-hidden className="bill-strap" style={bandSwatchStyle(t.band_color)} />}
                   <div className="bill-tags">
                     <BandSwatch color={t.band_color} size={16} className="bill-tag" />
                     {t.includes_shirt && <span className="bill-tag bill-tag-cyan">Event t-shirt</span>}

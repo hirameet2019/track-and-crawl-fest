@@ -252,7 +252,7 @@ export function DrifterQueue({
                               key={m.key}
                               type="button"
                               onClick={() => { setMethod(m.key); setReceived(false); }}
-                              className={`rounded-md px-3 py-1 text-sm font-semibold transition ${method === m.key ? "bg-gradient-to-r from-cyan-300 to-green-300 text-zinc-950" : "text-zinc-300 hover:bg-white/10"}`}
+                              className={`rounded-md px-3 py-1 text-sm font-semibold transition ${method === m.key ? "bg-white/[0.12] text-white ring-1 ring-inset ring-cyan-300/70" : "text-white/75 hover:bg-white/10"}`}
                             >
                               {m.label}
                             </button>

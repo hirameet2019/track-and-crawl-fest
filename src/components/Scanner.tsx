@@ -235,7 +235,7 @@ function ResultCard({ r, onKit }: { r: AnyResult; onKit: (id: string, item: stri
   const tone =
     r.result === "ok" || r.result === "offline_ok" ? "bg-emerald-600" :
     r.result === "already_redeemed" || r.result === "offline_used" ? "bg-red-600" :
-    r.result === "void" ? "bg-zinc-800" : "bg-amber-500";
+    r.result === "void" ? "bg-neutral-700" : "bg-amber-500";
   const title =
     r.result === "ok" ? "ADMIT" :
     r.result === "offline_ok" ? "ADMIT (offline)" :

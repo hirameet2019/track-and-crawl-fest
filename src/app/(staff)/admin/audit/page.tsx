@@ -17,8 +17,8 @@ const CAT_TONE: Record<AuditCategory, string> = {
   walkin: "bg-fuchsia-500/15 text-fuchsia-300 border-fuchsia-500/30",
   numbers: "bg-amber-500/15 text-amber-300 border-amber-500/30",
   staff: "bg-violet-500/15 text-violet-300 border-violet-500/30",
-  settings: "bg-zinc-500/20 text-zinc-300 border-zinc-500/30",
-  other: "bg-zinc-500/20 text-zinc-300 border-zinc-500/30",
+  settings: "bg-zinc-500/20 text-white/75 border-zinc-500/30",
+  other: "bg-zinc-500/20 text-white/75 border-zinc-500/30",
 };
 
 type Row = { id: number; created_at: string; actor: string | null; action: string; entity: string; entity_id: string | null; data: Record<string, unknown> | null };
@@ -176,15 +176,15 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
                     <span className={`inline-block rounded-full border px-2 py-0.5 text-[11px] font-semibold ${CAT_TONE[m.cat]}`}>{m.label}</span>
                     <div className="mt-0.5 font-mono text-[10px] text-zinc-500">{r.action}</div>
                   </td>
-                  <td className="py-3 pr-3 text-zinc-300">{summary || <span className="text-zinc-600">—</span>}</td>
+                  <td className="py-3 pr-3 text-white/75">{summary || <span className="text-zinc-600">—</span>}</td>
                   <td className="py-3 pr-3 font-mono text-xs">
                     {href ? <Link prefetch={false} href={href} className="underline">{r.entity} {r.entity_id?.slice(0, 8)}</Link> : <span className="text-zinc-500">{r.entity} {r.entity_id?.slice(0, 8)}</span>}
                   </td>
                   <td className="py-3 pr-3 text-xs">
                     {r.data && (
                       <details>
-                        <summary className="cursor-pointer text-zinc-500 hover:text-zinc-300">raw</summary>
-                        <pre className="mt-1 max-w-xs overflow-x-auto rounded bg-black/40 p-2 text-[10px] text-zinc-300">{JSON.stringify(r.data, null, 1)}</pre>
+                        <summary className="cursor-pointer text-zinc-500 hover:text-white/75">raw</summary>
+                        <pre className="mt-1 max-w-xs overflow-x-auto rounded bg-black/40 p-2 text-[10px] text-white/75">{JSON.stringify(r.data, null, 1)}</pre>
                       </details>
                     )}
                   </td>

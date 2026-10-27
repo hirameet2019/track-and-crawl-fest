@@ -204,7 +204,7 @@ export function DrifterLinks({ entries, siteUrl, signupSlug }: { entries: Drifte
               </button>
               {preview.length > 0 && (
                 <span className="text-xs text-zinc-500">
-                  First line reads as: <b className="text-zinc-300">{preview[0].name}</b>
+                  First line reads as: <b className="text-white/75">{preview[0].name}</b>
                   {preview[0].team && <> &middot; {preview[0].team}</>}
                   {preview[0].car && <> &middot; Car #{preview[0].car}</>}
                 </span>

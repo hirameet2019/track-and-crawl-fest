@@ -100,7 +100,7 @@ function InlineNumber({
       <span className="text-xs text-zinc-400">{unit}</span>
       <input className="input w-20 py-1 text-sm" inputMode="decimal" value={draft} onChange={(e) => setDraft(e.target.value)} aria-label={label} autoFocus />
       <button className="btn-secondary px-2 py-1 text-xs" disabled={pending}>{pending ? "..." : "Save"}</button>
-      <button type="button" className="px-1 text-xs text-zinc-500 hover:text-zinc-300" onClick={() => setEditing(false)}>Cancel</button>
+      <button type="button" className="px-1 text-xs text-zinc-500 hover:text-white/75" onClick={() => setEditing(false)}>Cancel</button>
       {err && <span className="text-xs text-rose-400">{err}</span>}
     </form>
   );
@@ -398,7 +398,7 @@ export function DrifterBands({
                 key={m.key}
                 type="button"
                 onClick={() => setMethod(m.key)}
-                className={`rounded-md px-3 py-1.5 text-sm font-semibold transition ${method === m.key ? "bg-gradient-to-r from-cyan-300 to-green-300 text-zinc-950" : "text-zinc-300 hover:bg-white/10"}`}
+                className={`rounded-md px-3 py-1.5 text-sm font-semibold transition ${method === m.key ? "bg-white/[0.12] text-white ring-1 ring-inset ring-cyan-300/70" : "text-white/75 hover:bg-white/10"}`}
               >
                 {m.label}
               </button>
@@ -445,7 +445,7 @@ export function DrifterBands({
           <ol className="mt-3 space-y-3 text-sm">
             {drifterRules(allowance, php(price), "desk").map((rule, i) => (
               <li key={i} className="border-l-2 border-white/15 pl-3">
-                <RuleLines lines={rule} strong="text-zinc-200" />
+                <RuleLines lines={rule} strong="text-white/90" />
               </li>
             ))}
           </ol>
@@ -589,7 +589,7 @@ export function DrifterBands({
                       <div className="truncate font-semibold" title={d.drifter_name}>{d.drifter_name}</div>
                       <div className="truncate text-xs text-zinc-500">{d.team_name ?? "no team"}</div>
                       <div className="text-xs text-zinc-400 sm:hidden">
-                        <b className="text-zinc-100">{d.bands}</b> band{d.bands === 1 ? "" : "s"} &middot; <span className="text-emerald-300">{d.free_bands} free</span> &middot; {d.paid_bands} paid &middot; {php(Number(d.amount_centavos))}
+                        <b className="text-white">{d.bands}</b> band{d.bands === 1 ? "" : "s"} &middot; <span className="text-emerald-300">{d.free_bands} free</span> &middot; {d.paid_bands} paid &middot; {php(Number(d.amount_centavos))}
                       </div>
                     </div>
                     <span className="hidden text-right font-bold tabular-nums sm:block">{d.bands}</span>

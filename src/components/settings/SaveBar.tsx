@@ -54,7 +54,7 @@ export function Group({ title, hint, children }: { title: string; hint?: React.R
   return (
     <section className="space-y-3 border-t border-white/10 pt-5 first:border-t-0 first:pt-0">
       <div>
-        <h3 className="text-sm font-semibold text-zinc-200">{title}</h3>
+        <h3 className="text-sm font-semibold text-white/90">{title}</h3>
         {hint && <p className="mt-0.5 text-xs text-zinc-500">{hint}</p>}
       </div>
       {children}

@@ -63,11 +63,6 @@ export async function EventHero({ event, prices }: { event: EventRow; prices: { 
       <div className="absolute inset-x-0 bottom-0 -z-10 h-64 bg-gradient-to-t from-brand via-brand/85 to-transparent" aria-hidden />
 
       <div className="mx-auto flex min-h-[78vh] max-w-5xl flex-col justify-end px-5 pb-14 pt-24 sm:min-h-[84vh] sm:px-8">
-        {event.tagline && (
-          <p className="mb-3 inline-flex w-fit items-center gap-2 rounded-full border border-white/20 bg-black/40 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-cyan-200 backdrop-blur">
-            {event.tagline}
-          </p>
-        )}
         <h1 className="m-0">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={site.logo} alt={event.name} className="w-full max-w-[680px] drop-shadow-[0_6px_24px_rgba(0,0,0,0.6)]" />
@@ -76,6 +71,7 @@ export async function EventHero({ event, prices }: { event: EventRow; prices: { 
         <div className="mt-6 flex flex-wrap gap-3 text-sm">
           <span className="glass px-4 py-2 font-semibold">{day}{time ? ` · ${time} onwards` : ""}</span>
           {event.venue && <span className="glass px-4 py-2 text-zinc-200">{event.venue}</span>}
+          {event.tagline && <span className="glass px-4 py-2 text-cyan-200">{event.tagline}</span>}
         </div>
 
         <div className="mt-8 flex flex-wrap items-end justify-between gap-6">

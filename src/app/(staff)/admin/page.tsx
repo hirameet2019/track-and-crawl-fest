@@ -13,9 +13,9 @@ import { BandSwatch } from "@/components/BandSwatch";
 
 function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
-    <div className="card">
+    <div className="card h-full">
       <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{label}</div>
-      <div className="mt-1 text-2xl font-bold">{value}</div>
+      <div className="mt-1 text-2xl font-bold tabular-nums">{value}</div>
       {sub && <div className="text-xs text-zinc-500">{sub}</div>}
     </div>
   );
@@ -148,7 +148,13 @@ export default async function DashboardPage() {
         <Stat label="Revenue (paid)" value={php(onlineRevenue + walkinRevenue + drifterRevenue)} sub={`${paid.length} online orders · ${walkinCount} walk-in bands${drifterRevenue ? ` · ${php(drifterRevenue)} drifter extras` : ""}${voidedCentavos ? ` · excludes ${php(voidedCentavos)} for ${voidedTickets} voided ticket${voidedTickets === 1 ? "" : "s"}` : ""}`} />
         <Stat label="Wristbands sold" value={String(sold)} sub={`${onlineSold} online · ${walkinCount} walk-in${drifterBands ? ` · ${drifterBands} drifter family (${drifterFree} free)` : ""} · ${redeemed} scanned at gate`} />
         <Stat label="Awaiting verification" value={String(queueCount ?? 0)} sub={oldestAgeMin != null ? `oldest ${humanMinutes(oldestAgeMin)}` : "queue empty"} />
-        <Stat label="Walk-in vs online" value={`${php(walkinRevenue)} / ${php(onlineRevenue)}`} />
+        <div className="card">
+          <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Walk-in vs online</div>
+          <dl className="mt-1 grid grid-cols-2 gap-3">
+            <div><dt className="text-xs text-zinc-500">Walk-in</dt><dd className="text-xl font-bold tabular-nums">{php(walkinRevenue)}</dd></div>
+            <div><dt className="text-xs text-zinc-500">Online</dt><dd className="text-xl font-bold tabular-nums">{php(onlineRevenue)}</dd></div>
+          </dl>
+        </div>
       </div>
 
       <div className={`grid gap-3 ${methodTiles.length > 2 ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
@@ -216,7 +222,7 @@ export default async function DashboardPage() {
                     {v.online > 0 && <div className={`w-full bg-cyan-300 ${v.walkin > 0 ? "" : "rounded-t"}`} style={{ height: `${(v.online / maxDay) * 100}%` }} />}
                     {total === 0 && <div className="h-px w-full bg-white/15" />}
                   </div>
-                  <div className={`mt-1 text-center text-[9px] ${total > 0 ? "font-semibold text-zinc-300" : "text-zinc-500"}`}>{d.slice(8)}</div>
+                  <div className={`mt-1 text-center text-[9px] ${total > 0 ? "font-semibold text-white/75" : "text-zinc-500"}`}>{d.slice(8)}</div>
                 </div>
               );
             })}

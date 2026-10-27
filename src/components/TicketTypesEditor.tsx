@@ -120,14 +120,14 @@ function TypeForm({ initial, stock, onDone }: { initial: TicketTypeInput; stock?
 
       <div className="grid gap-x-6 gap-y-3 sm:grid-cols-3">
         <div className="space-y-2">
-          <div className="text-sm font-semibold text-zinc-200">Where it is sold</div>
+          <div className="text-sm font-semibold text-white/90">Where it is sold</div>
           <Check label="Sold online" checked={f.sell_online} onChange={(v) => set("sell_online", v)} />
           <Check label="Sold at the gate" checked={f.sell_at_gate} onChange={(v) => set("sell_at_gate", v)} hint="Walk-in tab and gate scanner" />
           <Check label="Gate records a name" checked={f.gate_needs_name} onChange={(v) => set("gate_needs_name", v)} />
           <div><label className="label">Name at the gate</label><input className="input h-9" maxLength={80} value={f.walkin_name ?? ""} placeholder="Same as name" onChange={(e) => set("walkin_name", e.target.value)} /></div>
         </div>
         <div className="space-y-2">
-          <div className="text-sm font-semibold text-zinc-200">Includes</div>
+          <div className="text-sm font-semibold text-white/90">Includes</div>
           <Check label="T-shirt (asks for a size)" checked={f.includes_shirt} onChange={(v) => set("includes_shirt", v)} />
           {f.includes_shirt && (
             <Check label="Shirt ships by courier" checked={f.ships_shirt} onChange={(v) => set("ships_shirt", v)} hint="Online buyers enter an address; made to order, about two weeks, LBC or J&T, buyer pays shipping" />
@@ -137,7 +137,7 @@ function TypeForm({ initial, stock, onDone }: { initial: TicketTypeInput; stock?
           <Check label="Car pass" checked={f.includes_car_pass} onChange={(v) => set("includes_car_pass", v)} />
         </div>
         <div className="space-y-2">
-          <div className="text-sm font-semibold text-zinc-200">Special</div>
+          <div className="text-sm font-semibold text-white/90">Special</div>
           <Check label="Needs car details" checked={f.requires_vehicle} onChange={(v) => set("requires_vehicle", v)} hint="Plate, model and car photo" />
           <Check label="Hide from staff pages" checked={f.hidden_in_admin} onChange={(v) => set("hidden_in_admin", v)} hint="Left out of the Dashboard, Walk-in, Orders and Verify. Its orders and sales stay in the system; untick to show them again." />
           <div>
@@ -196,8 +196,8 @@ export function TicketTypesEditor({ types, stock }: { types: TicketTypeRow[]; st
                   <span className="font-semibold">{t.name}</span>
                   <BandSwatch color={t.band_color} className="text-xs text-zinc-400" />
                   <span className="text-sm">{t.sell_online ? php(t.price_centavos) : t.sell_at_gate ? "gate only" : t.drifter_family ? "Drifters tab only" : "not on sale"}</span>
-                  {!t.active && <span className="rounded-full bg-zinc-700 px-2 py-0.5 text-[11px]">hidden</span>}
-                  {t.active && t.hidden_in_admin && <span className="rounded-full bg-zinc-700 px-2 py-0.5 text-[11px]" title="Left out of the Dashboard, Walk-in, Orders and Verify">not on staff pages</span>}
+                  {!t.active && <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px]">hidden</span>}
+                  {t.active && t.hidden_in_admin && <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px]" title="Left out of the Dashboard, Walk-in, Orders and Verify">not on staff pages</span>}
                   {st && <span className="text-xs text-zinc-500">{st.shares ? `${st.sold} sold · uses the ${st.shares} wristbands` : `${st.sold} sold of ${st.pool_total} bands`}</span>}
                   <button type="button" className="btn-secondary ml-auto px-3 py-1 text-xs" disabled={open !== null} onClick={() => setOpen(t.id)}>Edit</button>
                 </div>

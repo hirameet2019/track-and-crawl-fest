@@ -94,13 +94,6 @@ body {
   }
 
   /* ---------- Public event theme (dark, neon) ---------- */
-  .neon-text {
-    background: linear-gradient(90deg, var(--neon-pink) 0%, var(--neon-violet) 30%, var(--neon-cyan) 65%, var(--neon-green) 100%);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-    filter: drop-shadow(0 0 18px color-mix(in srgb, var(--neon-violet) 45%, transparent));
-  }
   .btn-neon {
     @apply inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3 text-sm font-bold uppercase tracking-wide text-black transition disabled:cursor-not-allowed disabled:opacity-50;
     background: linear-gradient(90deg, var(--neon-cyan), var(--neon-green));
@@ -436,10 +429,17 @@ table, .tabular { font-variant-numeric: tabular-nums; }
     backdrop-filter: blur(14px); color: #fff;
   }
   @media (min-width: 640px) {
+    /* A full-width checkout strip: a narrow pill parked on the right sat over the
+       price and stepper column, so the line beneath it could not be operated. */
     .total-bar {
-      bottom: 1rem; margin: 0 0 0 auto; width: min(100%, 30rem); padding: 1.1rem 1.25rem;
+      bottom: 1rem; margin: 0; padding: 0.9rem 1.25rem;
       border: 1px solid rgb(255 255 255 / 0.14); border-radius: 1.25rem; box-shadow: 0 24px 60px rgb(0 0 0 / 0.55);
     }
+  }
+  #tickets { scroll-padding-bottom: 8rem; }
+  .bill-strap {
+    display: block; width: min(11rem, 40%); height: 6px; margin-top: 0.7rem; border-radius: 999px;
+    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.25);
   }
   .total-amount {
     font-family: var(--font-orbitron), "Arial Black", sans-serif; font-weight: 900;

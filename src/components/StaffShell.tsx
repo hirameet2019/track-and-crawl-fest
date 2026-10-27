@@ -125,7 +125,7 @@ export function StaffShell({
         Ticket page
       </a>
       <div className="mt-2 flex items-center gap-3 rounded-xl px-3 py-2">
-        <span aria-hidden className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-xs font-bold text-black" style={{ background: "linear-gradient(135deg, var(--neon-cyan), var(--neon-green))" }}>
+        <span aria-hidden className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-zinc-200 text-xs font-bold text-cyan-300 ring-1 ring-inset ring-cyan-300/50">
           {name.trim().slice(0, 1).toUpperCase() || "?"}
         </span>
         <div className="min-w-0 flex-1">

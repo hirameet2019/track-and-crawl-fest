@@ -46,7 +46,7 @@ export function SalesScheduleForm({ types, note }: { types: TicketTypeRow[]; not
             <li key={t.id} className="space-y-2 py-4">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                 <span className="font-semibold">{t.name}</span>
-                <BandSwatch color={t.band_color} className="rounded-full border border-white/15 bg-black/30 px-2 py-0.5 text-[11px] text-zinc-300" />
+                <BandSwatch color={t.band_color} className="rounded-full border border-white/15 bg-black/30 px-2 py-0.5 text-[11px] text-white/75" />
                 <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${status.cls}`}>{status.label}</span>
               </div>
               <div className="grid grid-cols-[1fr_auto] gap-2 sm:grid-cols-[minmax(0,15rem)_auto_auto_auto]">

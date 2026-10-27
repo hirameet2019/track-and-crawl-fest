@@ -100,7 +100,7 @@ export function SiteLookForm({ current, defaults, customised }: { current: SiteS
 
       {/* ---------------------------------------------------------- brand */}
       <section className="space-y-4">
-        <h3 className="text-sm font-semibold text-zinc-200">Title and images</h3>
+        <h3 className="text-sm font-semibold text-white/90">Title and images</h3>
         <div>
           <label className="label">Browser tab suffix</label>
           <input className="input" value={s.titleSuffix} onChange={(e) => set("titleSuffix", e.target.value)} placeholder="Tickets" maxLength={40} />
@@ -115,7 +115,7 @@ export function SiteLookForm({ current, defaults, customised }: { current: SiteS
 
       {/* ---------------------------------------------------------- hero */}
       <section className="space-y-4 border-t border-white/10 pt-5">
-        <h3 className="text-sm font-semibold text-zinc-200">Sales page slideshow</h3>
+        <h3 className="text-sm font-semibold text-white/90">Sales page slideshow</h3>
         <ol className="space-y-3">
           {s.hero.slides.map((sl, i) => (
             <li key={i} className="rounded-xl border border-white/10 bg-black/20 p-3">
@@ -177,7 +177,7 @@ export function SiteLookForm({ current, defaults, customised }: { current: SiteS
 
       {/* ---------------------------------------------------------- colours */}
       <section className="space-y-4 border-t border-white/10 pt-5">
-        <h3 className="text-sm font-semibold text-zinc-200">Colours</h3>
+        <h3 className="text-sm font-semibold text-white/90">Colours</h3>
         <div
           className="h-3 rounded-full"
           style={{ backgroundImage: `linear-gradient(90deg, ${s.theme.neon.pink}, ${s.theme.neon.violet}, ${s.theme.neon.cyan}, ${s.theme.neon.green})` }}
@@ -198,13 +198,13 @@ export function SiteLookForm({ current, defaults, customised }: { current: SiteS
 
       {/* ---------------------------------------------------------- pdf */}
       <section className="space-y-4 border-t border-white/10 pt-5">
-        <h3 className="text-sm font-semibold text-zinc-200">PDF ticket</h3>
+        <h3 className="text-sm font-semibold text-white/90">PDF ticket</h3>
         <div className="grid gap-4 sm:grid-cols-2">
           <AssetField label="Ticket logo" kind="pdf" value={s.pdfLogo ?? ""} onChange={(v) => set("pdfLogo", v || null)} onClear={() => set("pdfLogo", null)} defaultLabel="Built-in logo" hint="PNG or JPG. Blank keeps the built-in logo." />
           <AssetField label="Ticket banner" kind="pdf" value={s.pdfBanner ?? ""} onChange={(v) => set("pdfBanner", v || null)} onClear={() => set("pdfBanner", null)} defaultLabel="Built-in banner" hint="Photo across the top of each ticket. PNG or JPG." />
         </div>
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className="text-sm text-zinc-300">Ticket colours</span>
+          <span className="text-sm text-white/75">Ticket colours</span>
           <button
             type="button"
             className="btn-secondary px-3 py-1 text-xs"
@@ -233,7 +233,7 @@ export function SiteLookForm({ current, defaults, customised }: { current: SiteS
 
       {/* ---------------------------------------------------------- note */}
       <section className="space-y-2 border-t border-white/10 pt-5">
-        <h3 className="text-sm font-semibold text-zinc-200">Note above the sales schedule</h3>
+        <h3 className="text-sm font-semibold text-white/90">Note above the sales schedule</h3>
         <textarea className="input min-h-20" value={s.salesScheduleNote ?? ""} onChange={(e) => set("salesScheduleNote", e.target.value || null)} maxLength={600} placeholder="Optional: the organizer's cut-off schedule, for staff" />
       </section>
 

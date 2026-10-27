@@ -127,16 +127,19 @@ export default async function WalkinPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Walk-in</h1>
-        <p className="mt-2 text-sm text-zinc-500">
-          Gate sales are a plain count: collect the payment, hand over the wristband, tap <b>+1</b> on that label. No name or contact is taken and no ticket is emailed.
-          Tap <b>−</b> to undo a mistake. Every tap deducts from the wristbands left for that label. For a label with a shirt, pick the size
-          you handed over first; a VIP Car with shirt counts as one car, with a band for the driver and one for the passenger.
-        </p>
-        <p className="mt-1 text-sm text-zinc-500">
-          {seesDrifters
-            ? <>Bands for a competing drifter&apos;s family go on the <b>Drifters</b> tab instead, recorded under the driver&apos;s name.</>
-            : <>A competing drifter&apos;s family does not buy here: send them to the registration desk.</>}
-        </p>
+        <p className="mt-2 text-sm text-zinc-500">Collect the payment, hand over the wristband, tap <b className="text-white">+1</b> on that label.</p>
+        <details className="mt-1 text-sm text-zinc-500">
+          <summary className="cursor-pointer font-semibold text-zinc-600 hover:text-white">How walk-in works</summary>
+          <p className="mt-2">
+            No name or contact is taken and no ticket is emailed. Tap <b>−</b> to undo a mistake. Every tap deducts from the wristbands left for that label.
+            For a label with a shirt, pick the size you handed over first; a VIP Car with shirt counts as one car, with a band for the driver and one for the passenger.
+          </p>
+          <p className="mt-1">
+            {seesDrifters
+              ? <>Bands for a competing drifter&apos;s family go on the <b>Drifters</b> tab instead, recorded under the driver&apos;s name.</>
+              : <>A competing drifter&apos;s family does not buy here: send them to the registration desk.</>}
+          </p>
+        </details>
       </div>
       <WalkinTally
         types={gateTypes}

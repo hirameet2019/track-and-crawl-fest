@@ -145,7 +145,7 @@ export function SetupOverview({
             <li key={i.title} className="flex flex-wrap items-start gap-x-3 gap-y-1 py-3">
               <span className={`mt-0.5 w-14 shrink-0 rounded-full border px-2 py-0.5 text-center text-[11px] font-semibold ${MARK[i.status].cls}`}>{MARK[i.status].label}</span>
               <div className="min-w-0 flex-1">
-                <div className="text-sm font-semibold text-zinc-100">{i.title}</div>
+                <div className="text-sm font-semibold text-white">{i.title}</div>
                 <div className="text-xs text-zinc-400">{i.detail}</div>
               </div>
               {i.href && (

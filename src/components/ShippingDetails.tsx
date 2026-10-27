@@ -15,7 +15,7 @@ export function ShippingDetails({ shipping, shirts = [], className = "" }: { shi
         {shipping.city}, {shipping.province} {shipping.zip}
       </div>
       {shirts.length > 0 && (
-        <div className="mt-2 text-xs text-zinc-300">
+        <div className="mt-2 text-xs text-white/75">
           {shirts.length === 1 ? "Shirt" : `${shirts.length} shirts`}: {shirts.map((s) => `${s.size ?? "?"}${s.holder ? ` (${s.holder})` : ""}`).join(", ")}
         </div>
       )}

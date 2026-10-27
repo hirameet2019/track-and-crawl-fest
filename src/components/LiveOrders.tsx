@@ -118,18 +118,18 @@ export function LiveOrders({ watch = "all" }: { watch?: "all" | "verification" }
     <div className="flex items-center gap-2 text-xs">
       <span
         className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-semibold ${
-          state === "live" ? "border-emerald-400/40 bg-emerald-400/10 text-emerald-300" : state === "connecting" ? "border-zinc-500/40 bg-zinc-500/10 text-zinc-300" : "border-amber-400/40 bg-amber-400/10 text-amber-300"
+          state === "live" ? "border-emerald-400/40 bg-emerald-400/10 text-emerald-300" : state === "connecting" ? "border-zinc-500/40 bg-zinc-500/10 text-white/75" : "border-amber-400/40 bg-amber-400/10 text-amber-300"
         }`}
         title={state === "live" ? "Updates arrive automatically; no need to refresh" : state === "connecting" ? "Connecting to live updates" : "Live updates disconnected; refresh the page"}
       >
         <span className={`h-2 w-2 rounded-full ${state === "live" ? "animate-pulse bg-emerald-400" : state === "connecting" ? "bg-zinc-400" : "bg-amber-400"}`} aria-hidden />
         {state === "live" ? "Live" : state === "connecting" ? "Connecting" : "Offline"}
       </span>
-      <button type="button" onClick={toggleMute} className="rounded-full border border-white/15 px-2.5 py-1 text-zinc-300 hover:bg-white/10" title={muted ? "Sound off for new orders" : "Sound on for new orders"} aria-pressed={muted}>
+      <button type="button" onClick={toggleMute} className="rounded-full border border-white/15 px-2.5 py-1 text-white/75 hover:bg-white/10" title={muted ? "Sound off for new orders" : "Sound on for new orders"} aria-pressed={muted}>
         {muted ? "Sound off" : "Sound on"}
       </button>
       {toast && (
-        <div role="status" className="fixed bottom-4 right-4 z-50 rounded-xl border border-cyan-300/40 bg-zinc-900/95 px-4 py-3 text-sm text-white shadow-2xl">
+        <div role="status" className="fixed bottom-4 right-4 z-50 rounded-xl border border-cyan-300/40 bg-zinc-100/95 px-4 py-3 text-sm text-white backdrop-blur shadow-2xl">
           <span className="mr-2 inline-block h-2 w-2 rounded-full bg-cyan-300 align-middle" aria-hidden />
           {toast}
         </div>

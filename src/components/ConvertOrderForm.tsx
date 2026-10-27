@@ -165,7 +165,7 @@ export function ConvertOrderForm({
             email with the updated PDF. Any difference in price is left as a balance to settle by hand.
           </p>
         </div>
-        <button type="button" className="text-xs text-zinc-400 hover:text-zinc-200" onClick={() => setOpen(false)}>Close</button>
+        <button type="button" className="text-xs text-zinc-400 hover:text-white/90" onClick={() => setOpen(false)}>Close</button>
       </div>
 
       {targets === null ? (
@@ -274,7 +274,7 @@ export function ConvertOrderForm({
 
           {target && isCar && (
             <div className="space-y-2">
-              <div className="text-xs font-semibold text-zinc-300">Car details</div>
+              <div className="text-xs font-semibold text-white/75">Car details</div>
               {Array.from({ length: qty }, (_, i) => (
                 <div key={i} className="space-y-2 rounded-lg border border-white/10 bg-black/20 p-2">
                   <div className="text-[11px] text-zinc-500">Car {i + 1}</div>
@@ -339,7 +339,7 @@ export function ConvertOrderForm({
             <div className="space-y-2 rounded-lg border border-violet-400/30 bg-violet-400/5 p-2">
               <div className="text-xs font-semibold text-violet-200">Where the shirt ships</div>
               {ctx?.shipping && !editShipping ? (
-                <div className="text-xs text-zinc-300">
+                <div className="text-xs text-white/75">
                   {ctx.shipping.name} · {ctx.shipping.mobile} · {ctx.shipping.address}, {ctx.shipping.city}, {ctx.shipping.province} {ctx.shipping.zip} ({ctx.shipping.courier})
                   <button type="button" className="ml-2 text-cyan-300 hover:underline" onClick={() => setEditShipping(true)}>Change</button>
                 </div>

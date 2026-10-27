@@ -41,7 +41,7 @@ export function PaymentQrForm({ event, channels }: { event: PaymentQrValues; cha
       <div>
         <h2 className="font-semibold">Payment QR codes</h2>
         <p className="text-sm text-zinc-500">
-          Buyers can pay with any channel that has a QR. Instructions name the first one{primary ? <>, now <b className="text-zinc-300">{channels[primary].label}</b></> : null}.
+          Buyers can pay with any channel that has a QR. Instructions name the first one{primary ? <>, now <b className="text-white/75">{channels[primary].label}</b></> : null}.
         </p>
       </div>
       <div className="grid gap-4 md:grid-cols-3">

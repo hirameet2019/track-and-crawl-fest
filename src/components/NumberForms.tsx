@@ -105,7 +105,7 @@ export function NumberForms({ ticketType, numbers }: { ticketType: TicketTypeRow
                 else if (n.status === "void") { setVoiding(null); setUnvoiding(n); }
               }}
               className={`rounded px-2 py-0.5 font-mono text-xs ${
-                n.status === "available" ? "bg-emerald-50 text-emerald-800 hover:bg-red-100" : n.status === "assigned" ? "bg-zinc-800 text-white" : "bg-red-100 text-red-700 line-through hover:bg-emerald-100 hover:text-emerald-800 hover:no-underline"
+                n.status === "available" ? "bg-emerald-50 text-emerald-800 hover:bg-red-100" : n.status === "assigned" ? "bg-white/15 text-white" : "bg-red-100 text-red-700 line-through hover:bg-emerald-100 hover:text-emerald-800 hover:no-underline"
               }`}
             >
               {n.number}
