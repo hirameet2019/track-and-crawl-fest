@@ -1,14 +1,12 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
-  "regions": ["sin1"],
+  "regions": [
+    "sin1"
+  ],
   "functions": {
-    "src/app/api/**/*.ts": { "maxDuration": 30 }
-  },
-  "crons": [
-    {
-      "path": "/api/cron/payment-emails",
-      "schedule": "*/5 * * * *"
+    "src/app/api/**/*.ts": {
+      "maxDuration": 30
     }
-  ]
+  }
 }
