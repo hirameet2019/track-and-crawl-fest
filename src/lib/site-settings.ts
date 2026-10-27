@@ -1,6 +1,6 @@
 import { cache } from "react";
 import { z } from "zod";
-import { BRAND, GALLERY, HERO, INFO, NOTES, THEME, type GalleryPhoto, type HeroSlide } from "@/config/site";
+import { BRAND, CIRCUIT, GALLERY, HERO, INFO, NOTES, THEME, type GalleryPhoto, type HeroSlide } from "@/config/site";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 /**
@@ -35,6 +35,8 @@ export interface SiteSettings {
   info: { endTime: string; presentedBy: string; sponsors: string };
   /** Past-event photos in the information block; the first is the large tile. */
   gallery: { title: string; photos: GalleryPhoto[] };
+  /** The venue: circuit and paddock photos beside the circuit map. */
+  circuit: { title: string; photos: GalleryPhoto[] };
 }
 
 const KEY = "site";
@@ -65,6 +67,7 @@ export const SITE_DEFAULTS: SiteSettings = {
   salesScheduleNote: NOTES.salesSchedule,
   info: { ...INFO },
   gallery: { title: GALLERY.title, photos: GALLERY.photos.map((p) => ({ ...p })) },
+  circuit: { title: CIRCUIT.title, photos: CIRCUIT.photos.map((p) => ({ ...p })) },
 };
 
 /** Most photos the gallery takes; the mosaic stops reading as a highlight reel past this. */
@@ -126,6 +129,12 @@ export const siteSettingsSchema = z.object({
     /** Empty hides the gallery. */
     photos: z.array(galleryPhoto).max(MAX_GALLERY_PHOTOS, `At most ${MAX_GALLERY_PHOTOS} photos`),
   }),
+  circuit: z.object({
+    /** Blank hides the heading. */
+    title: z.string().trim().max(60),
+    /** Empty leaves the map on its own. */
+    photos: z.array(galleryPhoto).max(6, "At most 6 circuit photos"),
+  }),
 });
 
 /**
@@ -142,6 +151,7 @@ export function mergeSiteSettings(stored: unknown): SiteSettings {
   const hero = (s.hero ?? {}) as Record<string, unknown>;
   const theme = (s.theme ?? {}) as Record<string, unknown>;
   const gallery = (s.gallery ?? {}) as Record<string, unknown>;
+  const circuit = (s.circuit ?? {}) as Record<string, unknown>;
   const d = SITE_DEFAULTS;
   return {
     titleSuffix: pick(shape.titleSuffix, s.titleSuffix, d.titleSuffix),
@@ -167,6 +177,10 @@ export function mergeSiteSettings(stored: unknown): SiteSettings {
     gallery: {
       title: "title" in gallery ? pick(shape.gallery.shape.title, gallery.title, d.gallery.title) : d.gallery.title,
       photos: pick(shape.gallery.shape.photos, gallery.photos, d.gallery.photos),
+    },
+    circuit: {
+      title: "title" in circuit ? pick(shape.circuit.shape.title, circuit.title, d.circuit.title) : d.circuit.title,
+      photos: pick(shape.circuit.shape.photos, circuit.photos, d.circuit.photos),
     },
   };
 }

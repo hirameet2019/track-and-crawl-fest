@@ -75,6 +75,7 @@ export async function saveSiteSettingsAction(value: SiteSettings): Promise<Actio
       salesScheduleNote: parsed.data.salesScheduleNote || null,
       hero: { ...parsed.data.hero, slides: parsed.data.hero.slides.map((s) => ({ ...s, video: s.video || undefined })) },
       gallery: { ...parsed.data.gallery, photos: parsed.data.gallery.photos.map((p) => ({ ...p, position: p.position || undefined })) },
+      circuit: { ...parsed.data.circuit, photos: parsed.data.circuit.photos.map((p) => ({ ...p, position: p.position || undefined })) },
     };
     await saveSiteSettings(next, userId);
     await audit(createAdminClient(), {

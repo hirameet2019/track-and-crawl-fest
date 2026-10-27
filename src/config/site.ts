@@ -166,6 +166,20 @@ export const GALLERY = {
   ] satisfies readonly GalleryPhoto[] as readonly GalleryPhoto[],
 } as const;
 
+/**
+ * The venue itself, shown in the information block: photos of the circuit and the
+ * paddock beside a map of the layout (src/config/circuit-map.ts). The first photo
+ * is the tall one. An empty list leaves the map on its own.
+ */
+export const CIRCUIT = {
+  title: "The circuit",
+  photos: [
+    { src: "/tcf/venue/paddock-tower.jpg", alt: "The Tarlac Circuit Hill control tower and pit building with its checkered garage door", position: "50% 55%" },
+    { src: "/tcf/venue/circuit-esses.jpg", alt: "The esses below the pit building, lined with tyre walls and red and white curbs", position: "50% 60%" },
+    { src: "/tcf/venue/circuit-main-straight.jpg", alt: "The main straight under the start gantry, with the hills behind the circuit", position: "50% 65%" },
+  ] satisfies readonly GalleryPhoto[] as readonly GalleryPhoto[],
+} as const;
+
 /* ----------------------------------------------------------------- locale */
 
 /**
