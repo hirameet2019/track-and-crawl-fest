@@ -139,7 +139,7 @@ export const INFO = {
   /** Strip of presenter logos ("Presented by"); blank hides the row. */
   presentedBy: "/tcf/presented-by.png",
   /** Sponsor logo strip; blank hides it. */
-  sponsors: "/tcf/sponsors.jpg",
+  sponsors: "/tcf/sponsors.png",
 } as const;
 
 /* ----------------------------------------------------------------- locale */

@@ -80,7 +80,7 @@ export async function EventInfo({ event }: { event: EventRow }) {
         <div className="mx-auto max-w-5xl px-4 pb-14 sm:px-8">
           <div className="checker" aria-hidden />
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={site.info.sponsors} alt="Event sponsors" className="mt-8 h-auto w-full rounded-2xl" />
+          <img src={site.info.sponsors} alt="Event sponsors" className="mt-8 h-auto w-full" />
         </div>
       )}
     </section>
