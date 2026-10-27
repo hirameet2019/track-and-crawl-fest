@@ -53,6 +53,8 @@ export default async function DashboardPage() {
     admin.from("orders").select("id, order_no, buyer_name, total_centavos, status, channel, created_at, order_items(ticket_type_id)").order("created_at", { ascending: false }).limit(60),
   ]);
   const availability = availabilityAll.filter((a) => !hidden.has(a.ticket_type_id));
+  // An event without coloured bands drops the Band column instead of showing it empty.
+  const anyBand = availability.some((a) => a.band_color);
   const pending = ((pendingRows ?? []) as unknown as Pending[]).filter((o) => shownOrder(o.order_items));
   const queueCount = pending.length;
   const oldest = pending[0] ?? null;
@@ -173,7 +175,7 @@ export default async function DashboardPage() {
         <p className="text-xs text-zinc-500">Same order as the organizer&apos;s sheet. Left = free wristbands minus unpaid reservations minus walk-in taps.</p>
         <table className="mt-3 w-full text-sm">
           <thead className="text-left text-xs uppercase text-zinc-500">
-            <tr><th className="py-1">Code</th><th>Label</th><th>Band</th><th className="text-right">Online</th><th className="text-right">Walk-in</th><th className="text-right">Reserved</th><th className="text-right">Left</th><th className="text-right">Pool</th><th className="text-right">Scanned</th><th className="text-right">Revenue</th><th className="w-36"></th></tr>
+            <tr><th className="py-1">Code</th><th>Label</th>{anyBand && <th>Band</th>}<th className="text-right">Online</th><th className="text-right">Walk-in</th><th className="text-right">Reserved</th><th className="text-right">Left</th><th className="text-right">Pool</th><th className="text-right">Scanned</th><th className="text-right">Revenue</th><th className="w-36"></th></tr>
           </thead>
           <tbody>
             {availability.map((a) => {
@@ -182,7 +184,7 @@ export default async function DashboardPage() {
                 <tr key={a.ticket_type_id} className="border-t">
                   <td className="py-2"><span className="rounded bg-white/10 px-1.5 py-0.5 font-black">{a.code}</span></td>
                   <td className="font-medium">{a.name}{a.pool_type_id && <span className="ml-1 text-[10px] uppercase text-zinc-500">{availability.find((x) => x.ticket_type_id === a.pool_type_id)?.code} bands</span>}{a.drifter_family ? <span className="ml-1 text-[10px] uppercase text-zinc-500">drifters</span> : !a.sell_online && <span className="ml-1 text-[10px] uppercase text-zinc-500">gate only</span>}</td>
-                  <td className="text-zinc-500"><BandSwatch color={a.band_color} size={12} label={false} /> {a.band_color}</td>
+                  {anyBand && <td className="text-zinc-500"><BandSwatch color={a.band_color} size={12} label={false} /> {a.band_color}</td>}
                   <td className="text-right">{a.online_sold}</td>
                   <td className="text-right">{a.walkin_sold}</td>
                   <td className="text-right text-amber-700">{a.reserved}</td>

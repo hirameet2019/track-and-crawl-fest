@@ -454,7 +454,7 @@ export function OrderForm({ types, availability, channel }: { types: TicketTypeR
                             <div>
                               <div className="text-xs font-semibold uppercase tracking-wide text-emerald-300">Passengers riding with this car</div>
                               <p className="mt-0.5 text-xs text-zinc-400">
-                                {t.included_companions > 0 && <>This package includes a wristband for <b>{t.included_companions} passenger{t.included_companions === 1 ? "" : "s"}</b> at no extra cost: the same <b>{t.band_color}</b> band as the car, no shirt, since the package has one t-shirt for the driver. The name can be left blank for now. </>}
+                                {t.included_companions > 0 && <>This package includes a wristband for <b>{t.included_companions} passenger{t.included_companions === 1 ? "" : "s"}</b> at no extra cost: the same {t.band_color ? <><b>{t.band_color}</b> band</> : "wristband"} as the car, no shirt, since the package has one t-shirt for the driver. The name can be left blank for now. </>}
                                 {t.included_companions > 0 ? "Extra" : "Each"} companion{t.included_companions > 0 ? "s" : ""}: <b>{php(companionPrice)}</b> per person, a <b>{companionType.name}</b> wristband with event t-shirt, added to your total. Wristbands are linked to plate <b>{a.vehicle_plate.trim() || "…"}</b>. Up to {MAX_COMPANIONS_PER_CAR} passengers per car.
                               </p>
                             </div>
@@ -481,7 +481,7 @@ export function OrderForm({ types, availability, channel }: { types: TicketTypeR
                                 />
                               </div>
                               {c.included ? (
-                                <div className="text-xs text-zinc-400 sm:pb-2">{t.band_color} wristband, lanyard and decal. No shirt.</div>
+                                <div className="text-xs text-zinc-400 sm:pb-2">{t.band_color ? `${t.band_color} wristband` : "Wristband"}, lanyard and decal. No shirt.</div>
                               ) : (
                                 <div>
                                   <label className="label">T-shirt size *</label>

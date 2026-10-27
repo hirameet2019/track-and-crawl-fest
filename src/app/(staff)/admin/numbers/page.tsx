@@ -27,7 +27,7 @@ export default async function NumbersPage({ searchParams }: { searchParams: Prom
         {availability.map((a) => (
           <a key={a.ticket_type_id} href={`?type=${a.ticket_type_id}`} className={`card block ${selected?.id === a.ticket_type_id ? "ring-2 ring-zinc-900" : ""}`}>
             <div className="font-semibold">{a.name}</div>
-            <div className="mt-1 text-xs text-zinc-500">{a.band_color} band{a.pool_type_id && <> · uses the {availability.find((x) => x.ticket_type_id === a.pool_type_id)?.code} stack</>}</div>
+            <div className="mt-1 text-xs text-zinc-500">{a.band_color ? `${a.band_color} band` : "No band colour"}{a.pool_type_id && <> · uses the {availability.find((x) => x.ticket_type_id === a.pool_type_id)?.code} stack</>}</div>
             <div className="mt-2 grid grid-cols-3 text-center text-xs">
               <div><div className="text-lg font-bold">{a.pool_total}</div>pool</div>
               <div><div className="text-lg font-bold">{a.sold}</div>used</div>

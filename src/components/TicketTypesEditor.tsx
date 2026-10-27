@@ -66,6 +66,9 @@ function Check({ label, checked, onChange, hint }: { label: string; checked: boo
 function TypeForm({ initial, stock, onDone }: { initial: TicketTypeInput; stock?: TypeStock; onDone: () => void }) {
   const router = useRouter();
   const [f, setF] = useState<TicketTypeInput>(initial);
+  // Unticking clears the colour; the last one typed comes back if it is ticked again.
+  const [coloured, setColoured] = useState(!!initial.band_color);
+  const [lastColour, setLastColour] = useState(initial.band_color ?? "");
   const [err, setErr] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const set = <K extends keyof TicketTypeInput>(k: K, v: TicketTypeInput[K]) => setF((p) => ({ ...p, [k]: v }));
@@ -89,7 +92,25 @@ function TypeForm({ initial, stock, onDone }: { initial: TicketTypeInput; stock?
           <input className="input h-9 font-mono uppercase" maxLength={3} value={f.code} disabled={codeLocked} onChange={(e) => set("code", e.target.value.toUpperCase())} />
         </div>
         <div><label className="label">Name *</label><input className="input h-9" maxLength={80} value={f.name} onChange={(e) => set("name", e.target.value)} /></div>
-        <div><label className="label">Band colour</label><input className="input h-9" maxLength={40} value={f.band_color ?? ""} onChange={(e) => set("band_color", e.target.value)} placeholder="Red stripes" /></div>
+        <div>
+          <label className="label flex items-center gap-1.5">
+            <input
+              type="checkbox"
+              checked={coloured}
+              onChange={(e) => {
+                setColoured(e.target.checked);
+                if (e.target.checked) set("band_color", lastColour);
+                else { setLastColour(f.band_color ?? ""); set("band_color", ""); }
+              }}
+            />
+            Band colour
+          </label>
+          {coloured ? (
+            <input className="input h-9" maxLength={40} value={f.band_color ?? ""} onChange={(e) => set("band_color", e.target.value)} placeholder="Red stripes" aria-label="Band colour" />
+          ) : (
+            <div className="input flex h-9 items-center text-zinc-500">No colour</div>
+          )}
+        </div>
       </div>
       <p className="-mt-2 text-[11px] text-zinc-500">
         {codeLocked
@@ -194,7 +215,7 @@ export function TicketTypesEditor({ types, stock }: { types: TicketTypeRow[]; st
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-white/10 px-3 py-2">
                   <span className="grid h-7 w-7 place-items-center rounded-md bg-white/10 text-sm font-black">{t.code}</span>
                   <span className="font-semibold">{t.name}</span>
-                  <BandSwatch color={t.band_color} className="text-xs text-zinc-400" />
+                  {t.band_color ? <BandSwatch color={t.band_color} className="text-xs text-zinc-400" /> : <span className="text-xs text-zinc-500">no colour</span>}
                   <span className="text-sm">{t.sell_online ? php(t.price_centavos) : t.sell_at_gate ? "gate only" : t.drifter_family ? "Drifters tab only" : "not on sale"}</span>
                   {!t.active && <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px]">hidden</span>}
                   {t.active && t.hidden_in_admin && <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px]" title="Left out of the Dashboard, Walk-in, Orders and Verify">not on staff pages</span>}

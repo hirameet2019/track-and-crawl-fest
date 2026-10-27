@@ -13,7 +13,7 @@ with ev as (
     sell_online, sell_at_gate, walkin_name, gate_needs_name, includes_shirt, includes_lanyard, includes_sticker, includes_car_pass,
     requires_vehicle, included_companions, is_child, online_cap, drifter_family, free_allowance, sort_order)
   select ev.id, 'C', 'Car Registration', 'Registration for one car. Plate number, make/model and a photo of the car are required.',
-         50000, null, 'Red', true, true, null, true, false, false, false, true, true, 0, false, null, false, 0, 1
+         50000, null, null, true, true, null, true, false, false, false, true, true, 0, false, null, false, 0, 1
   from ev
   returning id
 )

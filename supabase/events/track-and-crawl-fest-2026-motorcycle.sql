@@ -6,7 +6,7 @@ with tt as (
     sell_online, sell_at_gate, walkin_name, gate_needs_name, includes_shirt, includes_lanyard, includes_sticker, includes_car_pass,
     requires_vehicle, included_companions, is_child, online_cap, drifter_family, free_allowance, sort_order)
   select e.id, 'M', 'Motorcycle Registration', 'Registration for one motorcycle. Plate number, make/model and a photo of the motorcycle are required.',
-         50000, null, 'Orange', true, true, null, true, false, false, false, true, true, 0, false, null, false, 0, 2
+         50000, null, null, true, true, null, true, false, false, false, true, true, 0, false, null, false, 0, 2
   from events e where e.slug = 'track-and-crawl-fest-2026'
   returning id
 )

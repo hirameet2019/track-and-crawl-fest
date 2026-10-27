@@ -101,7 +101,7 @@ export async function buildStaffSalesWorkbook(): Promise<Buffer> {
       account: ACCOUNT_LABELS[raw] ?? raw,
       at,
       local: wallTime(e.created_at),
-      wristband: `${t?.walkin_name ?? t?.name ?? "?"} (${(t?.band_color ?? "").toLowerCase()})`,
+      wristband: `${t?.walkin_name ?? t?.name ?? "?"}${t?.band_color ? ` (${t.band_color.toLowerCase()})` : ""}`,
       entry: e.qty < 0 ? "Take-back" : e.drifter_name ? "Family bands" : "Sale",
       bands: e.qty,
       free: e.free_qty,
