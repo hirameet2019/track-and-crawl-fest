@@ -24,7 +24,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const [event, site, rules] = await Promise.all([getActiveEvent(), getSiteSettings(), getRules()]);
   const name = event?.name ?? site.titleSuffix;
   const where = event?.venue ? ` at ${event.venue}` : "";
-  const description = event ? `Buy tickets for ${event.name}${where}. Pay via ${primaryChannel(event, rules.channels).payVia}.` : undefined;
+  const description = event ? `Buy tickets for ${event.name}${where}. Pay via ${primaryChannel(event, rules.channels, rules.extraChannels).payVia}.` : undefined;
   return {
     metadataBase: new URL(SITE_URL),
     title: { default: event ? [event.name, site.titleSuffix].filter(Boolean).join(" · ") : site.titleSuffix, template: `%s · ${name}` },

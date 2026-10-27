@@ -1,7 +1,7 @@
 import { cache } from "react";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { PAGE_DEFAULTS, RULE_DEFAULTS, type PageSettings, type Rules } from "@/lib/rules-types";
+import { MAX_EXTRA_CHANNELS, PAGE_DEFAULTS, PAY_PAGE_DEFAULTS, RULE_DEFAULTS, type PageSettings, type PayPageSettings, type Rules } from "@/lib/rules-types";
 import type { PaymentMethod } from "@/lib/supabase/types";
 
 /**
@@ -74,6 +74,60 @@ const page = z.object({
   footerNote: line(300),
 });
 
+const BUILT_IN_IDS = ["gotyme", "gcash", "maya", "cash", "other"];
+const extraChannel = z.object({
+  id: z.string().trim().toLowerCase().regex(/^[a-z0-9][a-z0-9-]{1,30}$/, "Channel ids are 2-31 lowercase letters, digits or dashes")
+    .refine((v) => !BUILT_IN_IDS.includes(v), "That id belongs to a built-in channel; pick another"),
+  enabled: z.boolean(),
+  label: z.string().trim().min(1, "Every channel needs a full name").max(60),
+  app: z.string().trim().min(1, "Every channel needs a short name").max(30),
+  via: z.string().trim().min(1, "Every channel needs its \"pay via\" wording").max(60),
+  payVia: z.string().trim().min(1, "Every channel needs its \"pay via\" wording").max(80),
+  qrUrl: asset.nullable(),
+  accountName: line(120),
+  accountNumber: line(60),
+  hint: line(240),
+  referenceImage: asset.nullable(),
+});
+const extraChannels = z
+  .array(extraChannel)
+  .max(MAX_EXTRA_CHANNELS, `At most ${MAX_EXTRA_CHANNELS} extra channels`)
+  .refine((list) => new Set(list.map((c) => c.id)).size === list.length, "Two channels have the same id")
+  .refine((list) => list.every((c) => !c.enabled || c.qrUrl || c.accountNumber), "A channel that is switched on needs a QR code or an account number");
+
+const payPage = z.object({
+  show: z.object(Object.fromEntries(Object.keys(PAY_PAGE_DEFAULTS.show).map((k) => [k, z.boolean()])) as Record<keyof PayPageSettings["show"], z.ZodBoolean>),
+  title: label("The payment page title"),
+  holdNote: line(300),
+  holdWarning: line(400),
+  holdWarningTl: line(400),
+  summaryTitle: label("The summary title"),
+  totalLabel: label("The total label"),
+  step1Title: label("The step 1 title"),
+  step1Text: line(300),
+  step1TextTl: line(300),
+  exactCallout: line(500),
+  exactCalloutTl: line(300),
+  step2Title: label("The step 2 title"),
+  step2Text: line(300),
+  step2TextTl: line(300),
+  methodLabel: label("The \"I paid with\" label"),
+  onlyOneNote: line(200),
+  referenceLabel: label("The reference number label"),
+  referencePlaceholder: line(60),
+  referenceHint: line(300),
+  referenceHelpTitle: line(120),
+  referenceHelpText: line(500),
+  referenceHelpTextTl: line(300),
+  screenshotLabel: label("The screenshot label"),
+  screenshotHint: line(300),
+  submitButton: label("The submit button"),
+  afterTitle: line(60),
+  afterText: line(500),
+  afterText2: line(500),
+  afterTextTl: line(300),
+});
+
 export const rulesSchema = z.object({
   paymentWindowMinutes: z.number().int().min(15, "Give buyers at least 15 minutes to pay").max(24 * 60, "At most 24 hours to pay"),
   reminderMinutes: z.number().int().min(5).max(120),
@@ -91,6 +145,8 @@ export const rulesSchema = z.object({
   drifterReferencePrefix: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{1,6}$/, "Prefix is 1-6 letters or digits"),
   buyerForm,
   page,
+  extraChannels,
+  payPage,
 }).refine((r) => r.reminderMinutes < r.paymentWindowMinutes, { message: "The reminder must go out before the hold runs out", path: ["reminderMinutes"] });
 
 /** Lay stored values over the defaults field by field. Exported for tests. */
@@ -126,6 +182,11 @@ export function mergeRules(stored: unknown): Rules {
     page: (() => {
       const sp = (s.page ?? {}) as Partial<PageSettings>;
       return pick(page, { ...d.page, ...sp, show: { ...d.page.show, ...(sp.show ?? {}) } }, d.page);
+    })(),
+    extraChannels: pick(extraChannels, s.extraChannels, d.extraChannels),
+    payPage: (() => {
+      const sp = (s.payPage ?? {}) as Partial<PayPageSettings>;
+      return pick(payPage, { ...d.payPage, ...sp, show: { ...d.payPage.show, ...(sp.show ?? {}) } }, d.payPage);
     })(),
   };
   // A reminder that lands after expiry would never send; keep the pair coherent.

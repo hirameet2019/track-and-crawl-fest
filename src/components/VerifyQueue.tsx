@@ -9,6 +9,7 @@ import type { Shipping } from "@/lib/shipping";
 import { ShippingDetails } from "@/components/ShippingDetails";
 import { SignedImage } from "@/components/SignedImage";
 import { humanMinutes } from "@/lib/elapsed";
+import { paymentLabel } from "@/lib/payment-options";
 
 export interface QueueOrder {
   id: string;
@@ -18,6 +19,7 @@ export interface QueueOrder {
   buyer_mobile: string | null;
   total_centavos: number;
   payment_method: string | null;
+  payment_channel_label?: string | null;
   payment_reference: string | null;
   payment_proof_path: string | null;
   proof_submitted_at: string | null;
@@ -113,7 +115,7 @@ function Card({ o, onDone }: { o: QueueOrder; onDone: (id: string, warning?: str
         )}
         <div className="rounded-lg bg-zinc-50 p-3 text-sm">
           <div className="flex justify-between"><span className="text-zinc-500">Expected amount</span><b className="text-lg">{php(o.total_centavos)}</b></div>
-          <div className="flex justify-between"><span className="text-zinc-500">Method</span><b className="uppercase">{o.payment_method}</b></div>
+          <div className="flex justify-between"><span className="text-zinc-500">Method</span><b className="uppercase">{paymentLabel(o)}</b></div>
           <div className="flex justify-between"><span className="text-zinc-500">Reference no.</span><b className="font-mono tracking-wide">{o.payment_reference}</b></div>
         </div>
         <p className="text-xs text-zinc-500">Check: the amount matches exactly, the reference number appears in the wallet history, and the date/time is plausible.</p>

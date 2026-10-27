@@ -7,7 +7,8 @@ import { EventDetailsForm } from "@/components/EventDetailsForm";
 import { TicketTypesEditor, type TypeStock } from "@/components/TicketTypesEditor";
 import { SiteLookForm } from "@/components/SiteLookForm";
 import { SetupOverview } from "@/components/settings/SetupOverview";
-import { PaymentQrForm, PaymentRulesForm } from "@/components/settings/PaymentsForms";
+import { ExtraChannelsForm, PaymentQrForm, PaymentRulesForm } from "@/components/settings/PaymentsForms";
+import { PayPageForm } from "@/components/settings/PayPageForm";
 import { OrderingForm } from "@/components/settings/OrderingForm";
 import { PageForm } from "@/components/settings/PageForm";
 import { AdvancedForm } from "@/components/settings/AdvancedForm";
@@ -25,7 +26,8 @@ const TABS = [
   { id: "overview", label: "Overview", blurb: "What is set up and what is still missing." },
   { id: "event", label: "Event", blurb: "Name, date, venue, sales window, receipt and help link." },
   { id: "tickets", label: "Tickets", blurb: "Ticket types, prices, what each includes, and online cut-offs." },
-  { id: "payments", label: "Payments", blurb: "QR codes, how long buyers have to pay, and how channels are named." },
+  { id: "payments", label: "Payments", blurb: "QR codes, more payment channels, how long buyers have to pay, and how channels are named." },
+  { id: "paypage", label: "Payment page", blurb: "What the payment page shows, and its steps, labels and notes." },
   { id: "ordering", label: "Ordering", blurb: "Limits per order and the shirt sizes offered." },
   { id: "page", label: "Page", blurb: "What the registration page shows, and its headings, steps and notes." },
   { id: "look", label: "Look", blurb: "Logo, artwork, slideshow, colours and the PDF ticket." },
@@ -60,6 +62,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           emailReady={email.provider !== "dry-run"}
           lookCustomised={customised}
           cronReady={!!process.env.CRON_SECRET}
+          extraChannels={rules.extraChannels}
         />
       );
       break;
@@ -86,9 +89,13 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       body = (
         <div className="space-y-6">
           {event ? <PaymentQrForm event={event} channels={rules.channels} /> : <NoEvent />}
+          <ExtraChannelsForm rules={rules} />
           <PaymentRulesForm rules={rules} />
         </div>
       );
+      break;
+    case "paypage":
+      body = <PayPageForm rules={rules} />;
       break;
     case "ordering":
       body = <OrderingForm rules={rules} />;

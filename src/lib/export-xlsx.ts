@@ -25,7 +25,7 @@ type TicketRow = {
   vehicle_photo_path: string | null; companion_of: string | null; included: boolean; redeemed_at: string | null; void_reason: string | null; ticket_type_id: string; created_at: string;
   /** What the gate handed over, ticked on the scanner: {"shirt": true, ...}. */
   kit_claimed: Record<string, boolean> | null;
-  order: { order_no: number; receipt_no: number | null; status: string; channel: string; buyer_name: string; buyer_email: string | null; buyer_mobile: string | null; total_centavos: number; payment_method: string | null; payment_reference: string | null; paid_at: string | null; shipping: Shipping | null; order_items: { ticket_type_id: string; qty: number; unit_price_centavos: number }[] } | null;
+  order: { order_no: number; receipt_no: number | null; status: string; channel: string; buyer_name: string; buyer_email: string | null; buyer_mobile: string | null; total_centavos: number; payment_method: string | null; payment_channel_label?: string | null; payment_reference: string | null; paid_at: string | null; shipping: Shipping | null; order_items: { ticket_type_id: string; qty: number; unit_price_centavos: number }[] } | null;
 };
 type WalkinRow = { created_at: string; qty: number; free_qty: number; drifter_name: string | null; unit_price_centavos: number; payment_method: string; payment_ref: string | null; shirt_size: string | null; holder_name: string | null; vehicle_plate: string | null; ticket_type_id: string; staff: { full_name: string } | null;
   /** Where the shirt of a gate VIP Pass ships (since 10 October); null: handed over or no shirt. */
@@ -84,7 +84,7 @@ export async function buildTicketsWorkbook(): Promise<Buffer> {
       admin
         .from("tickets")
         .select(
-          "number, status, holder_name, shirt_size, vehicle_plate, vehicle_model, vehicle_photo_path, companion_of, included, redeemed_at, void_reason, ticket_type_id, created_at, kit_claimed, order:orders(order_no, receipt_no, status, channel, buyer_name, buyer_email, buyer_mobile, total_centavos, payment_method, payment_reference, paid_at, shipping, order_items(ticket_type_id, qty, unit_price_centavos))",
+          "number, status, holder_name, shirt_size, vehicle_plate, vehicle_model, vehicle_photo_path, companion_of, included, redeemed_at, void_reason, ticket_type_id, created_at, kit_claimed, order:orders(order_no, receipt_no, status, channel, buyer_name, buyer_email, buyer_mobile, total_centavos, payment_method, payment_channel_label, payment_reference, paid_at, shipping, order_items(ticket_type_id, qty, unit_price_centavos))",
         )
         .order("number")
         .order("id")
@@ -292,7 +292,7 @@ export async function buildTicketsWorkbook(): Promise<Buffer> {
         r.values = [
           x.number, x.status, x.holder_name ?? "", x.shirt_size ?? "", x.vehicle_plate ?? "", x.vehicle_model ?? "", x.vehicle_photo_path ? "yes" : "", x.companion_of ?? "",
           !x.included && shirtShips(t, x.order) ? shippingOneLine(x.order!.shipping!) : "", manila(x.redeemed_at), x.void_reason ?? "", x.order?.order_no ?? "", x.order?.receipt_no ?? "", x.order?.status ?? "", x.order?.channel ?? "", x.order?.buyer_name ?? "",
-          x.order?.buyer_email ?? "", x.order?.buyer_mobile ?? "", php(x.order ? orderTotal(x.order) : null), x.order?.payment_method ?? "", x.order?.payment_reference ?? "", manila(x.order?.paid_at), manila(x.created_at),
+          x.order?.buyer_email ?? "", x.order?.buyer_mobile ?? "", php(x.order ? orderTotal(x.order) : null), x.order ? (x.order.payment_channel_label ?? x.order.payment_method ?? "") : "", x.order?.payment_reference ?? "", manila(x.order?.paid_at), manila(x.created_at),
         ];
         r.getCell(1).font = { bold: true };
         r.getCell(19).numFmt = "#,##0.00";

@@ -11,6 +11,7 @@ import { IMAGE_MIME, MAX_UPLOAD_BYTES } from "@/lib/image";
 import { MOBILE_RE, emailProblem, normalizeEmail, normalizeMobile } from "@/lib/contact";
 import { audit } from "@/lib/audit";
 import { shippingSchema } from "@/lib/shipping";
+import { paymentOptions } from "@/lib/payment-options";
 
 export type ActionResult = { ok: true; warning?: string } | { ok: false; error: string };
 
@@ -231,7 +232,8 @@ export async function createOnlineOrder(formData: FormData): Promise<ActionResul
 
 const proofSchema = z.object({
   order_id: z.string().uuid(),
-  payment_method: z.enum(["gotyme", "gcash", "maya"]),
+  // A channel id from the payment page: gotyme / gcash / maya or one added in Settings.
+  payment_channel: z.string().trim().min(1, "Choose how you paid").max(40),
   // InstaPay / bank references mix letters and digits; e-wallets use digits only.
   payment_reference: z.preprocess(
     (v) => String(v ?? "").replace(/\s+/g, "").toUpperCase(),
@@ -243,7 +245,7 @@ const proofSchema = z.object({
 export async function submitPaymentProof(formData: FormData): Promise<ActionResult> {
   const parsed = proofSchema.safeParse({
     order_id: formData.get("order_id"),
-    payment_method: formData.get("payment_method"),
+    payment_channel: formData.get("payment_channel"),
     payment_reference: formData.get("payment_reference"),
   });
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
@@ -265,15 +267,24 @@ export async function submitPaymentProof(formData: FormData): Promise<ActionResu
     return { ok: false, error: `This order is already ${order.status.replace("_", " ")}` };
   }
 
-  // Reject reference numbers already used on another live order
-  const { data: dupe } = await admin
+  // Only a channel the payment page offers right now counts.
+  const [{ data: event }, rules] = await Promise.all([
+    admin.from("events").select("gotyme_qr_url, gotyme_account_name, gcash_qr_url, gcash_account_name, maya_qr_url, maya_account_name").eq("id", order.event_id).single(),
+    getRules(),
+  ]);
+  const option = event ? paymentOptions(event, rules).find((o) => o.id === parsed.data.payment_channel) : undefined;
+  if (!option) return { ok: false, error: "That payment channel is not available any more. Reload the page and choose again." };
+
+  // Reject reference numbers already used on another live order through the same channel
+  let dupeQuery = admin
     .from("orders")
     .select("id")
-    .eq("payment_method", parsed.data.payment_method)
+    .eq("payment_method", option.method)
     .eq("payment_reference", parsed.data.payment_reference)
     .neq("id", order.id)
-    .neq("status", "rejected")
-    .maybeSingle();
+    .neq("status", "rejected");
+  if (option.method === "other") dupeQuery = dupeQuery.eq("payment_channel", option.id);
+  const { data: dupe } = await dupeQuery.limit(1).maybeSingle();
   if (dupe) return { ok: false, error: "This reference number was already submitted for another order" };
 
   const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
@@ -287,7 +298,9 @@ export async function submitPaymentProof(formData: FormData): Promise<ActionResu
     .from("orders")
     .update({
       status: "awaiting_verification",
-      payment_method: parsed.data.payment_method,
+      payment_method: option.method,
+      payment_channel: option.id,
+      payment_channel_label: option.label,
       payment_reference: parsed.data.payment_reference,
       payment_proof_path: path,
       proof_submitted_at: new Date().toISOString(),
@@ -295,7 +308,7 @@ export async function submitPaymentProof(formData: FormData): Promise<ActionResu
     })
     .eq("id", order.id);
   if (error) return { ok: false, error: error.message };
-  await audit(admin, { actor: null, action: "order.proof_submitted", entity: "order", entity_id: order.id, data: { method: parsed.data.payment_method, reference: parsed.data.payment_reference } });
+  await audit(admin, { actor: null, action: "order.proof_submitted", entity: "order", entity_id: order.id, data: { method: option.method, channel: option.id, reference: parsed.data.payment_reference } });
 
   redirect(`/order/${order.id}`);
 }

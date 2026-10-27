@@ -11,6 +11,7 @@ import { SignedImage } from "@/components/SignedImage";
 import { php } from "@/lib/money";
 import { ShippingDetails } from "@/components/ShippingDetails";
 import type { OrderStatus } from "@/lib/supabase/types";
+import { paymentLabel } from "@/lib/payment-options";
 
 export interface OrderRow {
   id: string;
@@ -22,6 +23,7 @@ export interface OrderRow {
   status: OrderStatus;
   channel: string;
   payment_method: string | null;
+  payment_channel_label?: string | null;
   payment_reference: string | null;
   created_at: string;
 }
@@ -103,7 +105,7 @@ export function OrdersTable({ rows, isAdmin, payApp }: { rows: OrderRow[]; isAdm
                     </td>
                     <td><div>{o.buyer_name}</div><div className="text-xs text-zinc-500">{o.buyer_email} {o.buyer_mobile}</div></td>
                     <td className="text-zinc-600">{o.channel}</td>
-                    <td className="text-xs"><span className="uppercase">{o.payment_method}</span> <span className="font-mono text-zinc-500">{o.payment_reference}</span></td>
+                    <td className="text-xs"><span className="uppercase">{o.payment_method ? paymentLabel(o) : ""}</span> <span className="font-mono text-zinc-500">{o.payment_reference}</span></td>
                     <td className="text-right">{php(o.total_centavos)}</td>
                     <td><OrderStatusBadge status={o.status} /></td>
                     <td className="text-xs text-zinc-500">{new Date(o.created_at).toLocaleString(LOCALE.locale, { timeZone: LOCALE.timeZone })}</td>
@@ -145,7 +147,7 @@ function OrderPanel({ d, isAdmin, payApp }: { d: OrderDetail; isAdmin: boolean; 
           <div><dt className="text-zinc-500">Name</dt><dd>{d.buyer_name}</dd></div>
           <div><dt className="text-zinc-500">Email</dt><dd className="break-all">{d.buyer_email ?? "-"}</dd></div>
           <div><dt className="text-zinc-500">Mobile</dt><dd>{d.buyer_mobile ?? "-"}</dd></div>
-          <div><dt className="text-zinc-500">Payment</dt><dd className="uppercase">{d.payment_method ?? "-"}</dd></div>
+          <div><dt className="text-zinc-500">Payment</dt><dd className="uppercase">{paymentLabel(d)}</dd></div>
           <div><dt className="text-zinc-500">Reference</dt><dd className="font-mono">{d.payment_reference ?? "-"}</dd></div>
           <div><dt className="text-zinc-500">Receipt no.</dt><dd>{d.receipt_no ?? "-"}</dd></div>
           <div><dt className="text-zinc-500">Created</dt><dd>{fmt(d.created_at)}</dd></div>

@@ -77,7 +77,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   // The table shows the newest 200. The totals must cover every matching order, not
   // just that page, so they are counted separately and paged through in full.
   const listPromise = filtered(
-    "id, order_no, buyer_name, buyer_email, buyer_mobile, total_centavos, status, channel, payment_method, payment_reference, created_at",
+    "id, order_no, buyer_name, buyer_email, buyer_mobile, total_centavos, status, channel, payment_method, payment_channel_label, payment_reference, created_at",
   )
     .order("created_at", { ascending: false })
     .limit(LIST_LIMIT);
@@ -232,7 +232,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
         Tap a row to open the order here. Nothing else loads until you do.
         {truncated ? ` The table shows the newest ${LIST_LIMIT}; the totals above cover all ${totalRows.length}.` : ""}
       </p>
-      <OrdersTable rows={(orders ?? []) as unknown as OrderRow[]} isAdmin={isAdmin} payApp={primaryChannel(event, (await getRules()).channels).app} />
+      <OrdersTable rows={(orders ?? []) as unknown as OrderRow[]} isAdmin={isAdmin} payApp={await getRules().then((r) => primaryChannel(event, r.channels, r.extraChannels).app)} />
     </div>
   );
 }

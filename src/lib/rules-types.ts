@@ -149,6 +149,128 @@ export const PAGE_DEFAULTS: PageSettings = {
   footerNote: "Payment via {pay}. Tickets are emailed after payment verification.",
 };
 
+/**
+ * A payment channel added in Admin > Settings > Payments, beside the built-in
+ * GoTyme / GCash / Maya: a bank transfer, another e-wallet. Offered on the payment
+ * page when enabled and it has a QR or an account number. Orders paid through it
+ * record payment_method "other" plus this id and label.
+ */
+export interface ExtraChannel {
+  /** Stable id stored on orders; lowercase letters, digits and dashes. */
+  id: string;
+  enabled: boolean;
+  /** Full name on the payment card and staff screens, e.g. "BPI bank transfer". */
+  label: string;
+  /** Short name in instructions: "Open your BPI app". */
+  app: string;
+  /** "Pay via" on the order form. */
+  via: string;
+  /** "Pay via" in page text and emails. */
+  payVia: string;
+  qrUrl: string | null;
+  accountName: string;
+  accountNumber: string;
+  /** Note under the QR / account details. */
+  hint: string;
+  /** Screenshot under "Where do I find the reference number?". */
+  referenceImage: string | null;
+}
+
+export const MAX_EXTRA_CHANNELS = 8;
+
+/**
+ * The payment page (/pay/<order>): what shows and what it says. Text may use
+ * {amount}, {order}, {name}, {email}, {minutes}, {app} and {scanHint} (" (or any
+ * bank app with InstaPay QR)" or nothing); **double asterisks** make bold. The hold
+ * note may place the live countdown with {timeLeft}; the after-submit text may
+ * place the order status link with {statusLink}.
+ */
+export interface PayPageSettings {
+  show: {
+    holdNote: boolean;
+    holdWarning: boolean;
+    summary: boolean;
+    accountName: boolean;
+    accountNumber: boolean;
+    exactCallout: boolean;
+    referenceHelp: boolean;
+    afterSubmit: boolean;
+    support: boolean;
+  };
+  title: string;
+  holdNote: string;
+  holdWarning: string;
+  holdWarningTl: string;
+  summaryTitle: string;
+  totalLabel: string;
+  step1Title: string;
+  step1Text: string;
+  step1TextTl: string;
+  exactCallout: string;
+  exactCalloutTl: string;
+  step2Title: string;
+  step2Text: string;
+  step2TextTl: string;
+  methodLabel: string;
+  onlyOneNote: string;
+  referenceLabel: string;
+  referencePlaceholder: string;
+  referenceHint: string;
+  referenceHelpTitle: string;
+  referenceHelpText: string;
+  referenceHelpTextTl: string;
+  screenshotLabel: string;
+  screenshotHint: string;
+  submitButton: string;
+  afterTitle: string;
+  afterText: string;
+  afterText2: string;
+  afterTextTl: string;
+}
+
+export const PAY_PAGE_DEFAULTS: PayPageSettings = {
+  show: {
+    holdNote: true,
+    holdWarning: true,
+    summary: true,
+    accountName: true,
+    accountNumber: true,
+    exactCallout: true,
+    referenceHelp: true,
+    afterSubmit: true,
+    support: true,
+  },
+  title: "Pay {amount}",
+  holdNote: "Order #{order} for {name}. Your wristbands are held for {minutes} minutes, and {timeLeft} of that is left.",
+  holdWarning: "Pay and upload before the timer ends. When it runs out the order is cancelled, the wristbands go back to the pool, and this page stops accepting payment.",
+  holdWarningTl: "Naka-hold ang wristbands mo ng {minutes} minuto. Bayaran at i-upload ang proof bago matapos ang oras. Pag naubos ito, kanselado na ang order at kailangan mo nang mag-order ulit.",
+  summaryTitle: "Order summary",
+  totalLabel: "Total to pay",
+  step1Title: "Scan and pay the exact amount",
+  step1Text: "Open your {app} app{scanHint}, scan the code, and pay the exact amount.",
+  step1TextTl: "Buksan ang {app} app, i-scan ang QR, at bayaran ang eksaktong halaga.",
+  exactCallout: "Pay exactly **{amount}**. Put **Order #{order}** in the message or note if your app allows it. Take a screenshot of the confirmation. Any InstaPay transfer fee is charged by your own bank on top, so the amount received must still be the full ticket price.",
+  exactCalloutTl: "Eksaktong **{amount}** ang ipadala. Pagkatapos magbayad, i-screenshot ang confirmation screen.",
+  step2Title: "Submit your proof of payment",
+  step2Text: "Type the reference number and upload the screenshot of your confirmation.",
+  step2TextTl: "Ilagay ang reference number at i-upload ang screenshot ng confirmation.",
+  methodLabel: "I paid with",
+  onlyOneNote: "Only {app} is accepted for now.",
+  referenceLabel: "Reference number",
+  referencePlaceholder: "e.g. 20260918ABCD1234",
+  referenceHint: "The reference / transaction number on your payment confirmation screen. Letters and digits, spaces are ignored.",
+  referenceHelpTitle: "Where do I find the reference number? Saan ito makikita?",
+  referenceHelpText: "Open your bank or e-wallet app, tap the transfer you just made, and copy the long number labelled **Reference No.**, **Transaction ID**, or **Trace No.** It is also on the confirmation screenshot.",
+  referenceHelpTextTl: "Buksan ang app, hanapin ang transfer na ginawa mo, at kopyahin ang mahabang numero na Reference No. o Transaction ID.",
+  screenshotLabel: "Payment screenshot",
+  screenshotHint: "The screenshot of your \"Transfer successful\" screen. Large screenshots are resized automatically. Screenshot ng confirmation ng bayad mo.",
+  submitButton: "Submit proof of payment / I-submit ang proof",
+  afterTitle: "After you submit",
+  afterText: "Every payment is checked by a real person against the account history, so your tickets are not instant. Please allow **up to 24 hours** for your receipt and QR tickets to arrive at **{email}**. Most are sent much sooner.",
+  afterText2: "If nothing arrives, look in your **Spam or Junk folder** first and mark the message as Not spam. You can also check your order any time at {statusLink}; it updates the moment your payment is confirmed.",
+  afterTextTl: "Pagkatapos i-submit, hintayin ang email na may receipt at QR tickets, hanggang 24 oras. Tingnan din ang Spam folder.",
+};
+
 /** Fill {pay}, {via} and {minutes} in page wording. Unknown tokens are left as typed. */
 export const fillText = (text: string, vars: Partial<Record<"pay" | "via" | "minutes", string | number>>) =>
   text.replace(/\{(pay|via|minutes)\}/g, (m, k: "pay" | "via" | "minutes") => (vars[k] !== undefined ? String(vars[k]) : m));
@@ -169,6 +291,9 @@ export interface Rules {
   drifterReferencePrefix: string;
   buyerForm: BuyerFormText;
   page: PageSettings;
+  /** Payment channels added in Settings, after GoTyme / GCash / Maya, in this order. */
+  extraChannels: ExtraChannel[];
+  payPage: PayPageSettings;
 }
 
 export const RULE_DEFAULTS: Rules = {
@@ -184,6 +309,8 @@ export const RULE_DEFAULTS: Rules = {
   drifterReferencePrefix: NOTES.drifterReferencePrefix,
   buyerForm: { ...BUYER_FORM_DEFAULTS },
   page: { ...PAGE_DEFAULTS, show: { ...PAGE_DEFAULTS.show } },
+  extraChannels: [],
+  payPage: { ...PAY_PAGE_DEFAULTS, show: { ...PAY_PAGE_DEFAULTS.show } },
 };
 
 /** Staff pickers (walk-in, drifters): every method, short name, cash first. */

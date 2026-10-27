@@ -126,13 +126,28 @@ export function primaryChannelKey(event: ChannelFields | null | undefined): Onli
   return ONLINE_CHANNELS.find((k) => event?.[`${k}_qr_url`]) ?? "gotyme";
 }
 
-/** The primary channel's display details. */
-export const primaryChannel = (event: ChannelFields | null | undefined, channels: Record<PaymentMethod, PaymentChannel> = PAYMENT_CHANNELS): PaymentChannel =>
-  channels[primaryChannelKey(event)];
+/** The first channel added in Settings that buyers can use, when no built-in one has a QR. */
+const firstExtra = (event: ChannelFields | null | undefined, extras: readonly ExtraChannel[]) =>
+  ONLINE_CHANNELS.some((k) => event?.[`${k}_qr_url`]) ? undefined : extras.find((c) => c.enabled && (c.qrUrl || c.accountNumber));
 
-/** Account holder name shown beside the primary channel's QR, from the events row. */
-export function primaryAccountName(event: ChannelFields & Pick<EventRow, "gotyme_account_name" | "gcash_account_name" | "maya_account_name">): string | null {
-  return event[`${primaryChannelKey(event)}_account_name`] ?? null;
+/**
+ * The primary channel's display details: the first built-in channel with a QR, or
+ * else the first channel added in Settings (pass `extras` for that), or GoTyme.
+ */
+export const primaryChannel = (
+  event: ChannelFields | null | undefined,
+  channels: Record<PaymentMethod, PaymentChannel> = PAYMENT_CHANNELS,
+  extras: readonly ExtraChannel[] = [],
+): PaymentChannel => {
+  const x = firstExtra(event, extras);
+  return x ? { label: x.label, app: x.app, via: x.via, payVia: x.payVia, hint: x.hint || undefined, referenceImage: x.referenceImage ?? undefined, accent: "text-cyan-300" } : channels[primaryChannelKey(event)];
+};
+
+/** Account holder name shown beside the primary channel's QR (events row, or the extra channel). */
+export function primaryAccountName(event: ChannelFields & Pick<EventRow, "gotyme_account_name" | "gcash_account_name" | "maya_account_name">, extras: readonly ExtraChannel[] = []): string | null {
+  const x = firstExtra(event, extras);
+  return x ? x.accountName || null : event[`${primaryChannelKey(event)}_account_name`] ?? null;
 }
 
+import type { ExtraChannel } from "@/lib/rules-types";
 import type { EventRow, OnlinePaymentMethod, PaymentMethod } from "@/lib/supabase/types";

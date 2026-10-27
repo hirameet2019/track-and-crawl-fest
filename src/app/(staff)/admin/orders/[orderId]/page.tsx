@@ -13,6 +13,7 @@ import { TicketActions } from "@/components/TicketActions";
 import { carNameOf, itemLabel } from "@/lib/items";
 import { shirtShips } from "@/lib/shipping";
 import { ShippingDetails } from "@/components/ShippingDetails";
+import { paymentLabel } from "@/lib/payment-options";
 
 const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleString(LOCALE.locale, { timeZone: LOCALE.timeZone }) : "-");
 
@@ -41,7 +42,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ or
             <div><dt className="text-zinc-500">Name</dt><dd>{order.buyer_name}</dd></div>
             <div><dt className="text-zinc-500">Email</dt><dd>{order.buyer_email ?? "-"}</dd></div>
             <div><dt className="text-zinc-500">Mobile</dt><dd>{order.buyer_mobile ?? "-"}</dd></div>
-            <div><dt className="text-zinc-500">Payment</dt><dd className="uppercase">{order.payment_method ?? "-"}</dd></div>
+            <div><dt className="text-zinc-500">Payment</dt><dd className="uppercase">{paymentLabel(order)}</dd></div>
             <div><dt className="text-zinc-500">Reference</dt><dd className="font-mono">{order.payment_reference ?? "-"}</dd></div>
             <div><dt className="text-zinc-500">Receipt no.</dt><dd>{order.receipt_no ?? "-"}</dd></div>
             <div><dt className="text-zinc-500">Created</dt><dd>{fmt(order.created_at)}</dd></div>
@@ -72,7 +73,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ or
             buyerName={order.buyer_name} totalCentavos={order.total_centavos}
             balanceCentavos={order.balance_centavos} balanceSettledAt={order.balance_settled_at}
             hasRedeemed={tickets.some((t) => t.status === "redeemed")}
-            payApp={primaryChannel(event, rules.channels).app}
+            payApp={primaryChannel(event, rules.channels, rules.extraChannels).app}
           />
         </div>
       </div>

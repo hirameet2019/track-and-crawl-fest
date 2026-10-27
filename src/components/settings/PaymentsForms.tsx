@@ -6,7 +6,7 @@ import { savePaymentQr, saveRulesSection, type PaymentQrInput, type PaymentQrVal
 import { AssetField } from "@/components/AssetField";
 import { ONLINE_CHANNELS } from "@/config/event";
 import { Group, NumberField, SaveBar, changed, type SaveMsg } from "@/components/settings/SaveBar";
-import type { Rules } from "@/lib/rules-types";
+import { MAX_EXTRA_CHANNELS, type ExtraChannel, type Rules } from "@/lib/rules-types";
 import type { PaymentMethod } from "@/lib/supabase/types";
 
 const toQr = (e: PaymentQrValues): PaymentQrInput => ({
@@ -57,6 +57,122 @@ export function PaymentQrForm({ event, channels }: { event: PaymentQrValues; cha
         ))}
       </div>
       <SaveBar label="Save QR codes" dirty={dirty} pending={pending} msg={msg} onSave={save} onDiscard={() => { setF(initial); setMsg(null); }} />
+    </div>
+  );
+}
+
+/** "BPI bank transfer" -> "bpi-bank-transfer", made unique against the others. */
+function channelId(label: string, taken: string[]): string {
+  const base = label.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 24) || "channel";
+  const reserved = ["gotyme", "gcash", "maya", "cash", "other", ...taken];
+  let id = base.length < 2 ? `${base}-pay` : base;
+  for (let n = 2; reserved.includes(id); n++) id = `${base}-${n}`;
+  return id;
+}
+
+const blankChannel = (taken: string[]): ExtraChannel => ({
+  id: channelId("new channel", taken),
+  enabled: true,
+  label: "",
+  app: "",
+  via: "",
+  payVia: "",
+  qrUrl: null,
+  accountName: "",
+  accountNumber: "",
+  hint: "",
+  referenceImage: null,
+});
+
+/**
+ * Payment channels beyond GoTyme / GCash / Maya: bank transfers, other e-wallets.
+ * Each shows on the payment page (after the built-in ones, in this order) while it
+ * is switched on and has a QR or an account number. Orders paid through one keep
+ * its name, so renaming or removing it later does not rewrite history.
+ */
+export function ExtraChannelsForm({ rules }: { rules: Rules }) {
+  const router = useRouter();
+  const initial = rules.extraChannels;
+  const [list, setList] = useState<ExtraChannel[]>(initial);
+  const [msg, setMsg] = useState<SaveMsg>(null);
+  const [pending, start] = useTransition();
+  const dirty = changed(list, initial);
+  const saved = new Set(initial.map((c) => c.id));
+
+  const set = (i: number, patch: Partial<ExtraChannel>) =>
+    setList((p) =>
+      p.map((c, j) => {
+        if (j !== i) return c;
+        const next = { ...c, ...patch };
+        // A new channel takes its id from its name until it is saved; after that the id is fixed.
+        if (patch.label !== undefined && !saved.has(c.id)) next.id = channelId(patch.label || "new channel", p.filter((_, k) => k !== i).map((x) => x.id));
+        return next;
+      }),
+    );
+  const move = (i: number, d: -1 | 1) =>
+    setList((p) => {
+      const n = [...p];
+      [n[i], n[i + d]] = [n[i + d], n[i]];
+      return n;
+    });
+
+  const save = () =>
+    start(async () => {
+      setMsg(null);
+      const r = await saveRulesSection({ extraChannels: list });
+      setMsg(r.ok ? { kind: "ok", text: "Saved. The payment page offers these on the next load." } : { kind: "err", text: r.error });
+      if (r.ok) router.refresh();
+    });
+
+  return (
+    <div className="card space-y-5">
+      <div>
+        <h2 className="font-semibold">More payment channels</h2>
+        <p className="text-sm text-zinc-500">
+          Bank transfers or other e-wallets, shown after the QR codes above. A channel is offered while it is switched on and has a QR or an account number.
+          Staff see its name on Verify, Orders, receipts and exports.
+        </p>
+      </div>
+
+      {list.length === 0 && <p className="rounded-xl border border-dashed border-white/15 p-4 text-center text-sm text-zinc-500">None yet. Only the channels above are offered.</p>}
+
+      <ol className="space-y-3">
+        {list.map((c, i) => (
+          // Index key: a new channel's id follows its name as it is typed, and remounting would drop focus.
+          <li key={i} className={`rounded-xl border p-3 ${c.enabled ? "border-white/15 bg-black/25" : "border-white/10 bg-black/10 opacity-80"}`}>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <label className="flex items-center gap-2 text-sm font-semibold">
+                <input type="checkbox" checked={c.enabled} onChange={(e) => set(i, { enabled: e.target.checked })} />
+                {c.label || "New channel"}
+                <span className="font-mono text-[11px] font-normal text-zinc-500">{c.id}</span>
+                {!c.enabled && <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-normal">off</span>}
+              </label>
+              <div className="flex gap-1">
+                <button type="button" className="btn-secondary px-2 py-0.5 text-xs" disabled={i === 0} onClick={() => move(i, -1)} aria-label={`Move ${c.label || "channel"} up`}>&uarr;</button>
+                <button type="button" className="btn-secondary px-2 py-0.5 text-xs" disabled={i === list.length - 1} onClick={() => move(i, 1)} aria-label={`Move ${c.label || "channel"} down`}>&darr;</button>
+                <button type="button" className="btn-secondary px-2 py-0.5 text-xs" onClick={() => setList((p) => p.filter((_, j) => j !== i))}>Remove</button>
+              </div>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div><label className="label">Full name *</label><input className="input h-9" maxLength={60} value={c.label} placeholder="BPI bank transfer" onChange={(e) => set(i, { label: e.target.value })} /></div>
+              <div><label className="label">Short name *</label><input className="input h-9" maxLength={30} value={c.app} placeholder="BPI" onChange={(e) => set(i, { app: e.target.value })} /></div>
+              <div><label className="label">&ldquo;Pay via&rdquo; on the order form *</label><input className="input h-9" maxLength={60} value={c.via} placeholder="BPI transfer" onChange={(e) => set(i, { via: e.target.value })} /></div>
+              <div><label className="label">&ldquo;Pay via&rdquo; in page text and emails *</label><input className="input h-9" maxLength={80} value={c.payVia} placeholder="BPI bank transfer" onChange={(e) => set(i, { payVia: e.target.value })} /></div>
+              <div><label className="label">Account name</label><input className="input h-9" maxLength={120} value={c.accountName} onChange={(e) => set(i, { accountName: e.target.value })} /></div>
+              <div><label className="label">Account number</label><input className="input h-9 font-mono" maxLength={60} value={c.accountNumber} onChange={(e) => set(i, { accountNumber: e.target.value })} /></div>
+              <div className="sm:col-span-2"><label className="label">Note under the QR / account</label><input className="input h-9" maxLength={240} value={c.hint} placeholder="e.g. InstaPay or PESONet from any bank" onChange={(e) => set(i, { hint: e.target.value })} /></div>
+              <AssetField label="QR code" value={c.qrUrl ?? ""} onChange={(v) => set(i, { qrUrl: v || null })} onClear={() => set(i, { qrUrl: null })} defaultLabel="No QR" hint="Optional when an account number is given." />
+              <AssetField label="Where to find the reference number" value={c.referenceImage ?? ""} onChange={(v) => set(i, { referenceImage: v || null })} onClear={() => set(i, { referenceImage: null })} defaultLabel="None" hint="Screenshot shown under the proof-of-payment form." />
+            </div>
+          </li>
+        ))}
+      </ol>
+
+      <button type="button" className="btn-secondary text-sm" disabled={list.length >= MAX_EXTRA_CHANNELS} onClick={() => setList((p) => [...p, blankChannel(p.map((x) => x.id))])}>
+        + Add payment channel
+      </button>
+
+      <SaveBar label="Save channels" dirty={dirty} pending={pending} msg={msg} onSave={save} onDiscard={() => { setList(initial); setMsg(null); }} />
     </div>
   );
 }

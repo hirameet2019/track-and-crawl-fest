@@ -18,6 +18,8 @@ export type OrderChannel = "online" | "onsite" | "import";
 export type PaymentMethod = "gotyme" | "gcash" | "maya" | "cash";
 /** Channels a buyer can pay through online (everything except cash at the gate). */
 export type OnlinePaymentMethod = Exclude<PaymentMethod, "cash">;
+/** What an order can record: the four above, or "other" for a channel added in Settings. */
+export type OrderPaymentMethod = PaymentMethod | "other";
 export type TicketStatus = "issued" | "redeemed" | "void";
 export type NumberStatus = "available" | "assigned" | "void";
 export type StaffRole = "admin" | "staff" | "gate" | "scanner";
@@ -128,7 +130,11 @@ export interface OrderRow {
   buyer_email: string | null;
   buyer_mobile: string | null;
   total_centavos: number;
-  payment_method: PaymentMethod | null;
+  payment_method: OrderPaymentMethod | null;
+  /** Settings id of the channel paid with; null on orders from before custom channels. */
+  payment_channel: string | null;
+  /** The channel's name when the proof came in. */
+  payment_channel_label: string | null;
   payment_reference: string | null;
   payment_proof_path: string | null;
   proof_submitted_at: string | null;
@@ -314,7 +320,7 @@ export interface Database {
         Args: {
           p_order_id: string;
           p_actor: string | null;
-          p_payment_method: PaymentMethod | null;
+          p_payment_method: OrderPaymentMethod | null;
           p_payment_reference: string | null;
           p_tokens: string[];
         };

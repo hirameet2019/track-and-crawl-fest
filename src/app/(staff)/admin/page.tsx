@@ -106,7 +106,7 @@ export default async function DashboardPage() {
   for (const o of paid) if (o.payment_method) byMethod[o.payment_method] = (byMethod[o.payment_method] ?? 0) + o.total_centavos;
   for (const w of tally) byMethod[w.payment_method] = (byMethod[w.payment_method] ?? 0) + amount(w);
   // GoTyme and cash are the live channels; GCash / Maya tiles only appear if they ever took money.
-  const methodTiles = (["gotyme", "cash", "gcash", "maya"] as const).filter((m) => m === "gotyme" || m === "cash" || byMethod[m] > 0);
+  const methodTiles = (["gotyme", "cash", "gcash", "maya", "other"] as const).filter((m) => m === "gotyme" || m === "cash" || byMethod[m] > 0);
   const sold = availability.reduce((s, a) => s + Number(a.sold), 0);
   const onlineSold = availability.reduce((s, a) => s + Number(a.online_sold), 0);
   const redeemed = availability.reduce((s, a) => s + Number(a.redeemed), 0);
@@ -163,9 +163,9 @@ export default async function DashboardPage() {
         {methodTiles.map((m) => (
           <Stat
             key={m}
-            label={PAYMENT_CHANNELS[m].label}
+            label={m === "other" ? "Other channels" : PAYMENT_CHANNELS[m].label}
             value={php(byMethod[m])}
-            sub={m === "cash" ? "reconcile vs cash box" : "online + gate, reconcile vs account history"}
+            sub={m === "cash" ? "reconcile vs cash box" : m === "other" ? "channels added in Settings, see Orders" : "online + gate, reconcile vs account history"}
           />
         ))}
       </div>

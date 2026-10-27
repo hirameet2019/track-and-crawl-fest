@@ -13,6 +13,7 @@ import { SupportContact } from "@/components/SupportContact";
 
 import { carNameOf, itemLabel } from "@/lib/items";
 import { SHIPPING_NOTE, SHIPPING_NOTE_TL, shirtShips } from "@/lib/shipping";
+import { paymentLabel } from "@/lib/payment-options";
 
 export const dynamic = "force-dynamic";
 
@@ -53,7 +54,7 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ or
         <div className="card callout-info mt-6">
           <h2 className="font-semibold text-violet-100">We received your proof of payment</h2>
           <p className="mt-1 text-sm text-violet-100">
-            Reference {order.payment_reference} via {order.payment_method?.toUpperCase()}. A team member is now checking it against the account history.
+            Reference {order.payment_reference} via {paymentLabel(order)}. A team member is now checking it against the account history.
             Your receipt and QR tickets will be emailed to <b>{order.buyer_email}</b> <b>within 24 hours</b>, usually much sooner.
             If it does not show up in your inbox, check your Spam or Junk folder and mark it as Not spam. Bookmark this page; it updates the moment your payment is confirmed.
           </p>

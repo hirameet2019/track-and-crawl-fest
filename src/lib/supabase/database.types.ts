@@ -186,6 +186,8 @@ export type Database = {
           order_no: number
           paid_at: string | null
           payment_method: Database["public"]["Enums"]["payment_method"] | null
+          payment_channel: string | null
+          payment_channel_label: string | null
           payment_proof_path: string | null
           payment_reference: string | null
           proof_submitted_at: string | null
@@ -211,6 +213,8 @@ export type Database = {
           order_no?: number
           paid_at?: string | null
           payment_method?: Database["public"]["Enums"]["payment_method"] | null
+          payment_channel?: string | null
+          payment_channel_label?: string | null
           payment_proof_path?: string | null
           payment_reference?: string | null
           proof_submitted_at?: string | null
@@ -236,6 +240,8 @@ export type Database = {
           order_no?: number
           paid_at?: string | null
           payment_method?: Database["public"]["Enums"]["payment_method"] | null
+          payment_channel?: string | null
+          payment_channel_label?: string | null
           payment_proof_path?: string | null
           payment_reference?: string | null
           proof_submitted_at?: string | null
@@ -636,7 +642,7 @@ export type Database = {
         | "rejected"
         | "expired"
         | "cancelled"
-      payment_method: "gotyme" | "gcash" | "maya" | "cash"
+      payment_method: "gotyme" | "gcash" | "maya" | "cash" | "other"
       staff_role: "admin" | "staff" | "scanner" | "gate"
       ticket_status: "issued" | "redeemed" | "void"
     }
@@ -659,7 +665,7 @@ export const Constants = {
         "expired",
         "cancelled",
       ],
-      payment_method: ["gotyme", "gcash", "maya", "cash"],
+      payment_method: ["gotyme", "gcash", "maya", "cash", "other"],
       staff_role: ["admin", "staff", "scanner", "gate"],
       ticket_status: ["issued", "redeemed", "void"],
     },

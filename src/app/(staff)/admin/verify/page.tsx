@@ -17,7 +17,7 @@ export default async function VerifyPage() {
   const admin = createAdminClient();
   const { data } = await admin
     .from("orders")
-    .select("id, order_no, buyer_name, buyer_email, buyer_mobile, total_centavos, payment_method, payment_reference, payment_proof_path, proof_submitted_at, shipping, order_items(qty, attendees, ticket_type_id, ticket_type:ticket_types(name, requires_vehicle, ships_shirt))")
+    .select("id, order_no, buyer_name, buyer_email, buyer_mobile, total_centavos, payment_method, payment_channel_label, payment_reference, payment_proof_path, proof_submitted_at, shipping, order_items(qty, attendees, ticket_type_id, ticket_type:ticket_types(name, requires_vehicle, ships_shirt))")
     .eq("status", "awaiting_verification")
     .order("proof_submitted_at", { ascending: true });
 
@@ -44,7 +44,7 @@ export default async function VerifyPage() {
         <h1 className="text-2xl font-bold">Payment verification</h1>
         <LiveOrders watch="verification" />
       </div>
-      <p className="text-sm text-zinc-500">Compare each screenshot and reference number with the organizer&apos;s {primaryChannel(event, rules.channels).app} transaction history, then approve or reject. New proofs appear here on their own; no need to refresh.</p>
+      <p className="text-sm text-zinc-500">Compare each screenshot and reference number with the organizer&apos;s {primaryChannel(event, rules.channels, rules.extraChannels).app} transaction history, then approve or reject. New proofs appear here on their own; no need to refresh.</p>
       <div className="mt-6">
         <VerifyQueue orders={orders} />
       </div>

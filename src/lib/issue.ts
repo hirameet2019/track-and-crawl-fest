@@ -3,7 +3,7 @@ import { newQrToken } from "@/lib/tokens";
 import { getOrderBundle } from "@/lib/queries";
 import { buildOrderPdf } from "@/lib/pdf/ticket-pdf";
 import { sendConvertedEmail, sendTicketsEmail } from "@/lib/email";
-import type { PaymentMethod } from "@/lib/supabase/types";
+import type { OrderPaymentMethod } from "@/lib/supabase/types";
 
 /**
  * Marks the order paid, pulls wristband numbers from the pool, creates tickets,
@@ -13,7 +13,7 @@ import type { PaymentMethod } from "@/lib/supabase/types";
 export async function issueOrder(opts: {
   orderId: string;
   actorId: string | null;
-  paymentMethod: PaymentMethod | null;
+  paymentMethod: OrderPaymentMethod | null;
   paymentReference: string | null;
 }) {
   const admin = createAdminClient();

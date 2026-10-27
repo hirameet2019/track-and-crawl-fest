@@ -3,6 +3,7 @@ import { SITE_URL } from "@/config/event";
 import { isSalesOpen } from "@/lib/queries";
 import { fmtCutoff } from "@/lib/cutoff";
 import type { AvailabilityRow, EventRow, TicketTypeRow } from "@/lib/supabase/types";
+import type { ExtraChannel } from "@/lib/rules-types";
 
 type Status = "done" | "todo" | "info";
 interface Item {
@@ -30,6 +31,7 @@ export function SetupOverview({
   emailReady,
   lookCustomised,
   cronReady,
+  extraChannels,
 }: {
   event: EventRow | null;
   types: TicketTypeRow[];
@@ -37,12 +39,14 @@ export function SetupOverview({
   emailReady: boolean;
   lookCustomised: boolean;
   cronReady: boolean;
+  /** Payment channels added under Payments; one switched on counts as a way to pay. */
+  extraChannels: ExtraChannel[];
 }) {
   const active = types.filter((t) => t.active);
   const online = active.filter((t) => t.sell_online);
   const banded = new Map(stock.map((a) => [a.ticket_type_id, a.pool_total]));
   const noBands = active.filter((t) => (t.sell_online || t.sell_at_gate) && !banded.get(t.id));
-  const hasQr = !!(event?.gotyme_qr_url || event?.gcash_qr_url || event?.maya_qr_url);
+  const hasQr = !!(event?.gotyme_qr_url || event?.gcash_qr_url || event?.maya_qr_url) || extraChannels.some((c) => c.enabled && (c.qrUrl || c.accountNumber));
   const localUrl = /localhost|127\.0\.0\.1/.test(SITE_URL);
 
   const items: Item[] = event
@@ -57,7 +61,7 @@ export function SetupOverview({
         {
           status: hasQr ? "done" : "todo",
           title: "Payment QR code",
-          detail: hasQr ? "Buyers have a way to pay." : "Upload at least one QR, or buyers cannot pay.",
+          detail: hasQr ? "Buyers have a way to pay." : "Upload a QR or add a payment channel with an account number, or buyers cannot pay.",
           href: "?tab=payments",
           action: "Payments",
         },

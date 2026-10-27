@@ -11,6 +11,7 @@ import { SITE_URL } from "@/config/event";
 import type { OrderBundle } from "@/lib/queries";
 import { carNameOf, itemLabel } from "@/lib/items";
 import { getSiteSettings } from "@/lib/site-settings";
+import { paymentLabel } from "@/lib/payment-options";
 
 const A4: [number, number] = [595.28, 841.89];
 
@@ -214,7 +215,7 @@ function drawReceiptPage(doc: PDFDocument, f: Fonts, b: OrderBundle) {
   rightTextColor(page, php(total), right, ty - 4.5, 13, f.bold, WHITE);
 
   text(page, "PAYMENT", MARGIN, y, 8, f.bold, MUTED);
-  text(page, (order.payment_method ?? "").toUpperCase(), MARGIN, y - 15, 11, f.bold);
+  text(page, (order.payment_method ? paymentLabel(order) : "").toUpperCase(), MARGIN, y - 15, 11, f.bold);
   if (order.payment_reference) text(page, `Ref. ${order.payment_reference}`, MARGIN, y - 29, 9.5, f.regular, MUTED);
   text(page, `Paid ${dateStr}`, MARGIN, y - 42, 9.5, f.regular, MUTED);
 

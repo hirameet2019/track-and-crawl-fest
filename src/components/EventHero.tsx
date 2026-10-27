@@ -26,7 +26,7 @@ export async function EventHero({ event, prices }: { event: EventRow; prices: { 
   const { day, time } = fmtDate(event.starts_at);
   const [site, rules] = await Promise.all([getSiteSettings(), getRules()]);
   const { page } = rules;
-  const channel = primaryChannel(event, rules.channels);
+  const channel = primaryChannel(event, rules.channels, rules.extraChannels);
   const fill = (text: string) => fillText(text, { pay: channel.payVia, via: channel.via, minutes: rules.paymentWindowMinutes });
   const fx = site.hero.effects;
   const show = page.show;

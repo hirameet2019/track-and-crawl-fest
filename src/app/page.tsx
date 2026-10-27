@@ -21,7 +21,7 @@ export const dynamic = "force-dynamic";
 export async function generateMetadata(): Promise<Metadata> {
   const [event, rules] = await Promise.all([getActiveEvent(), getRules()]);
   return {
-    description: event ? `${event.name}${event.venue ? ` at ${event.venue}` : ""}. Pay via ${primaryChannel(event, rules.channels).payVia}.` : undefined,
+    description: event ? `${event.name}${event.venue ? ` at ${event.venue}` : ""}. Pay via ${primaryChannel(event, rules.channels, rules.extraChannels).payVia}.` : undefined,
   };
 }
 
@@ -42,7 +42,7 @@ export default async function HomePage() {
 
   // Registration fees in the hero: every type sold online, e.g. "₱500 per car".
   const { page } = rules;
-  const channel = primaryChannel(event, rules.channels);
+  const channel = primaryChannel(event, rules.channels, rules.extraChannels);
   const fill = (text: string) => fillText(text, { pay: channel.payVia, via: channel.via, minutes: rules.paymentWindowMinutes });
 
   const prices = types.map((t) => ({ label: t.requires_vehicle ? `per ${vehicleWords(t).noun}` : t.name, price: php(t.price_centavos) }));
