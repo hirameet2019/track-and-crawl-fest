@@ -9,6 +9,7 @@ import { SiteLookForm } from "@/components/SiteLookForm";
 import { SetupOverview } from "@/components/settings/SetupOverview";
 import { PaymentQrForm, PaymentRulesForm } from "@/components/settings/PaymentsForms";
 import { OrderingForm } from "@/components/settings/OrderingForm";
+import { PageForm } from "@/components/settings/PageForm";
 import { AdvancedForm } from "@/components/settings/AdvancedForm";
 import { LOCALE } from "@/config/site";
 import { getActiveEvent, getAvailability, publicOrder } from "@/lib/queries";
@@ -26,6 +27,7 @@ const TABS = [
   { id: "tickets", label: "Tickets", blurb: "Ticket types, prices, what each includes, and online cut-offs." },
   { id: "payments", label: "Payments", blurb: "QR codes, how long buyers have to pay, and how channels are named." },
   { id: "ordering", label: "Ordering", blurb: "Limits per order and the shirt sizes offered." },
+  { id: "page", label: "Page", blurb: "What the registration page shows, and its headings, steps and notes." },
   { id: "look", label: "Look", blurb: "Logo, artwork, slideshow, colours and the PDF ticket." },
   { id: "email", label: "Email", blurb: "The mailbox tickets and receipts are sent from." },
   { id: "advanced", label: "Advanced", blurb: "Staff login domain, drifter references, locale." },
@@ -90,6 +92,9 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       break;
     case "ordering":
       body = <OrderingForm rules={rules} />;
+      break;
+    case "page":
+      body = <PageForm rules={rules} />;
       break;
     case "look": {
       const [site, customised] = await Promise.all([getSiteSettings(), siteSettingsCustomised()]);

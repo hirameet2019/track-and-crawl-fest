@@ -11,6 +11,7 @@ import { fmtCutoff, isTypeClosed } from "@/lib/cutoff";
 import { php } from "@/lib/money";
 import { primaryChannel } from "@/config/event";
 import { getRules } from "@/lib/rules";
+import { fillText } from "@/lib/rules-types";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +41,10 @@ export default async function HomePage() {
   const lastClose = types.map((t) => t.sales_close_at).filter((x): x is string => !!x).sort().pop() ?? null;
 
   // Registration fees in the hero: every type sold online, e.g. "₱500 per car".
+  const { page } = rules;
+  const channel = primaryChannel(event, rules.channels);
+  const fill = (text: string) => fillText(text, { pay: channel.payVia, via: channel.via, minutes: rules.paymentWindowMinutes });
+
   const prices = types.map((t) => ({ label: t.requires_vehicle ? `per ${vehicleWords(t).noun}` : t.name, price: php(t.price_centavos) }));
 
   // overflow-x-clip (not hidden): off-screen reveal transforms and hero glows
@@ -52,26 +57,29 @@ export default async function HomePage() {
 
       <section id="tickets" className="dark-zone mx-auto max-w-5xl px-4 pb-16 pt-8 sm:px-8">
         <Reveal className="mb-10 flex items-end justify-between gap-6" from="left">
-          <h2 className="reveal-title display-title text-[2.4rem] sm:text-[3.4rem]">Register your ride</h2>
-          <p className="hidden text-right text-sm text-zinc-400 sm:block">
-            Pay via {primaryChannel(event, rules.channels).payVia}.<br />Your QR pass is emailed after we check your payment (check Spam too).
-          </p>
+          <h2 className="reveal-title display-title text-[2.4rem] sm:text-[3.4rem]">{fill(page.heading)}</h2>
+          {page.show.sideNote && page.sideNote && (
+            <p className="hidden whitespace-pre-line text-right text-sm text-zinc-400 sm:block">{fill(page.sideNote)}</p>
+          )}
         </Reveal>
 
         {open ? (
-          <OrderForm types={types} availability={publicAvailability(availability, types)} channel={primaryChannel(event, rules.channels)} />
+          <OrderForm types={types} availability={publicAvailability(availability, types)} channel={channel} />
         ) : (
           <Reveal from="up" className="border-y border-white/10 py-10 text-center sm:py-14">
-            <h3 className="display-title text-[1.7rem] text-white sm:text-[2.4rem]" style={{ textShadow: "0 0 32px color-mix(in srgb, var(--neon-pink) 40%, transparent)" }}>Online sales are closed</h3>
-            <p className="mx-auto mt-4 max-w-xl text-zinc-300">{lastClose ? `Online sales ended ${fmtCutoff(lastClose)}. ` : ""}Tickets may still be available at the venue gate.</p>
-            <p className="mt-1 text-sm text-zinc-500">Sarado na ang online ticket sales. Maaaring may tickets pa sa gate ng venue.</p>
+            <h3 className="display-title text-[1.7rem] text-white sm:text-[2.4rem]" style={{ textShadow: "0 0 32px color-mix(in srgb, var(--neon-pink) 40%, transparent)" }}>{fill(page.closedTitle)}</h3>
+            <p className="mx-auto mt-4 max-w-xl text-zinc-300">{lastClose ? `Online sales ended ${fmtCutoff(lastClose)}. ` : ""}{fill(page.closedText)}</p>
+            {page.closedTextTl && <p className="mt-1 text-sm text-zinc-500">{fill(page.closedTextTl)}</p>}
           </Reveal>
         )}
 
-        <div className="mt-10 flex justify-center"><SupportContact event={event} compact /></div>
-        <p className="mt-3 text-center text-xs text-zinc-500">
-          Payment via {primaryChannel(event, rules.channels).payVia}. Tickets are emailed after payment verification. <Link href="/login" className="underline">Staff login</Link>
-        </p>
+        {page.show.support && <div className="mt-10 flex justify-center"><SupportContact event={event} compact /></div>}
+        {((page.show.footerNote && page.footerNote) || page.show.staffLink) && (
+          <p className="mt-3 text-center text-xs text-zinc-500">
+            {page.show.footerNote && page.footerNote && <>{fill(page.footerNote)} </>}
+            {page.show.staffLink && <Link href="/login" className="underline">Staff login</Link>}
+          </p>
+        )}
       </section>
     </main>
   );

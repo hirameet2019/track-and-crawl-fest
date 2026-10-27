@@ -1,7 +1,7 @@
 import { cache } from "react";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { RULE_DEFAULTS, type Rules } from "@/lib/rules-types";
+import { PAGE_DEFAULTS, RULE_DEFAULTS, type PageSettings, type Rules } from "@/lib/rules-types";
 import type { PaymentMethod } from "@/lib/supabase/types";
 
 /**
@@ -35,6 +35,45 @@ const shirtRow = z.object({
   sleeve: z.number().min(0).max(80),
 });
 
+const label = (what: string) => z.string().trim().min(1, `${what} cannot be blank`).max(60);
+const buyerForm = z.object({
+  title: label("The step title"),
+  subtitle: z.string().trim().max(240),
+  nameLabel: label("The name label"),
+  namePlaceholder: z.string().trim().max(60),
+  emailLabel: label("The email label"),
+  emailPlaceholder: z.string().trim().max(60),
+  emailHint: z.string().trim().max(200),
+  confirmLabel: label("The confirm-email label"),
+  confirmPlaceholder: z.string().trim().max(60),
+  confirmHint: z.string().trim().max(200),
+  mobileLabel: label("The mobile label"),
+  mobilePlaceholder: z.string().trim().max(60),
+  mobileHint: z.string().trim().max(200),
+});
+
+const line = (max: number) => z.string().trim().max(max);
+const page = z.object({
+  show: z.object(Object.fromEntries(Object.keys(PAGE_DEFAULTS.show).map((k) => [k, z.boolean()])) as Record<keyof PageSettings["show"], z.ZodBoolean>),
+  heroPricesLabel: line(40),
+  heroButton: label("The hero button"),
+  heading: label("The registration heading"),
+  sideNote: line(300),
+  step1Title: label("The step 1 title"),
+  step1Sub: line(240),
+  step2Title: label("The step 2 title"),
+  step2Sub: line(240),
+  shippingTitle: label("The shirt-delivery title"),
+  shippingSub: line(240),
+  submitButton: label("The continue button"),
+  payNote: line(300),
+  payNoteTl: line(300),
+  closedTitle: label("The sales-closed title"),
+  closedText: line(300),
+  closedTextTl: line(300),
+  footerNote: line(300),
+});
+
 export const rulesSchema = z.object({
   paymentWindowMinutes: z.number().int().min(15, "Give buyers at least 15 minutes to pay").max(24 * 60, "At most 24 hours to pay"),
   reminderMinutes: z.number().int().min(5).max(120),
@@ -50,6 +89,8 @@ export const rulesSchema = z.object({
   channels: z.object({ gotyme: channel, gcash: channel, maya: channel, cash: channel }),
   staffUsernameDomain: z.string().trim().toLowerCase().regex(/^[a-z0-9-]+(\.[a-z0-9-]+)+$/, "Domain looks wrong, e.g. drift.local"),
   drifterReferencePrefix: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{1,6}$/, "Prefix is 1-6 letters or digits"),
+  buyerForm,
+  page,
 }).refine((r) => r.reminderMinutes < r.paymentWindowMinutes, { message: "The reminder must go out before the hold runs out", path: ["reminderMinutes"] });
 
 /** Lay stored values over the defaults field by field. Exported for tests. */
@@ -80,6 +121,12 @@ export function mergeRules(stored: unknown): Rules {
     channels,
     staffUsernameDomain: pick(base.staffUsernameDomain, s.staffUsernameDomain, d.staffUsernameDomain),
     drifterReferencePrefix: pick(base.drifterReferencePrefix, s.drifterReferencePrefix, d.drifterReferencePrefix),
+    // Field by field over the defaults, so wording added to the form later still has text.
+    buyerForm: pick(buyerForm, { ...d.buyerForm, ...(s.buyerForm as object | undefined) }, d.buyerForm),
+    page: (() => {
+      const sp = (s.page ?? {}) as Partial<PageSettings>;
+      return pick(page, { ...d.page, ...sp, show: { ...d.page.show, ...(sp.show ?? {}) } }, d.page);
+    })(),
   };
   // A reminder that lands after expiry would never send; keep the pair coherent.
   if (merged.reminderMinutes >= merged.paymentWindowMinutes) merged.reminderMinutes = Math.min(d.reminderMinutes, merged.paymentWindowMinutes - 1);

@@ -5,6 +5,7 @@ import { createOnlineOrder, type CreateOrderInput } from "@/app/actions/orders";
 import { COURIERS, SHIPPING_NOTE, SHIPPING_NOTE_TL, SHIRT_PROCESSING, type Courier } from "@/lib/shipping";
 import type { PaymentChannel } from "@/config/event";
 import { useRules } from "@/components/RulesProvider";
+import { fillText } from "@/lib/rules-types";
 import { shrinkImage } from "@/lib/image";
 import { php } from "@/lib/money";
 import { fmtCutoff, hoursUntilCutoff, isTypeClosed } from "@/lib/cutoff";
@@ -95,7 +96,8 @@ function CarPhotoField({ preview, fileName, onPick, noun = "car" }: { preview: s
 
 export function OrderForm({ types, availability, channel }: { types: TicketTypeRow[]; availability: PublicAvailability[]; channel: PaymentChannel }) {
   // Limits, hold time and shirt sizes from Admin > Settings.
-  const { maxQtyPerType: MAX_QTY_PER_TYPE, maxCompanionsPerCar: MAX_COMPANIONS_PER_CAR, paymentWindowMinutes: PAYMENT_WINDOW_MINUTES, shirtChart } = useRules();
+  const { maxQtyPerType: MAX_QTY_PER_TYPE, maxCompanionsPerCar: MAX_COMPANIONS_PER_CAR, paymentWindowMinutes: PAYMENT_WINDOW_MINUTES, shirtChart, buyerForm: bf, page } = useRules();
+  const fill = (text: string) => fillText(text, { pay: channel.payVia, via: channel.via, minutes: PAYMENT_WINDOW_MINUTES });
   const SHIRT_SIZES = shirtChart.map((r) => r.size);
   const SHIRT_SIZE_CHART = Object.fromEntries(shirtChart.map((r) => [r.size, r]));
   const [qty, setQty] = useState<Record<string, number>>({});
@@ -342,8 +344,8 @@ export function OrderForm({ types, availability, channel }: { types: TicketTypeR
           biggest, each line stepping down a size, so the page reads as the poster continued. */}
       <section aria-labelledby="tiers-title">
         <Reveal as="h2" className="form-step" delay={80}>
-          <span id="tiers-title"><span className="form-step-no">1</span> What are you bringing?</span>
-          <span className="form-step-sub">One registration per car or motorcycle. Ilang sasakyan ang irerehistro? Pindutin ang + o -.</span>
+          <span id="tiers-title"><span className="form-step-no">1</span> {fill(page.step1Title)}</span>
+          {page.step1Sub && <span className="form-step-sub">{fill(page.step1Sub)}</span>}
         </Reveal>
         <div className="mt-2">
           {billed.map((t, idx) => {
@@ -401,7 +403,7 @@ export function OrderForm({ types, availability, channel }: { types: TicketTypeR
 
       {anySelected && (
         <section className="enter space-y-3">
-          <h2 className="form-step"><span><span className="form-step-no">2</span> Vehicle details</span><span className="form-step-sub">Driver o rider, plate, make/model at litrato ng bawat sasakyan.</span></h2>
+          <h2 className="form-step"><span><span className="form-step-no">2</span> {fill(page.step2Title)}</span>{page.step2Sub && <span className="form-step-sub">{fill(page.step2Sub)}</span>}</h2>
           {types.filter((t) => (qty[t.id] ?? 0) > 0).map((t) => (
             <div key={t.id} className="card space-y-4">
               <h3 className="holder-title">{t.name} <span className="text-zinc-400">× {qty[t.id]}</span></h3>
@@ -519,15 +521,15 @@ export function OrderForm({ types, availability, channel }: { types: TicketTypeR
       )}
 
       <Reveal as="section" className="space-y-3" delay={120}>
-        <h2 className="form-step"><span><span className="form-step-no">{anySelected ? 3 : 2}</span> Your details</span><span className="form-step-sub">Dito ipapadala ang confirmation at QR pass. Siguraduhing tama ang email at cellphone number.</span></h2>
+        <h2 className="form-step"><span><span className="form-step-no">{anySelected ? 3 : 2}</span> {fill(bf.title)}</span>{bf.subtitle && <span className="form-step-sub">{fill(bf.subtitle)}</span>}</h2>
         <div className="card grid gap-3 sm:grid-cols-2">
           <div className="sm:col-span-2">
-            <label className="label">Full name *</label>
-            <input className="input" value={buyer.buyer_name} onChange={(e) => setBuyer({ ...buyer, buyer_name: e.target.value })} required />
+            <label className="label" htmlFor="buyer-name">{bf.nameLabel} *</label>
+            <input id="buyer-name" className="input" placeholder={bf.namePlaceholder || undefined} value={buyer.buyer_name} onChange={(e) => setBuyer({ ...buyer, buyer_name: e.target.value })} required />
           </div>
           <div className="sm:col-span-2 grid gap-3 sm:grid-cols-2">
             <div>
-              <label className="label">Email * (tickets are sent here)</label>
+              <label className="label" htmlFor="buyer-email">{bf.emailLabel} *</label>
               <input
                 id="buyer-email"
                 className={`input ${emailIssue ? "border-amber-400/60" : ""}`}
@@ -537,7 +539,7 @@ export function OrderForm({ types, availability, channel }: { types: TicketTypeR
                 autoCapitalize="none"
                 autoCorrect="off"
                 spellCheck={false}
-                placeholder="name@gmail.com"
+                placeholder={bf.emailPlaceholder || undefined}
                 value={buyer.buyer_email}
                 onChange={(e) => setBuyer({ ...buyer, buyer_email: e.target.value })}
                 onBlur={() => setBuyer((b) => ({ ...b, buyer_email: normalizeEmail(b.buyer_email) }))}
@@ -557,12 +559,12 @@ export function OrderForm({ types, availability, channel }: { types: TicketTypeR
                     ?
                   </>
                 ) : (
-                  "Your receipt and QR tickets go to this address only. Check Spam or Junk if it does not arrive."
+                  bf.emailHint
                 )}
               </p>
             </div>
             <div>
-              <label className="label">Confirm email *</label>
+              <label className="label" htmlFor="buyer-email-confirm">{bf.confirmLabel} *</label>
               <input
                 id="buyer-email-confirm"
                 className={`input ${emailMismatch ? "border-rose-400/60" : emailConfirm && !emailMismatch ? "border-emerald-400/50" : ""}`}
@@ -572,7 +574,7 @@ export function OrderForm({ types, availability, channel }: { types: TicketTypeR
                 autoCapitalize="none"
                 autoCorrect="off"
                 spellCheck={false}
-                placeholder="Type it again"
+                placeholder={bf.confirmPlaceholder || undefined}
                 value={emailConfirm}
                 onChange={(e) => setEmailConfirm(e.target.value)}
                 onBlur={() => setEmailConfirm((v) => normalizeEmail(v))}
@@ -581,19 +583,19 @@ export function OrderForm({ types, availability, channel }: { types: TicketTypeR
                 aria-describedby="buyer-email-confirm-hint"
               />
               <p id="buyer-email-confirm-hint" className={`mt-1 text-xs ${emailMismatch ? "enter text-rose-300" : emailConfirm && !emailIssue ? "text-emerald-300" : "text-zinc-500"}`}>
-                {emailMismatch ? "Does not match the email above" : emailConfirm && !emailIssue ? "Emails match" : "Retype it so a typo cannot send your tickets elsewhere."}
+                {emailMismatch ? "Does not match the email above" : emailConfirm && !emailIssue ? "Emails match" : bf.confirmHint}
               </p>
             </div>
           </div>
           <div>
-            <label className="label">Mobile number *</label>
+            <label className="label" htmlFor="buyer-mobile">{bf.mobileLabel} *</label>
             <input
               id="buyer-mobile"
               className="input"
               type="tel"
               inputMode="numeric"
               autoComplete="tel-national"
-              placeholder="09171234567"
+              placeholder={bf.mobilePlaceholder || undefined}
               maxLength={16}
               value={buyer.buyer_mobile}
               onChange={(e) => setBuyer({ ...buyer, buyer_mobile: e.target.value.replace(/[^\d+\s-]/g, "") })}
@@ -603,7 +605,7 @@ export function OrderForm({ types, availability, channel }: { types: TicketTypeR
               aria-describedby="buyer-mobile-hint"
             />
             <p id="buyer-mobile-hint" className={`mt-1 text-xs ${mobileIssue ? "text-amber-300" : "text-zinc-500"}`}>
-              {mobileIssue ?? "11 digits starting with 09. +63 works too."}
+              {mobileIssue ?? bf.mobileHint}
             </p>
           </div>
         </div>
@@ -611,7 +613,7 @@ export function OrderForm({ types, availability, channel }: { types: TicketTypeR
 
       {needsShipping && (
         <Reveal as="section" className="space-y-3" delay={120}>
-          <h2 className="form-step"><span><span className="form-step-no">4</span> Shirt delivery</span><span className="form-step-sub">Saan ipapadala ang shirt.</span></h2>
+          <h2 className="form-step"><span><span className="form-step-no">4</span> {fill(page.shippingTitle)}</span>{page.shippingSub && <span className="form-step-sub">{fill(page.shippingSub)}</span>}</h2>
           <div className="card space-y-3">
             <div className="rounded-lg border border-violet-400/30 bg-violet-400/10 p-3 text-sm text-violet-100">
               {SHIPPING_NOTE}
@@ -682,10 +684,12 @@ export function OrderForm({ types, availability, channel }: { types: TicketTypeR
             {anySelected && <div className="text-xs text-zinc-400">{count} ticket{count === 1 ? "" : "s"}</div>}
           </div>
           <button className="btn-neon" disabled={!anySelected || pending}>
-            {pending ? "Reserving..." : "Review & continue"}
+            {pending ? "Reserving..." : fill(page.submitButton)}
           </button>
         </div>
-        <p className="mt-3 text-xs text-zinc-400">You will have {PAYMENT_WINDOW_MINUTES} minutes to pay via {channel.via} and upload your proof of payment. <span className="text-zinc-500">Sa susunod na page ang QR at ang pag-upload ng screenshot.</span></p>
+        {(page.payNote || page.payNoteTl) && (
+          <p className="mt-3 text-xs text-zinc-400">{fill(page.payNote)}{page.payNote && page.payNoteTl && " "}{page.payNoteTl && <span className="text-zinc-500">{fill(page.payNoteTl)}</span>}</p>
+        )}
       </Reveal>
     </form>
     {review && (

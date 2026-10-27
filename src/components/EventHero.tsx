@@ -2,6 +2,9 @@ import Link from "next/link";
 import { SiteLogo } from "@/components/SiteLogo";
 import { LOCALE } from "@/config/site";
 import { HeroSlides } from "@/components/HeroSlides";
+import { primaryChannel } from "@/config/event";
+import { getRules } from "@/lib/rules";
+import { fillText } from "@/lib/rules-types";
 import { getSiteSettings } from "@/lib/site-settings";
 import { heroFallbackGradient, neon } from "@/lib/theme";
 import type { EventRow } from "@/lib/supabase/types";
@@ -21,8 +24,13 @@ function fmtDate(iso: string | null) {
 /** Full hero for the sales page. */
 export async function EventHero({ event, prices }: { event: EventRow; prices: { label: string; price: string }[] }) {
   const { day, time } = fmtDate(event.starts_at);
-  const site = await getSiteSettings();
+  const [site, rules] = await Promise.all([getSiteSettings(), getRules()]);
+  const { page } = rules;
+  const channel = primaryChannel(event, rules.channels);
+  const fill = (text: string) => fillText(text, { pay: channel.payVia, via: channel.via, minutes: rules.paymentWindowMinutes });
   const fx = site.hero.effects;
+  const show = page.show;
+  const chips = show.heroDate || (show.heroVenue && event.venue) || (show.heroTagline && event.tagline);
   return (
     <section className="relative isolate overflow-hidden bg-brand text-white">
       {/* Slides from Admin > Settings, cross-fading, each with the same slow zoom/pan */}
@@ -68,29 +76,35 @@ export async function EventHero({ event, prices }: { event: EventRow; prices: { 
           <SiteLogo src={site.logo} name={event.name} size="xl" className="w-full max-w-[680px] drop-shadow-[0_6px_24px_rgba(0,0,0,0.6)]" />
         </h1>
 
-        <div className="mt-6 flex flex-wrap gap-3 text-sm">
-          <span className="glass px-4 py-2 font-semibold">{day}{time ? ` · ${time} onwards` : ""}</span>
-          {event.venue && <span className="glass px-4 py-2 text-zinc-200">{event.venue}</span>}
-          {event.tagline && <span className="glass px-4 py-2 text-cyan-200">{event.tagline}</span>}
-        </div>
-
-        <div className="mt-8 flex flex-wrap items-end justify-between gap-6">
-          <div>
-            <div className="info-fact-label">Registration</div>
-            <div className="mt-1 flex flex-wrap gap-x-6 gap-y-1">
-              {prices.map((p) => (
-                <div key={p.label} className="text-lg font-bold">
-                  {p.price} <span className="text-sm font-medium text-zinc-400">{p.label}</span>
-                </div>
-              ))}
-            </div>
+        {chips && (
+          <div className="mt-6 flex flex-wrap gap-3 text-sm">
+            {show.heroDate && <span className="glass px-4 py-2 font-semibold">{day}{time ? ` · ${time} onwards` : ""}</span>}
+            {show.heroVenue && event.venue && <span className="glass px-4 py-2 text-zinc-200">{event.venue}</span>}
+            {show.heroTagline && event.tagline && <span className="glass px-4 py-2 text-cyan-200">{event.tagline}</span>}
           </div>
-          <a href="#tickets" className="btn-neon pulse">Register now</a>
-        </div>
-        <a href="#info" aria-label="Scroll down to the event details" className="hero-cue mx-auto mt-8 flex w-fit flex-col items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.3em] text-zinc-400 hover:text-white">
+        )}
+
+        {(show.heroPrices || show.heroButton) && (
+          <div className="mt-8 flex flex-wrap items-end justify-between gap-6">
+            {show.heroPrices ? (
+              <div>
+                {page.heroPricesLabel && <div className="info-fact-label">{fill(page.heroPricesLabel)}</div>}
+                <div className="mt-1 flex flex-wrap gap-x-6 gap-y-1">
+                  {prices.map((p) => (
+                    <div key={p.label} className="text-lg font-bold">
+                      {p.price} <span className="text-sm font-medium text-zinc-400">{p.label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : <span />}
+            {show.heroButton && <a href="#tickets" className="btn-neon pulse">{fill(page.heroButton)}</a>}
+          </div>
+        )}
+        {show.heroScrollCue && <a href="#info" aria-label="Scroll down to the event details" className="hero-cue mx-auto mt-8 flex w-fit flex-col items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.3em] text-zinc-400 hover:text-white">
           Scroll
           <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden><path d="M6 9l6 6 6-6" /></svg>
-        </a>
+        </a>}
       </div>
     </section>
   );

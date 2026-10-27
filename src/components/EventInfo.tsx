@@ -1,4 +1,5 @@
 import { LOCALE } from "@/config/site";
+import { getRules } from "@/lib/rules";
 import { getSiteSettings } from "@/lib/site-settings";
 import { Reveal } from "@/components/Reveal";
 import type { EventRow } from "@/lib/supabase/types";
@@ -41,43 +42,55 @@ function Fact({ icon, label, value, sub, children }: { icon: keyof typeof Icon; 
  * presenters and sponsors. Everything comes from the event row and Settings.
  */
 export async function EventInfo({ event }: { event: EventRow }) {
-  const site = await getSiteSettings();
+  const [site, { page }] = await Promise.all([getSiteSettings(), getRules()]);
+  const show = page.show;
   const start = event.starts_at ? new Date(event.starts_at) : null;
   const date = start ? start.toLocaleDateString(LOCALE.locale, { month: "short", day: "numeric", year: "numeric", timeZone: LOCALE.timeZone }).toUpperCase() : "Date to be announced";
   const weekday = start ? start.toLocaleDateString(LOCALE.locale, { weekday: "long", timeZone: LOCALE.timeZone }) : undefined;
   const time = hours(event.starts_at, site.info.endTime);
   // The venue row: first comma part large, the rest as the line under it.
   const [place, ...rest] = (event.venue ?? "").split(",").map((x) => x.trim());
-  const maps = event.venue ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.venue)}` : null;
+  const maps = event.venue && show.mapsLink ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.venue)}` : null;
+  // Settings > Page can switch each part off; an empty side drops its column.
+  const facts = (show.venue && !!event.venue) || show.date || (show.time && !!time);
+  const tagline = show.tagline && event.tagline;
 
   return (
     <section id="info" aria-labelledby="info-title" className="info-section">
-      <div className="mx-auto grid max-w-5xl gap-12 px-4 py-16 sm:px-8 md:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] md:items-center md:gap-16 md:py-24">
+      <h2 id="info-title" className="sr-only">Event details</h2>
+      {(facts || tagline) && (
+      <div className={`mx-auto grid max-w-5xl gap-12 px-4 py-16 sm:px-8 md:items-center md:gap-16 md:py-24 ${facts && tagline ? "md:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)]" : ""}`}>
+        {facts && (
         <Reveal from="left">
-          <h2 id="info-title" className="sr-only">Event details</h2>
           <dl className="space-y-8">
-            {event.venue && (
+            {show.venue && event.venue && (
               <Fact icon="pin" label="Venue" value={place} sub={rest.join(", ") || undefined}>
                 {maps && <dd className="mt-2"><a href={maps} target="_blank" rel="noreferrer" className="info-link">Open in Google Maps</a></dd>}
               </Fact>
             )}
-            <Fact icon="calendar" label="Event date" value={date} sub={weekday} />
-            {time && <Fact icon="clock" label="Time" value={time} />}
+            {show.date && <Fact icon="calendar" label="Event date" value={date} sub={weekday} />}
+            {show.time && time && <Fact icon="clock" label="Time" value={time} />}
           </dl>
         </Reveal>
-        <Reveal from="right" className="space-y-10">
-          {event.tagline && <p className="info-tagline">{event.tagline}</p>}
-        </Reveal>
+        )}
+        {tagline && (
+          <Reveal from="right" className="space-y-10">
+            <p className="info-tagline">{tagline}</p>
+          </Reveal>
+        )}
       </div>
+      )}
+      {/* Keep the hero from butting into whatever comes first when the details are all off. */}
+      {!facts && !tagline && <div className="h-16 md:h-24" aria-hidden />}
       {/* The presenters are the headline sponsors: their own centred band, wider than the column allowed. */}
-      {site.info.presentedBy && (
+      {show.presenters && site.info.presentedBy && (
         <Reveal from="up" className="mx-auto max-w-5xl px-4 pb-16 text-center sm:px-8 md:pb-24">
           <div className="info-fact-label">Presented by</div>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={site.info.presentedBy} alt="Event presenters" className="mx-auto mt-4 h-auto w-full max-w-xl" />
         </Reveal>
       )}
-      {site.gallery.photos.length > 0 && (
+      {show.gallery && site.gallery.photos.length > 0 && (
         <div className="mx-auto max-w-5xl px-4 pb-16 sm:px-8 md:pb-24">
           {site.gallery.title && (
             <Reveal from="left" className="mb-5">
@@ -95,7 +108,7 @@ export async function EventInfo({ event }: { event: EventRow }) {
           </ul>
         </div>
       )}
-      {site.info.sponsors && (
+      {show.sponsors && site.info.sponsors && (
         <div className="mx-auto max-w-5xl px-4 pb-14 sm:px-8">
           <div className="checker" aria-hidden />
           {/* eslint-disable-next-line @next/next/no-img-element */}
