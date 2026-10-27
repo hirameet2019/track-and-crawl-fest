@@ -222,7 +222,7 @@ function drawReceiptPage(doc: PDFDocument, f: Fonts, b: OrderBundle) {
   const fy = 96;
   page.drawLine({ start: { x: MARGIN, y: fy + 30 }, end: { x: right, y: fy + 30 }, thickness: 0.6, color: LINE });
   let fyy = fy + 16;
-  fyy = paragraph(page, "Thank you for your purchase. Your tickets follow on the next pages. Present each QR code at the venue gate and staff will hand you the matching numbered wristband.", MARGIN, fyy, 8.5, f.regular, contentW, MUTED);
+  fyy = paragraph(page, "Thank you for registering. Your registration passes follow on the next pages, one for each car or motorcycle. Present each QR code at the venue gate and staff will hand you the matching numbered wristband and vehicle pass.", MARGIN, fyy, 8.5, f.regular, contentW, MUTED);
   if (event.refund_policy) fyy = paragraph(page, `Refund policy: ${event.refund_policy}`, MARGIN, fyy - 2, 8.5, f.regular, contentW, MUTED);
   text(page, "This is a system-generated document and does not require a signature.", MARGIN, fyy - 4, 7.5, f.regular, MUTED);
 }
