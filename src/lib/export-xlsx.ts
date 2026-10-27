@@ -258,7 +258,7 @@ export async function buildTicketsWorkbook(): Promise<Buffer> {
   }
 
   // ------------------------------------------------------ per label sheets
-  const ticketHeader = ["Wristband no.", "Status", "Holder", "Shirt", "Plate", "Vehicle", "Car photo", "Companion of car", "Ship shirt to", "Scanned at gate", "Void reason", "Order #", "Receipt #", "Order status", "Channel", "Buyer", "Email", "Mobile", "Order total (PHP)", "Payment", "Reference", "Paid at", "Issued at"];
+  const ticketHeader = ["Wristband no.", "Status", "Holder", "Shirt", "Plate", "Vehicle", "Vehicle photo", "Companion of car", "Ship shirt to", "Scanned at gate", "Void reason", "Order #", "Receipt #", "Order status", "Channel", "Buyer", "Email", "Mobile", "Order total (PHP)", "Payment", "Reference", "Paid at", "Issued at"];
   // A package sale (VIP Car with shirt) is one sale of two bands: the passenger's is included.
   const walkinHeader = ["Time (Manila)", "Sales", "Bands", "Price each (PHP)", "Amount (PHP)", "Shirt", "Name", "Plate", "Payment", "Reference", "Staff"];
   const drifterHeader = ["Time (Manila)", "Drifter", "Bands", "Free", "Charged", "Price each (PHP)", "Amount (PHP)", "Payment", "Staff"];

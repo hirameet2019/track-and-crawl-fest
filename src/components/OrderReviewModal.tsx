@@ -133,7 +133,7 @@ export function OrderReviewModal({
                       <li key={i} className="flex items-center gap-3 rounded-lg bg-black/30 px-3 py-2 text-sm">
                         {a.photo_preview ? (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img src={a.photo_preview} alt={`Car ${a.vehicle_plate}`} className="h-10 w-14 shrink-0 rounded-md border border-white/10 object-cover" />
+                          <img src={a.photo_preview} alt={`Vehicle ${a.vehicle_plate}`} className="h-10 w-14 shrink-0 rounded-md border border-white/10 object-cover" />
                         ) : (
                           <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-white/10 text-[11px] font-bold text-zinc-300">{i + 1}</span>
                         )}

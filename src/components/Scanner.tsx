@@ -1,6 +1,7 @@
 "use client";
 
 import { LOCALE } from "@/config/site";
+import { vehicleWords } from "@/lib/vehicle";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { downloadTicketCache, findTickets, markKitClaimed, redeemTicket, type ScanResult, type TicketMatch } from "@/app/actions/scan";
 
@@ -270,7 +271,7 @@ function ResultCard({ r, onKit }: { r: AnyResult; onKit: (id: string, item: stri
     { key: "shirt", label: `T-shirt ${t.shirt_size ?? ""}`, show: t.ticket_type.includes_shirt && !t.included && !t.shirt_ships },
     { key: "lanyard", label: "ID lanyard", show: t.ticket_type.includes_lanyard },
     { key: "sticker", label: t.ticket_type.includes_car_pass && !t.companion_of ? "Event decals (2)" : "Event decal", show: t.ticket_type.includes_sticker },
-    { key: "car_pass", label: "Car pass", show: t.ticket_type.includes_car_pass && !t.companion_of },
+    { key: "car_pass", label: `${vehicleWords(t.ticket_type).noun[0].toUpperCase()}${vehicleWords(t.ticket_type).noun.slice(1)} pass`, show: t.ticket_type.includes_car_pass && !t.companion_of },
   ];
   return (
     <div className={`rounded-xl p-5 text-white ${tone}`}>

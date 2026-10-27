@@ -50,7 +50,8 @@ export const BRAND = {
      * with. The keys are slots, not literal colours: "pink" is the first stripe
      * band and the wordmark's first line, "green" the second line, and so on.
      */
-    palette: {} as Partial<Record<"pink" | "pinkDark" | "green" | "cyan" | "teal" | "gold" | "goldDark" | "violet", string>>,
+    // The poster's red, orange and amber instead of the Meet & Drift neon stripe.
+    palette: { pink: "#e8252b", pinkDark: "#a01116", green: "#ff6a1a", cyan: "#ffa21f", teal: "#dd5b02", gold: "#ffa21f", goldDark: "#b73d06", violet: "#c11015" } as Partial<Record<"pink" | "pinkDark" | "green" | "cyan" | "teal" | "gold" | "goldDark" | "violet", string>>,
   },
 } as const;
 

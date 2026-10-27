@@ -1,4 +1,5 @@
 import { LOCALE } from "@/config/site";
+import { vehicleWords } from "@/lib/vehicle";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import QRCode from "qrcode";
@@ -162,7 +163,7 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ or
                 </div>
                 {photos[i] && (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={photos[i]!} alt={`Car ${t.vehicle_plate ?? ""}`} className="mt-2 h-24 w-36 rounded-lg border border-white/10 object-cover" />
+                  <img src={photos[i]!} alt={`${vehicleWords(t.ticket_type).noun} ${t.vehicle_plate ?? ""}`} className="mt-2 h-24 w-36 rounded-lg border border-white/10 object-cover" />
                 )}
                 <div className="mt-2"><TicketStatusBadge status={t.status} /></div>
                 {t.status === "void" && t.void_reason && <div className="mt-1 text-xs text-rose-300">{t.void_reason}</div>}

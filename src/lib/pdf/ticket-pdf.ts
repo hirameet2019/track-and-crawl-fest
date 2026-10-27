@@ -1,5 +1,6 @@
 import { BRAND as SITE_BRAND, LOCALE } from "@/config/site";
 import { shirtShips, type Shipping } from "@/lib/shipping";
+import { vehicleWords } from "@/lib/vehicle";
 import { PDFDocument, StandardFonts, degrees, rgb, type PDFFont, type PDFImage, type PDFPage } from "pdf-lib";
 import fontkit from "@pdf-lib/fontkit";
 import { readFile } from "fs/promises";
@@ -413,6 +414,9 @@ async function drawTicketPage(doc: PDFDocument, f: Fonts, b: OrderBundle, t: Ord
   // A passenger riding with a car wears a car wristband but drives nothing: no plate
   // block, no car pass stub, no car photo.
   const isCarPass = tt.includes_car_pass && !t.companion_of;
+  // "Car" or "Motorcycle", from the ticket name, for the pass and its stub.
+  const vehicle = vehicleWords(tt).noun;
+  const Vehicle = vehicle[0].toUpperCase() + vehicle.slice(1);
   /** What this ticket is called on the badges: a bundled passenger is not a car. */
   const typeLabel = t.companion_of && t.included && tt.requires_vehicle ? "VIP Car Passenger" : tt.name;
 
@@ -476,7 +480,7 @@ async function drawTicketPage(doc: PDFDocument, f: Fonts, b: OrderBundle, t: Ord
     text(page, `${tt.band_color} wristband`, lx + 18, y, 10, f.regular, INK);
   }
   y -= 30;
-  y = labelValue(page, f, "HOLDER", t.holder_name ?? order.buyer_name, lx, y, 13);
+  y = labelValue(page, f, isCarPass ? vehicleWords(tt).person.toUpperCase() : "HOLDER", t.holder_name ?? order.buyer_name, lx, y, 13);
   // A shirt that ships is not handed over at the gate; say so on the ticket.
   const shipped = shirtShips(tt, order);
   if (tt.includes_shirt && !t.included) {
@@ -494,7 +498,7 @@ async function drawTicketPage(doc: PDFDocument, f: Fonts, b: OrderBundle, t: Ord
   if (tt.includes_shirt && !t.included) includes.push(shipped ? "Event T-shirt (shipped to you)" : "Event T-shirt");
   if (tt.includes_lanyard) includes.push("ID Lanyard");
   if (tt.includes_sticker) includes.push(isCarPass ? "2 Event Decals" : "Event Decal");
-  if (isCarPass) includes.push("Car Pass");
+  if (isCarPass) includes.push(`${Vehicle} Pass`);
 
   // gate steps, anchored to the bottom of the card
   {
@@ -537,7 +541,7 @@ async function drawTicketPage(doc: PDFDocument, f: Fonts, b: OrderBundle, t: Ord
   // ---------------------------------------------------------- stub (perforated)
   const stubTop = cardBottom - 18;
   page.drawLine({ start: { x: MARGIN, y: stubTop }, end: { x: right, y: stubTop }, thickness: 0.8, color: rgb(0.55, 0.55, 0.6), dashArray: [4, 4] });
-  text(page, isCarPass ? "CAR PASS  -  cut along the line and display on the dashboard" : "STUB  -  cut along the line and keep", MARGIN, stubTop - 12, 7.5, f.bold, MUTED);
+  text(page, isCarPass ? (vehicle === "car" ? "CAR PASS  -  cut along the line and display on the dashboard" : `${vehicle.toUpperCase()} PASS  -  cut along the line and keep it with the ${vehicle}`) : "STUB  -  cut along the line and keep", MARGIN, stubTop - 12, 7.5, f.bold, MUTED);
 
   const sY = 70, sH = stubTop - 24 - sY;
   page.drawRectangle({ x: MARGIN, y: sY, width: contentW, height: sH, color: rgb(0.05, 0.03, 0.09) });
