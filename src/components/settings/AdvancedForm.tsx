@@ -12,7 +12,7 @@ import type { Rules } from "@/lib/rules-types";
  */
 export function AdvancedForm({ rules, locale }: { rules: Rules; locale: { locale: string; timeZone: string; utcOffset: string; currency: string } }) {
   const router = useRouter();
-  const initial = { staffUsernameDomain: rules.staffUsernameDomain, drifterReferencePrefix: rules.drifterReferencePrefix };
+  const initial = { staffUsernameDomain: rules.staffUsernameDomain };
   const [f, setF] = useState(initial);
   const [msg, setMsg] = useState<SaveMsg>(null);
   const [pending, start] = useTransition();
@@ -21,16 +21,11 @@ export function AdvancedForm({ rules, locale }: { rules: Rules; locale: { locale
   function save() {
     // Same rules as the server; checked first so nobody confirms a save that then fails.
     if (!/^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(f.staffUsernameDomain)) {
-      setMsg({ kind: "err", text: "Domain looks wrong, e.g. drift.local" });
-      return;
-    }
-    if (!/^[A-Z0-9]{1,6}$/.test(f.drifterReferencePrefix)) {
-      setMsg({ kind: "err", text: "Prefix is 1-6 letters or digits" });
+      setMsg({ kind: "err", text: "Domain looks wrong, e.g. staff.local" });
       return;
     }
     const warn: string[] = [];
     if (f.staffUsernameDomain !== initial.staffUsernameDomain) warn.push(`Short-username logins will look for @${f.staffUsernameDomain}. Staff whose accounts end in @${initial.staffUsernameDomain} must type their full email.`);
-    if (f.drifterReferencePrefix !== initial.drifterReferencePrefix) warn.push(`Drifter references change from ${initial.drifterReferencePrefix}-… to ${f.drifterReferencePrefix}-… everywhere, including ones already sent.`);
     if (warn.length && !window.confirm(`${warn.join("\n\n")}\n\nSave anyway?`)) return;
     start(async () => {
       setMsg(null);
@@ -48,9 +43,6 @@ export function AdvancedForm({ rules, locale }: { rules: Rules; locale: { locale
         <input className="input max-w-xs font-mono" value={f.staffUsernameDomain} onChange={(e) => setF((p) => ({ ...p, staffUsernameDomain: e.target.value.trim().toLowerCase() }))} spellCheck={false} aria-label="Staff login domain" />
       </Group>
 
-      <Group title="Drifter reference prefix" hint="Shown at the drifter desk and in their emails, e.g. MD3-4F2A1C. Computed from each link, so it changes for everyone at once.">
-        <input className="input max-w-[8rem] font-mono uppercase" maxLength={6} value={f.drifterReferencePrefix} onChange={(e) => setF((p) => ({ ...p, drifterReferencePrefix: e.target.value.toUpperCase() }))} spellCheck={false} aria-label="Drifter reference prefix" />
-      </Group>
 
       <Group title="Locale" hint="Built into every screen, so it is changed in code (src/config/site.ts) by a developer.">
         <dl className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm sm:grid-cols-4">

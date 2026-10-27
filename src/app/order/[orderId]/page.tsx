@@ -14,12 +14,13 @@ import { SupportContact } from "@/components/SupportContact";
 import { carNameOf, itemLabel } from "@/lib/items";
 import { SHIPPING_NOTE, SHIPPING_NOTE_TL, shirtShips } from "@/lib/shipping";
 import { paymentLabel } from "@/lib/payment-options";
+import { getRules } from "@/lib/rules";
 
 export const dynamic = "force-dynamic";
 
 export default async function OrderStatusPage({ params }: { params: Promise<{ orderId: string }> }) {
   const { orderId } = await params;
-  const b = await getOrderBundle(orderId);
+  const [b, { terms: T }] = await Promise.all([getOrderBundle(orderId), getRules()]);
   if (!b) notFound();
   const { order, event, items } = b;
   const shipping = order.shipping;
@@ -71,14 +72,14 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ or
         <div className="card mt-6">
           <h2 className="font-semibold">This order expired before payment was submitted</h2>
           <p className="mt-1 text-sm">
-            The wristbands were released back to the pool, so this order can no longer be paid.{" "}
+            The {T.many} were released back to the pool, so this order can no longer be paid.{" "}
             <Link href="/" className="underline">Place a new order</Link> while tickets are still available.
           </p>
           <p className="mt-1 text-sm">
             <b>Already paid?</b> Do not pay again. Contact the organizer below with your order number and payment reference.
           </p>
           <p className="mt-1 text-xs text-zinc-600">
-            Kanselado na ang order at naibalik na sa pool ang wristbands, kaya mag-order ulit. Kung nakabayad ka na, huwag nang magbayad
+            Kanselado na ang order at naibalik na sa pool ang {T.many}, kaya mag-order ulit. Kung nakabayad ka na, huwag nang magbayad
             ulit, kontakin ang organizer sa ibaba at sabihin ang order number at reference number mo.
           </p>
         </div>
@@ -149,7 +150,7 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ or
               <div key={t.id} className={`card flex flex-col items-center text-center ${t.status === "void" ? "opacity-60 grayscale" : ""}`}>
                 <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{t.ticket_type.name}</div>
                 <div className="ticket-no mt-1 text-3xl">{t.number}</div>
-                {t.ticket_type.band_color && <div className="text-xs text-zinc-500">{t.ticket_type.band_color} wristband</div>}
+                {t.ticket_type.band_color && <div className="text-xs text-zinc-500">{t.ticket_type.band_color} {T.one}</div>}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 {t.status === "void" ? (
                   <div className="my-3 flex h-48 w-48 items-center justify-center rounded-lg border-2 border-dashed border-rose-400/60 text-3xl font-black text-rose-400">VOID</div>

@@ -2,11 +2,11 @@ import type { Shipping } from "@/lib/shipping";
 import { fetchAll } from "@/lib/fetch-all";
 import { LOCALE } from "@/config/site";
 import { requireStaff } from "@/lib/auth";
-import { hasRole } from "@/lib/roles";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getActiveEvent, getAvailability, getTicketTypes } from "@/lib/queries";
 import { WalkinTally, type GateSale, type TallyEntry, type TallyToday } from "@/components/WalkinTally";
 import type { PaymentMethod } from "@/lib/supabase/types";
+import { getRules } from "@/lib/rules";
 
 export const dynamic = "force-dynamic";
 
@@ -18,8 +18,8 @@ function manilaDayStart(): string {
 }
 
 export default async function WalkinPage() {
+  const { terms: T } = await getRules();
   const session = await requireStaff("gate");
-  const seesDrifters = hasRole(session.staff.role, "staff");
   const event = await getActiveEvent();
   if (!event) return <p>No active event.</p>;
 
@@ -127,17 +127,12 @@ export default async function WalkinPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Walk-in</h1>
-        <p className="mt-2 text-sm text-zinc-500">Collect the payment, hand over the wristband, tap <b className="text-white">+1</b> on that label.</p>
+        <p className="mt-2 text-sm text-zinc-500">Collect the payment{T.physical ? `, hand over the ${T.one}` : ""}, tap <b className="text-white">+1</b> on that label.</p>
         <details className="mt-1 text-sm text-zinc-500">
           <summary className="cursor-pointer font-semibold text-zinc-600 hover:text-white">How walk-in works</summary>
           <p className="mt-2">
-            No name or contact is taken and no ticket is emailed. Tap <b>−</b> to undo a mistake. Every tap deducts from the wristbands left for that label.
-            For a label with a shirt, pick the size you handed over first; a VIP Car with shirt counts as one car, with a band for the driver and one for the passenger.
-          </p>
-          <p className="mt-1">
-            {seesDrifters
-              ? <>Bands for a competing drifter&apos;s family go on the <b>Drifters</b> tab instead, recorded under the driver&apos;s name.</>
-              : <>A competing drifter&apos;s family does not buy here: send them to the registration desk.</>}
+            No name or contact is taken and no ticket is emailed. Tap <b>−</b> to undo a mistake. Every tap deducts from the {T.many} left for that label.
+            For a label with a shirt, pick the size you handed over first.
           </p>
         </details>
       </div>

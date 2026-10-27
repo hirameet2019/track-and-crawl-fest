@@ -22,6 +22,7 @@ const LIST_LIMIT = 200;
 const PAGE = 1000;
 
 export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ q?: string; status?: string; type?: string }> }) {
+  const { terms: T } = await getRules();
   const session = await requireStaff("staff");
   const isAdmin = session.staff.role === "admin";
   const { q = "", status = "", type: typeParam = "" } = await searchParams;
@@ -180,7 +181,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3"><h1 className="text-2xl font-bold">Orders</h1><LiveOrders /></div>
         <div className="flex gap-2">
-          <a href="/api/admin/export" className="btn-secondary" title="Excel: Summary plus one colour-coded sheet per wristband label">Export Excel</a>
+          <a href="/api/admin/export" className="btn-secondary" title="Excel: Summary plus one sheet per ticket type">Export Excel</a>
         </div>
       </div>
 
@@ -208,7 +209,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
       <p className="mt-2 text-xs text-zinc-500">
         {scopeNote}.{voided.count ? ` ${voided.count} voided order${voided.count === 1 ? "" : "s"} (${php(voided.centavos)}) are counted in none of the three.` : ""}
         {typeRow && wholePaid !== paid.centavos && (
-          <> With their other wristbands, the paid ones come to {php(wholePaid)}.</>
+          <> With their other {T.many}, the paid ones come to {php(wholePaid)}.</>
         )}
       </p>
 
@@ -218,8 +219,8 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
           <option value="">All statuses</option>
           {STATUSES.map((st) => <option key={st} value={st}>{st.replace("_", " ")}</option>)}
         </select>
-        <select name="type" defaultValue={type} className="input w-auto" aria-label="Wristband">
-          <option value="">All wristbands</option>
+        <select name="type" defaultValue={type} className="input w-auto" aria-label="Ticket type">
+          <option value="">All ticket types</option>
           {wristbands.map((t) => (
             <option key={t.id} value={t.id}>{t.code} · {t.name}{t.band_color ? ` (${t.band_color})` : ""}</option>
           ))}

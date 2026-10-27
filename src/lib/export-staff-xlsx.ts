@@ -140,7 +140,7 @@ export async function buildStaffSalesWorkbook(): Promise<Buffer> {
   const summary = wb.addWorksheet("Summary", { views: [{ state: "frozen", ySplit: 4 }] });
   const all = wb.addWorksheet("All entries", { views: [{ state: "frozen", ySplit: 4 }] });
 
-  const DETAIL = ["Time (Manila)", "Wristband", "Entry", "Bands", "Free", "Price (PHP)", "Amount (PHP)", "Name (holder or drifter)", "Plate", "Shirt", "Shirt ships to", "Payment", "Reference"];
+  const DETAIL = ["Time (Manila)", "Ticket type", "Entry", "Bands", "Free", "Price (PHP)", "Amount (PHP)", "Name", "Plate", "Shirt", "Shirt ships to", "Payment", "Reference"];
   const WIDTHS = [26, 34, 13, 8, 7, 12, 14, 30, 12, 7, 60, 10, 14];
   /** One entry per row from `first`, columns shifted right by `shift`; returns the last data row. */
   function writeEntries(ws: ExcelJS.Worksheet, list: Line[], first: number, shift: number) {
@@ -190,8 +190,8 @@ export async function buildStaffSalesWorkbook(): Promise<Buffer> {
   }
 
   const legend =
-    "Times are Manila time. Take-back = a band taken back after a wrong tap (negative bands). Free = drifter family bands inside the free allowance. " +
-    `Amount = (bands - free) x price. Yellow rows were recorded on another day than ${dayLabel}.`;
+    "Times are Manila time. Take-back = a sale undone after a wrong tap (negative). Free = units handed over at no charge (a car's included passengers). " +
+    `Amount = (sold - free) x price. Yellow rows were recorded on another day than ${dayLabel}.`;
 
   // --------------------------------------------------------- All entries
   note(all, "A1", "Every walk-in entry by every staff account, by time", true);
@@ -223,7 +223,7 @@ export async function buildStaffSalesWorkbook(): Promise<Buffer> {
     `Exported ${new Date().toLocaleString(LOCALE.locale, { timeZone: LOCALE.timeZone })} (Manila) from the ticket database. Every figure comes from the account sheets (SUMIFS). ` +
       "Net bands = bands in minus taken back. Amount counts paid bands only. Walk-ins only: labels hidden in Settings > Tickets are left out.",
   );
-  const cols = ["Staff", "Wristband", "Price (PHP)", "Bands in", "Taken back", "Free", "Net bands", "Amount, all days (PHP)", `Amount on ${dayLabel} (PHP)`];
+  const cols = ["Staff", "Ticket type", "Price (PHP)", "Bands in", "Taken back", "Free", "Net bands", "Amount, all days (PHP)", `Amount on ${dayLabel} (PHP)`];
   head(summary, 4, cols);
   summary.getRow(4).height = 30;
   let row = 5;

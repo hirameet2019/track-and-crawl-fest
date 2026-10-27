@@ -6,6 +6,7 @@ import { saveTicketType, type TicketTypeInput } from "@/app/actions/setup";
 import { BandSwatch } from "@/components/BandSwatch";
 import { php } from "@/lib/money";
 import type { TicketTypeRow } from "@/lib/supabase/types";
+import { useRules } from "@/components/RulesProvider";
 
 /** Wristband pool numbers per type, from the availability view. */
 export interface TypeStock {
@@ -64,6 +65,7 @@ function Check({ label, checked, onChange, hint }: { label: string; checked: boo
 }
 
 function TypeForm({ initial, stock, onDone }: { initial: TicketTypeInput; stock?: TypeStock; onDone: () => void }) {
+  const { terms: T } = useRules();
   const router = useRouter();
   const [f, setF] = useState<TicketTypeInput>(initial);
   // Unticking clears the colour; the last one typed comes back if it is ticked again.
@@ -114,8 +116,8 @@ function TypeForm({ initial, stock, onDone }: { initial: TicketTypeInput; stock?
       </div>
       <p className="-mt-2 text-[11px] text-zinc-500">
         {codeLocked
-          ? `Code is locked: ${stock?.pool_total} wristband serials are loaded under it.`
-          : "Code = the letter printed on this type's band serials (R067521 → R). The wristband import matches by it."}
+          ? `Code is locked: ${stock?.pool_total} ${T.one} numbers are loaded under it.`
+          : `Code = the letter that starts this type's ${T.one} numbers (C001 → C). The number import matches by it.`}
       </p>
       <div><label className="label">Description (shown on the ticket card)</label><textarea className="input min-h-16" maxLength={400} value={f.description ?? ""} onChange={(e) => set("description", e.target.value)} /></div>
 
@@ -166,13 +168,6 @@ function TypeForm({ initial, stock, onDone }: { initial: TicketTypeInput; stock?
             <input className="input h-9" type="number" min={0} max={12} value={f.included_companions} disabled={!f.requires_vehicle} onChange={(e) => set("included_companions", Number(e.target.value))} />
           </div>
           <Check label="Kids ticket" checked={f.is_child} onChange={(v) => set("is_child", v)} />
-          <Check label="Drifter family band" checked={f.drifter_family} onChange={(v) => set("drifter_family", v)} hint="Handed out on the Drifters tab" />
-          {f.drifter_family && (
-            <div>
-              <label className="label">Free bands per drifter</label>
-              <input className="input h-9" type="number" min={0} max={50} value={f.free_allowance} onChange={(e) => set("free_allowance", Number(e.target.value))} />
-            </div>
-          )}
         </div>
       </div>
 
@@ -195,6 +190,7 @@ function TypeForm({ initial, stock, onDone }: { initial: TicketTypeInput; stock?
  * form in place. Hidden types stay listed (greyed) so they can be brought back.
  */
 export function TicketTypesEditor({ types, stock }: { types: TicketTypeRow[]; stock: Record<string, TypeStock> }) {
+  const { terms: T } = useRules();
   const [open, setOpen] = useState<string | null>(null);
   const nextSort = types.reduce((m, t) => Math.max(m, t.sort_order), 0) + 1;
 
@@ -202,7 +198,7 @@ export function TicketTypesEditor({ types, stock }: { types: TicketTypeRow[]; st
     <div className="card space-y-4">
       <div>
         <h2 className="font-semibold">Ticket types</h2>
-        <p className="text-sm text-zinc-500">One per wristband label. Load the band serials for a new type at Admin &gt; Numbers.</p>
+        <p className="text-sm text-zinc-500">One per ticket type. Load the {T.one} numbers for a new type at Admin &gt; Numbers.</p>
       </div>
       <ul className="space-y-2">
         {types.map((t) => {
@@ -216,10 +212,10 @@ export function TicketTypesEditor({ types, stock }: { types: TicketTypeRow[]; st
                   <span className="grid h-7 w-7 place-items-center rounded-md bg-white/10 text-sm font-black">{t.code}</span>
                   <span className="font-semibold">{t.name}</span>
                   {t.band_color ? <BandSwatch color={t.band_color} className="text-xs text-zinc-400" /> : <span className="text-xs text-zinc-500">no colour</span>}
-                  <span className="text-sm">{t.sell_online ? php(t.price_centavos) : t.sell_at_gate ? "gate only" : t.drifter_family ? "Drifters tab only" : "not on sale"}</span>
+                  <span className="text-sm">{t.sell_online ? php(t.price_centavos) : t.sell_at_gate ? "gate only" : "not on sale"}</span>
                   {!t.active && <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px]">hidden</span>}
                   {t.active && t.hidden_in_admin && <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px]" title="Left out of the Dashboard, Walk-in, Orders and Verify">not on staff pages</span>}
-                  {st && <span className="text-xs text-zinc-500">{st.shares ? `${st.sold} sold · uses the ${st.shares} wristbands` : `${st.sold} sold of ${st.pool_total} bands`}</span>}
+                  {st && <span className="text-xs text-zinc-500">{st.shares ? `${st.sold} sold · uses the ${st.shares} ${T.many}` : `${st.sold} sold of ${st.pool_total}`}</span>}
                   <button type="button" className="btn-secondary ml-auto px-3 py-1 text-xs" disabled={open !== null} onClick={() => setOpen(t.id)}>Edit</button>
                 </div>
               )}

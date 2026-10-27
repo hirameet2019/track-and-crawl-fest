@@ -50,7 +50,8 @@ export function ConvertOrderForm({
   hasRedeemed: boolean;
 }) {
   const router = useRouter();
-  const sizes = useRules().shirtChart.map((r) => r.size);
+  const { shirtChart, terms: T } = useRules();
+  const sizes = shirtChart.map((r) => r.size);
   const [open, setOpen] = useState(false);
   const [ctx, setCtx] = useState<ConvertContext | null>(null);
   const [typeId, setTypeId] = useState("");
@@ -160,7 +161,7 @@ export function ConvertOrderForm({
         <div>
           <div className="text-xs font-semibold uppercase tracking-wide text-cyan-200">Convert this order</div>
           <p className="mt-1 text-xs text-zinc-400">
-            Pick the tickets that change; the others keep their wristband number and QR code. Keeps the order number
+            Pick the tickets that change; the others keep their {T.one} number and QR code. Keeps the order number
             and receipt. The picked tickets&apos; bands go back to the pool, new ones are issued, and the buyer gets one
             email with the updated PDF. Any difference in price is left as a balance to settle by hand.
           </p>
@@ -226,15 +227,9 @@ export function ConvertOrderForm({
             </select>
             {target && (
               <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-zinc-400">
-                <BandSwatch color={target.band_color} size={10} label={false} /> {target.band_color} wristband
+                <BandSwatch color={target.band_color} size={10} label={false} /> {target.band_color} {T.one}
                 {target.shares_stack_with && <> &middot; same bands as {target.shares_stack_with}</>}
                 {fits > 0 && <> &middot; {php(pickedValue)} covers <b>{fits}</b> of these</>}
-              </p>
-            )}
-            {target?.drifter_family && (
-              <p className="mt-1 rounded-lg border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-amber-200">
-                Paid for through this order, so it does <b>not</b> use up that drifter&apos;s {target.free_allowance} free bands. Hand-outs
-                recorded on the Drifters tab are the only ones counted there.
               </p>
             )}
           </div>
@@ -258,7 +253,7 @@ export function ConvertOrderForm({
               )}
             </div>
             {tooMany && <p className="mt-1 text-xs text-rose-400">Only {target?.sellable} left for that label.</p>}
-            {passengers > 0 && <p className="mt-1 text-xs text-zinc-500">Each car also gets {passengers} free passenger wristband{passengers > 1 ? "s" : ""}.</p>}
+            {passengers > 0 && <p className="mt-1 text-xs text-zinc-500">Each car also gets {passengers} free passenger {passengers > 1 ? T.many : T.one}.</p>}
           </div>
 
           {target && (
@@ -365,7 +360,7 @@ export function ConvertOrderForm({
             <input
               id={`convert-reason-${orderId}`}
               className="input mt-1"
-              placeholder="e.g. Upgraded to VIP Car Display at the buyer's request"
+              placeholder="e.g. Changed from Car to Motorcycle at the buyer's request"
               value={reason}
               onChange={(e) => { setReason(e.target.value); setConfirm(false); }}
             />
@@ -387,8 +382,8 @@ export function ConvertOrderForm({
             <div className="space-y-2">
               <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-amber-200">
                 {keptCount > 0
-                  ? <>The wristband number{pickedAll.length === 1 ? "" : "s"} of the {pickedAll.length} picked ticket{pickedAll.length === 1 ? "" : "s"} stop working immediately; the other {keptCount} stay as they are. The buyer is emailed.</>
-                  : <>The wristband numbers on this order stop working immediately and the buyer is emailed.</>}
+                  ? <>The {T.one} number{pickedAll.length === 1 ? "" : "s"} of the {pickedAll.length} picked ticket{pickedAll.length === 1 ? "" : "s"} stop working immediately; the other {keptCount} stay as they are. The buyer is emailed.</>
+                  : <>The {T.one} numbers on this order stop working immediately and the buyer is emailed.</>}
                 {balance > 0 && <> You will still owe them <b>{php(balance)}</b>.</>}
                 {balance < 0 && <> They will still owe <b>{php(-balance)}</b>.</>}
               </p>

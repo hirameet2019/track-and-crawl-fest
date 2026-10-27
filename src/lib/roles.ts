@@ -4,7 +4,7 @@ import type { StaffRole } from "@/lib/supabase/types";
  * Staff roles from least to most access. Each one sees everything below it.
  *   scanner  Scan only
  *   gate     the walk-in desk: Walk-in and Scan, nothing about online orders or buyers
- *   staff    + Dashboard, Verify, Orders, Drifters
+ *   staff    + Dashboard, Verify, Orders
  *   admin    + Numbers, Audit, Settings
  * A role this code does not know ranks 0 and gets nothing, so a new value added to
  * the database ahead of the code can never fall through to full access.

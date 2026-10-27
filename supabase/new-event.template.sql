@@ -39,8 +39,8 @@ insert into events (
   true
 );
 
--- One row per wristband label. code = the letter printed on the band serials
--- (the import script matches serials to types by this letter).
+-- One row per ticket type. code = the letter that starts its numbers (C001 -> C);
+-- the number import matches by it.
 insert into ticket_types (
   event_id, code, name, description, price_centavos, walkin_price_centavos, band_color,
   sell_online, sell_at_gate, walkin_name, gate_needs_name,
@@ -50,17 +50,12 @@ insert into ticket_types (
 )
 select e.id, v.* from events e,
 (values
-  -- code name                 description                                  price  gate   band       online gate  walkin_name gate_name shirt lany  stick carpass vehicle comp child cap   drifter free sort
-  ('P', '<General Admission>', '<General admission wristband.>',            15000, null, '<Pink>',   true,  true, null,       false,    false,false,false,false,  false,  0,   false,null, false,  0,   1),
-  ('B', '<Kids (12 and below)>','<For children 12 and below.>',             7500,  null, '<Blue>',   true,  true, null,       false,    false,false,false,false,  false,  0,   true, null, false,  0,   2),
-  ('G', '<VIP Pass>',          '<VIP wristband with shirt and lanyard.>',   95000, null, '<Green>',  true,  true, null,       false,    true, true, true, false,  false,  0,   false,null, false,  0,   3),
-  -- A car ticket: needs plate + car photo; included_companions free passes ride on it.
-  ('R', '<VIP Car Display>',   '<Display your car. Includes car pass.>',    150000,null, '<Red>',    true,  true, null,       true,     true, true, false,true,   true,   1,   false,null, false,  0,   4),
-  -- Gate-only label: sold at the Walk-in tab, never online (price there comes from walkin_price).
-  ('Y', '<Adult Walk-in>',     '<Sold at the gate only.>',                  0,     20000,'<Yellow>', false, true, null,       false,    false,false,false,false,  false,  0,   false,null, false,  0,   5)
-  -- Drifter family label (Drifters tab, free_allowance free bands per drifter). Delete if not needed;
-  -- the Drifters tab hides itself when no type has drifter_family = true.
-  -- ,('D', '<Drifter Family>', '<For competing drivers'' families.>',       0,     20000,'<Black>',  false, false,null,       false,    false,false,false,false,  false,  0,   false,null, true,   6,   6)
+  -- code name                       description                                          price  gate   band  online gate  walkin_name gate_name shirt lany  stick carpass vehicle comp child cap   (unused) sort
+  -- A vehicle registration: needs the driver's name, plate, make/model and a photo.
+  ('C', '<Car Registration>',        '<Registration for one car. Plate, model and photo.>',   50000, null, null, true,  true, null,       true,     false,false,false,true,   true,   0,   false,null, false, 0,  1),
+  ('M', '<Motorcycle Registration>', '<Registration for one motorcycle.>',                    50000, null, null, true,  true, null,       true,     false,false,false,true,   true,   0,   false,null, false, 0,  2),
+  -- A plain entry with no vehicle, if the event sells one.
+  ('G', '<General Admission>',       '<Entry for one person.>',                               15000, null, null, true,  true, null,       false,    false,false,false,false,  false,  0,   false,null, false, 0,  3)
 ) as v(code, name, description, price_centavos, walkin_price_centavos, band_color,
        sell_online, sell_at_gate, walkin_name, gate_needs_name,
        includes_shirt, includes_lanyard, includes_sticker, includes_car_pass,
@@ -70,5 +65,5 @@ where e.slug = '<event-slug-2027>';
 
 commit;
 
--- Wristband serials come next, from the organizer's spreadsheet:
---   python scripts/wristbands-from-xlsx.py "<Remaining Tickets.xlsx>" --push
+-- Registration numbers come next: import a range per type at Admin > Numbers
+-- (e.g. prefix C, 1 to 500, pad 3 gives C001 to C500).

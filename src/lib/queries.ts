@@ -35,21 +35,7 @@ export const getActiveEvent = cache(async (): Promise<EventRow | null> => {
 });
 
 /**
- * Whether this event sells drifter family bands. The Drifters tab and its
- * dashboard shortcut only appear when it does, so an event without them (a
- * concert, say) does not show staff a tab that leads to "not set up".
- */
-export const hasDrifterLabel = cache(async (eventId: string): Promise<boolean> => {
-  const { count } = await createAdminClient()
-    .from("ticket_types")
-    .select("id", { count: "exact", head: true })
-    .eq("event_id", eventId)
-    .eq("drifter_family", true);
-  return (count ?? 0) > 0;
-});
-
-/**
- * Active ticket types in organizer order (B, Y, O, R, P, G).
+ * Active ticket types in organizer order (sort_order).
  * `onlineOnly` hides walk-in-only labels from the public order form.
  */
 export async function getTicketTypes(eventId: string, opts: { onlineOnly?: boolean } = {}): Promise<TicketTypeRow[]> {

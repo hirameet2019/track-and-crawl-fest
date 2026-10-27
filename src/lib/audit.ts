@@ -26,7 +26,7 @@ export const CATEGORY_LABEL: Record<AuditCategory, string> = {
   payments: "Payments",
   tickets: "Gate / tickets",
   walkin: "Walk-in tally",
-  numbers: "Wristband pool",
+  numbers: "Number pool",
   staff: "Staff access",
   settings: "Settings",
   other: "Other",
@@ -39,7 +39,7 @@ const ACTIONS: Record<string, { cat: AuditCategory; label: string }> = {
   "order.issued": { cat: "payments", label: "Payment approved, tickets issued" },
   "order.rejected": { cat: "payments", label: "Payment rejected" },
   "order.resent": { cat: "orders", label: "Tickets re-sent by email" },
-  "order.reverted": { cat: "orders", label: "Paid order reverted, wristband released" },
+  "order.reverted": { cat: "orders", label: "Paid order reverted, number released" },
   "ticket.redeemed": { cat: "tickets", label: "Ticket scanned at gate" },
   "ticket.unredeemed": { cat: "tickets", label: "Gate scan undone, ticket usable again" },
   "ticket.voided": { cat: "payments", label: "Ticket voided" },
@@ -50,19 +50,11 @@ const ACTIONS: Record<string, { cat: AuditCategory; label: string }> = {
   "ticket.kit": { cat: "tickets", label: "Kit item handed over" },
   "walkin.recorded": { cat: "walkin", label: "Walk-in tally" },
   "ticket_type.walkin_price": { cat: "walkin", label: "Gate price changed" },
-  "drifter.bands": { cat: "walkin", label: "Drifter wristbands" },
-  "ticket_type.free_allowance": { cat: "walkin", label: "Free bands per drifter changed" },
-  "drifter.entry_added": { cat: "walkin", label: "Drifters added to the entry list" },
-  "drifter.entry_removed": { cat: "walkin", label: "Drifter removed from the entry list" },
-  "drifter.registered": { cat: "walkin", label: "Drifter sent in their list" },
-  "drifter.self_registered": { cat: "walkin", label: "Drifter signed up through the shared link" },
-  "drifter.signup_link": { cat: "walkin", label: "Drifter sign-up link changed" },
-  "drifter.handed_over": { cat: "walkin", label: "Pre-registered bands handed over" },
-  "numbers.imported": { cat: "numbers", label: "Wristband range imported" },
-  "numbers.imported_list": { cat: "numbers", label: "Wristband list imported" },
-  "number.voided": { cat: "numbers", label: "Wristband voided" },
-  "number.unvoided": { cat: "numbers", label: "Wristband restored to pool" },
-  "number.deleted": { cat: "numbers", label: "Wristband removed from the pool" },
+  "numbers.imported": { cat: "numbers", label: "Number range imported" },
+  "numbers.imported_list": { cat: "numbers", label: "Number list imported" },
+  "number.voided": { cat: "numbers", label: "Number voided" },
+  "number.unvoided": { cat: "numbers", label: "Number restored to pool" },
+  "number.deleted": { cat: "numbers", label: "Number removed from the pool" },
   "staff.signed_in": { cat: "staff", label: "Staff signed in" },
   "staff.signed_out": { cat: "staff", label: "Staff signed out" },
   "settings.email_updated": { cat: "settings", label: "Email settings changed" },
@@ -129,37 +121,10 @@ export function describe(action: string, data: Record<string, unknown> | null | 
       return [d.order_no ? `Order #${d.order_no}` : "", Array.isArray(d.released_numbers) ? `released ${d.released_numbers.join(", ")}` : "", d.reason ? String(d.reason) : ""].filter(Boolean).join(" · ");
     case "walkin.recorded": {
       const qty = Number(d.qty ?? 0);
-      return `${qty > 0 ? "+" : ""}${qty} band(s) · ${peso(d.unit_price_centavos)} each · ${String(d.method ?? "cash").toUpperCase()}`;
+      return `${qty > 0 ? "+" : ""}${qty} sold · ${peso(d.unit_price_centavos)} each · ${String(d.method ?? "cash").toUpperCase()}`;
     }
     case "ticket_type.walkin_price":
       return `New gate price ${peso(d.walkin_price_centavos)}`;
-    case "drifter.bands": {
-      const qty = Number(d.qty ?? 0);
-      const paid = Number(d.paid ?? 0);
-      return [
-        `${d.drifter ?? "?"}${d.team ? ` (${d.team})` : ""}: ${qty > 0 ? "+" : ""}${qty} band(s)`,
-        Number(d.free ?? 0) ? `${d.free} free` : "",
-        paid ? `${paid} paid at ${peso(d.unit_price_centavos)} (${String(d.method ?? "cash").toUpperCase()}${d.payment_ref ? ` ref ${d.payment_ref}` : ""}${d.payment_confirmed ? ", payment confirmed" : ""})` : "",
-        qty > 0 ? (d.rules_ack ? "rules confirmed" : "RULES NOT CONFIRMED") : "",
-      ].filter(Boolean).join(" · ");
-    }
-    case "drifter.entry_added":
-      return `${d.count} drifter(s)${Array.isArray(d.names) ? `: ${(d.names as string[]).slice(0, 6).join(", ")}${(d.names as string[]).length > 6 ? "..." : ""}` : ""}`;
-    case "drifter.entry_removed":
-      return `${d.drifter ?? "?"} - link closed`;
-    case "drifter.registered":
-      return `${d.drifter ?? "?"}${d.team ? ` (${d.team})` : ""} listed ${d.bands} band(s)${d.resubmitted ? " (updated)" : ""} and confirmed the rules`;
-    case "drifter.self_registered":
-      return `${d.drifter ?? "?"}${d.team ? ` (${d.team})` : ""}${d.car ? ` · car #${d.car}` : ""} signed up with ${d.bands} band(s)`;
-    case "drifter.signup_link":
-      return d.action === "close" ? "Sign-up link closed" : d.action === "replace" ? "Sign-up link replaced; the old one stopped working" : "Sign-up link opened";
-    case "drifter.handed_over": {
-      const charge = Number(d.charge_centavos ?? 0);
-      const progress = d.collected !== undefined && d.of !== undefined ? ` (${d.collected} of ${d.of} collected)` : "";
-      return `${d.drifter ?? "?"}${d.team ? ` (${d.team})` : ""}: ${d.bands} band(s) handed over${progress}${charge ? ` - ${peso(charge)} received ${String(d.method ?? "cash").toUpperCase()}${d.payment_ref ? ` ref ${d.payment_ref}` : ""}` : " - free"}`;
-    }
-    case "ticket_type.free_allowance":
-      return `${d.free_allowance} free band(s) per drifter`;
     case "numbers.imported":
       return `${d.prefix ?? ""}${d.start ?? ""} to ${d.prefix ?? ""}${d.end ?? ""}`;
     case "numbers.imported_list":

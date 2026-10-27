@@ -6,10 +6,12 @@ import { LiveOrders } from "@/components/LiveOrders";
 import { humanMinutes } from "@/lib/elapsed";
 import { requireStaff } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getActiveEvent, getAvailability, getTicketTypes, hasDrifterLabel } from "@/lib/queries";
+import { getActiveEvent, getAvailability, getTicketTypes } from "@/lib/queries";
 import { php } from "@/lib/money";
 import { PAYMENT_CHANNELS } from "@/config/event";
 import { BandSwatch } from "@/components/BandSwatch";
+import { getRules } from "@/lib/rules";
+import { cap } from "@/lib/rules-types";
 
 function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
@@ -24,11 +26,10 @@ function Stat({ label, value, sub }: { label: string; value: string; sub?: strin
 const manilaDay = (iso: string) => new Date(iso).toLocaleDateString("en-CA", { timeZone: LOCALE.timeZone });
 
 export default async function DashboardPage() {
+  const { terms: T } = await getRules();
   await requireStaff("staff");
   const event = await getActiveEvent();
   if (!event) return <p>No active event. Run the seed.</p>;
-  // cached: the staff layout already asked, so this costs no extra query
-  const drifters = await hasDrifterLabel(event.id);
 
   const admin = createAdminClient();
   // Labels hidden in Settings (hidden_in_admin) are left out of every figure here; their
@@ -90,23 +91,16 @@ export default async function DashboardPage() {
   const voidedCentavos = [...orderSums.values()].reduce((s, o) => s + o.voided, 0);
   const voidedTickets = [...orderSums.values()].reduce((s, o) => s + o.voidedTickets, 0);
   const tally = walkins.filter((w) => !hidden.has(w.ticket_type_id));
-  // Bands inside a drifter's free allowance are handed over, not sold: they count as
-  // wristbands out but never as money. Gate taps and drifter hand-outs are also kept
-  // apart so the organizer can see what the grid consumed.
+  // A gate sale's free units (a car's included passengers) are handed over, not sold.
   const amount = (w: { qty: number; free_qty: number; unit_price_centavos: number }) => (w.qty - w.free_qty) * w.unit_price_centavos;
-  const gate = tally.filter((w) => !w.drifter_name);
-  const drifterTally = tally.filter((w) => w.drifter_name);
   const onlineRevenue = paid.reduce((s, o) => s + o.total_centavos, 0);
-  const walkinRevenue = gate.reduce((s, w) => s + amount(w), 0);
-  const walkinCount = gate.reduce((s, w) => s + w.qty, 0);
-  const drifterRevenue = drifterTally.reduce((s, w) => s + amount(w), 0);
-  const drifterBands = drifterTally.reduce((s, w) => s + w.qty, 0);
-  const drifterFree = drifterTally.reduce((s, w) => s + w.free_qty, 0);
+  const walkinRevenue = tally.reduce((s, w) => s + amount(w), 0);
+  const walkinCount = tally.reduce((s, w) => s + w.qty, 0);
   const byMethod = { gotyme: 0, gcash: 0, maya: 0, cash: 0 } as Record<string, number>;
   for (const o of paid) if (o.payment_method) byMethod[o.payment_method] = (byMethod[o.payment_method] ?? 0) + o.total_centavos;
   for (const w of tally) byMethod[w.payment_method] = (byMethod[w.payment_method] ?? 0) + amount(w);
-  // GoTyme and cash are the live channels; GCash / Maya tiles only appear if they ever took money.
-  const methodTiles = (["gotyme", "cash", "gcash", "maya", "other"] as const).filter((m) => m === "gotyme" || m === "cash" || byMethod[m] > 0);
+  // Cash at the gate always; every other channel once it has taken money.
+  const methodTiles = (["gotyme", "gcash", "maya", "other", "cash"] as const).filter((m) => m === "cash" || byMethod[m] > 0);
   const sold = availability.reduce((s, a) => s + Number(a.sold), 0);
   const onlineSold = availability.reduce((s, a) => s + Number(a.online_sold), 0);
   const redeemed = availability.reduce((s, a) => s + Number(a.redeemed), 0);
@@ -139,7 +133,6 @@ export default async function DashboardPage() {
         </div>
         <div className="flex gap-2">
           <Link prefetch={false} href="/admin/walkin" className="btn-secondary">Walk-in tally</Link>
-          {drifters && <Link prefetch={false} href="/admin/drifters" className="btn-secondary">Drifters</Link>}
           <Link prefetch={false} href="/admin/verify" className={`btn-primary ${queueCount ? "" : "opacity-60"}`}>
             Verify queue {queueCount ? <span className="rounded-full bg-amber-400 px-2 text-xs text-black">{queueCount}</span> : null}
           </Link>
@@ -147,8 +140,8 @@ export default async function DashboardPage() {
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat label="Revenue (paid)" value={php(onlineRevenue + walkinRevenue + drifterRevenue)} sub={`${paid.length} online orders · ${walkinCount} walk-in bands${drifterRevenue ? ` · ${php(drifterRevenue)} drifter extras` : ""}${voidedCentavos ? ` · excludes ${php(voidedCentavos)} for ${voidedTickets} voided ticket${voidedTickets === 1 ? "" : "s"}` : ""}`} />
-        <Stat label="Wristbands sold" value={String(sold)} sub={`${onlineSold} online · ${walkinCount} walk-in${drifterBands ? ` · ${drifterBands} drifter family (${drifterFree} free)` : ""} · ${redeemed} scanned at gate`} />
+        <Stat label="Revenue (paid)" value={php(onlineRevenue + walkinRevenue)} sub={`${paid.length} online orders · ${walkinCount} walk-in${voidedCentavos ? ` · excludes ${php(voidedCentavos)} for ${voidedTickets} voided ticket${voidedTickets === 1 ? "" : "s"}` : ""}`} />
+        <Stat label={`${cap(T.many)} sold`} value={String(sold)} sub={`${onlineSold} online · ${walkinCount} walk-in · ${redeemed} scanned at gate`} />
         <Stat label="Awaiting verification" value={String(queueCount ?? 0)} sub={oldestAgeMin != null ? `oldest ${humanMinutes(oldestAgeMin)}` : "queue empty"} />
         <div className="card">
           <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Walk-in vs online</div>
@@ -171,8 +164,8 @@ export default async function DashboardPage() {
       </div>
 
       <div className="card overflow-x-auto">
-        <h2 className="font-semibold">Per wristband label</h2>
-        <p className="text-xs text-zinc-500">Same order as the organizer&apos;s sheet. Left = free wristbands minus unpaid reservations minus walk-in taps.</p>
+        <h2 className="font-semibold">Per ticket type</h2>
+        <p className="text-xs text-zinc-500">Same order as the organizer&apos;s sheet. Left = free {T.many} minus unpaid reservations minus walk-in taps.</p>
         <table className="mt-3 w-full text-sm">
           <thead className="text-left text-xs uppercase text-zinc-500">
             <tr><th className="py-1">Code</th><th>Label</th>{anyBand && <th>Band</th>}<th className="text-right">Online</th><th className="text-right">Walk-in</th><th className="text-right">Reserved</th><th className="text-right">Left</th><th className="text-right">Pool</th><th className="text-right">Scanned</th><th className="text-right">Revenue</th><th className="w-36"></th></tr>
@@ -183,7 +176,7 @@ export default async function DashboardPage() {
               return (
                 <tr key={a.ticket_type_id} className="border-t">
                   <td className="py-2"><span className="rounded bg-white/10 px-1.5 py-0.5 font-black">{a.code}</span></td>
-                  <td className="font-medium">{a.name}{a.pool_type_id && <span className="ml-1 text-[10px] uppercase text-zinc-500">{availability.find((x) => x.ticket_type_id === a.pool_type_id)?.code} bands</span>}{a.drifter_family ? <span className="ml-1 text-[10px] uppercase text-zinc-500">drifters</span> : !a.sell_online && <span className="ml-1 text-[10px] uppercase text-zinc-500">gate only</span>}</td>
+                  <td className="font-medium">{a.name}{a.pool_type_id && <span className="ml-1 text-[10px] uppercase text-zinc-500">{availability.find((x) => x.ticket_type_id === a.pool_type_id)?.code} bands</span>}{!a.sell_online && <span className="ml-1 text-[10px] uppercase text-zinc-500">gate only</span>}</td>
                   {anyBand && <td className="text-zinc-500"><BandSwatch color={a.band_color} size={12} label={false} /> {a.band_color}</td>}
                   <td className="text-right">{a.online_sold}</td>
                   <td className="text-right">{a.walkin_sold}</td>

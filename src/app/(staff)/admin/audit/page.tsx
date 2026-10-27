@@ -95,7 +95,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold">Audit log</h1>
-          <p className="mt-2 text-sm text-zinc-500">Who did what, and when. Every approval, rejection, gate scan, walk-in tap, wristband import and sign-in is recorded here and cannot be edited from the app.</p>
+          <p className="mt-2 text-sm text-zinc-500">Who did what, and when. Every approval, rejection, gate scan, walk-in tap, number import and sign-in is recorded here and cannot be edited from the app.</p>
         </div>
       </div>
 

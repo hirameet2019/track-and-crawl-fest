@@ -104,7 +104,7 @@ export async function createOnlineOrder(formData: FormData): Promise<ActionResul
   let includedTotal = 0;
   const companionsPerCar = new Map<string, number>();
   const includedPerCar = new Map<string, number>();
-  const { maxQtyPerType: MAX_QTY_PER_TYPE, maxCompanionsPerCar: MAX_COMPANIONS_PER_CAR, paymentWindowMinutes: PAYMENT_WINDOW_MINUTES, shirtChart } = await getRules();
+  const { maxQtyPerType: MAX_QTY_PER_TYPE, maxCompanionsPerCar: MAX_COMPANIONS_PER_CAR, paymentWindowMinutes: PAYMENT_WINDOW_MINUTES, shirtChart, terms: T } = await getRules();
   const sizes = new Set(shirtChart.map((r) => r.size));
   // Free companions come with a car package: included_companions per car of that label
   // (VIP Car Display with shirt has one; the no-shirt car has none).
@@ -128,7 +128,7 @@ export async function createOnlineOrder(formData: FormData): Promise<ActionResul
         if (a.included) {
           if (car && (tt.id !== car.id || car.included_companions < 1)) return { ok: false, error: `${car.name} has no included passenger on this line` };
         } else if (!tt.includes_shirt || tt.requires_vehicle) {
-          return { ok: false, error: "Companions must be VIP Pass tickets" };
+          return { ok: false, error: "Companions must use the companion ticket type" };
         }
         if (!plates.has(plateKey(a.companion_of))) return { ok: false, error: `Companion ${a.holder_name || i + 1} must belong to a car in this order` };
         a.companion_of = a.companion_of.replace(/\s+/g, " ").trim().toUpperCase();
@@ -139,7 +139,7 @@ export async function createOnlineOrder(formData: FormData): Promise<ActionResul
         if (a.included) {
           const inc = (includedPerCar.get(plateKey(a.companion_of)) ?? 0) + 1;
           includedPerCar.set(plateKey(a.companion_of), inc);
-          if (inc > (car?.included_companions ?? 0)) return { ok: false, error: `Only ${car?.included_companions ?? 0} passenger wristband(s) are included per car (${a.companion_of})` };
+          if (inc > (car?.included_companions ?? 0)) return { ok: false, error: `Only ${car?.included_companions ?? 0} passenger ${(car?.included_companions ?? 0) === 1 ? T.one : T.many} are included per car (${a.companion_of})` };
           includedTotal += 1;
         }
       } else if (a.included) {
@@ -262,7 +262,7 @@ export async function submitPaymentProof(formData: FormData): Promise<ActionResu
     // Expiry is final: the wristbands went back to the pool the moment the hold
     // lapsed, so accepting a late upload here would promise stock that may already
     // belong to someone else. A buyer who did pay is sent to the organizer.
-    return { ok: false, error: "This order expired, so the wristbands were released. Please place a new order. If you already paid, contact the organizer with your reference number and they will sort it out." };
+    return { ok: false, error: `This order expired, so the ${(await getRules()).terms.many} were released. Please place a new order. If you already paid, contact the organizer with your reference number and they will sort it out.` };
   } else if (order.status !== "pending_payment" && order.status !== "awaiting_verification") {
     return { ok: false, error: `This order is already ${order.status.replace("_", " ")}` };
   }

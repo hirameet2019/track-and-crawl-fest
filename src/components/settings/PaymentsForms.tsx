@@ -6,7 +6,7 @@ import { savePaymentQr, saveRulesSection, type PaymentQrInput, type PaymentQrVal
 import { AssetField } from "@/components/AssetField";
 import { ONLINE_CHANNELS } from "@/config/event";
 import { Group, NumberField, SaveBar, changed, type SaveMsg } from "@/components/settings/SaveBar";
-import { MAX_EXTRA_CHANNELS, type ExtraChannel, type Rules } from "@/lib/rules-types";
+import { MAX_EXTRA_CHANNELS, cap, type ExtraChannel, type Rules } from "@/lib/rules-types";
 import type { PaymentMethod } from "@/lib/supabase/types";
 
 const toQr = (e: PaymentQrValues): PaymentQrInput => ({
@@ -211,7 +211,7 @@ export function PaymentRulesForm({ rules }: { rules: Rules }) {
 
       <Group title="Timing" hint="Orders already placed keep the deadline they were given.">
         <div className="grid gap-3 sm:grid-cols-3">
-          <NumberField label="Time to pay" suffix="minutes" min={15} max={1440} value={f.paymentWindowMinutes} onChange={(v) => setF((p) => ({ ...p, paymentWindowMinutes: v }))} hint="Wristbands are held this long." />
+          <NumberField label="Time to pay" suffix="minutes" min={15} max={1440} value={f.paymentWindowMinutes} onChange={(v) => setF((p) => ({ ...p, paymentWindowMinutes: v }))} hint={`${cap(rules.terms.many)} are held this long.`} />
           <NumberField label="Reminder email" suffix="min before" min={5} max={120} value={f.reminderMinutes} onChange={(v) => setF((p) => ({ ...p, reminderMinutes: v }))} hint="Keep it above the 5-minute cron interval." />
           <NumberField label="Skip expiry notices after" suffix="hours" min={1} max={48} value={f.expiryNoticeMaxAgeHours} onChange={(v) => setF((p) => ({ ...p, expiryNoticeMaxAgeHours: v }))} hint="Stops a stale backlog going out at once." />
         </div>

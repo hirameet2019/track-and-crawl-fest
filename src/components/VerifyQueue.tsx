@@ -10,6 +10,7 @@ import { ShippingDetails } from "@/components/ShippingDetails";
 import { SignedImage } from "@/components/SignedImage";
 import { humanMinutes } from "@/lib/elapsed";
 import { paymentLabel } from "@/lib/payment-options";
+import { vehicleKind, vehicleWords } from "@/lib/vehicle";
 
 export interface QueueOrder {
   id: string;
@@ -92,11 +93,17 @@ function Card({ o, onDone }: { o: QueueOrder; onDone: (id: string, warning?: str
         )}
         {o.order_items.some((i) => i.requires_vehicle) && (
           <div className="rounded-lg border border-white/10 bg-black/30 p-3">
-            <div className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">Cars for display</div>
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">
+              {(() => {
+                // "Cars", "Motorcycles", or "Vehicles" when an order has both.
+                const kinds = new Set(o.order_items.filter((i) => i.requires_vehicle).map((i) => vehicleKind(i)));
+                return kinds.size > 1 ? "Vehicles" : kinds.has("motorcycle") ? "Motorcycles" : "Cars";
+              })()}
+            </div>
             <ul className="mt-2 space-y-2">
               {o.order_items.filter((i) => i.requires_vehicle).flatMap((i) => i.attendees.map((a, k) => (
                 <li key={`${i.name}-${k}`} className="flex items-center gap-3 text-sm">
-                  <SignedImage bucket="vehicle-photos" path={a.vehicle_photo_path} alt={`Car of ${a.holder_name ?? "attendee"}`} className="h-14 w-20 rounded-md object-cover" />
+                  <SignedImage bucket="vehicle-photos" path={a.vehicle_photo_path} alt={`${vehicleWords(i).noun} of ${a.holder_name ?? "attendee"}`} className="h-14 w-20 rounded-md object-cover" />
                   <div>
                     <div className="font-mono font-bold tracking-wide">{a.vehicle_plate ?? "-"}</div>
                     <div className="text-xs text-zinc-500">{a.vehicle_model ?? "-"} &middot; {a.holder_name ?? ""}</div>

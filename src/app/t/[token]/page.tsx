@@ -5,6 +5,7 @@ import QRCode from "qrcode";
 import { TicketStatusBadge } from "@/components/StatusBadge";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ticketUrl } from "@/lib/pdf/ticket-pdf";
+import { getRules } from "@/lib/rules";
 import type { EventRow, TicketRow, TicketTypeRow } from "@/lib/supabase/types";
 
 export const dynamic = "force-dynamic";
@@ -26,7 +27,7 @@ export default async function TicketPage({ params }: { params: Promise<{ token: 
     ticket_type: TicketTypeRow;
     order: { order_no: number; buyer_name: string; event: EventRow };
   };
-  const qr = await QRCode.toDataURL(ticketUrl(t.qr_token), { margin: 1, width: 320 });
+  const [qr, { terms: T }] = await Promise.all([QRCode.toDataURL(ticketUrl(t.qr_token), { margin: 1, width: 320 }), getRules()]);
 
   return (
     <main className="dark-zone flex-1 bg-brand"><div className="mx-auto w-full max-w-md px-4 py-10">
@@ -34,7 +35,7 @@ export default async function TicketPage({ params }: { params: Promise<{ token: 
         <p className="text-xs font-semibold uppercase tracking-widest text-zinc-500">{t.order.event.name}</p>
         <h1 className="display-title mt-2 text-2xl">{t.ticket_type.name}</h1>
         <div className="ticket-no mt-4 text-5xl">{t.number}</div>
-        {t.ticket_type.band_color && <p className="text-xs text-zinc-500">{t.ticket_type.band_color} wristband</p>}
+        {t.ticket_type.band_color && <p className="text-xs text-zinc-500">{t.ticket_type.band_color} {T.one}</p>}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={qr} alt="Ticket QR" className="mx-auto my-5 h-56 w-56 rounded-2xl bg-white p-3" />
         <p className="font-medium">{t.holder_name ?? t.order.buyer_name}</p>

@@ -100,7 +100,7 @@ export function PayPageForm({ rules }: { rules: Rules }) {
         hint={
           <>
             Leave an optional line blank to show nothing. <b className="text-white/70">**Double asterisks**</b> make bold. These fill themselves in:{" "}
-            {["{amount}", "{order}", "{name}", "{email}", "{minutes}", "{app}", "{scanHint}"].map((tok, i) => (
+            {["{amount}", "{order}", "{name}", "{email}", "{minutes}", "{app}", "{scanHint}", "{item}", "{items}"].map((tok, i) => (
               <span key={tok}>{i ? ", " : ""}<code className="rounded bg-black/40 px-1">{tok}</code></span>
             ))}
             .

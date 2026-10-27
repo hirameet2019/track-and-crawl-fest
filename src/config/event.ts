@@ -10,9 +10,9 @@ export const SITE_URL =
 /** Minutes a buyer has to pay and upload proof before the order expires. */
 export const PAYMENT_WINDOW_MINUTES = 60;
 /**
- * Expiry is final: once the hold lapses the wristbands go straight back to the
- * pool and the order cannot be revived by the buyer. Organizer's decision, taken
- * to keep wristband inventory unambiguous.
+ * Expiry is final: once the hold lapses the registrations go straight back to the
+ * pool and the order cannot be revived by the buyer. Taken to keep the number
+ * inventory unambiguous.
  *
  * The case this gives up on is the buyer who paid at minute 58 and uploaded at
  * minute 62. They are sent to the support contact on the events row instead, so
@@ -32,9 +32,8 @@ export const REMINDER_MINUTES_BEFORE_EXPIRY = 15;
 export const EXPIRY_NOTICE_MAX_AGE_HOURS = 3;
 
 /**
- * Shirt sizes offered on ticket types that include a shirt (VIP Pass, VIP Car
- * Display). The list mirrors the supplier's "Regular Shirt" size chart so every
- * size the buyer can see on the chart is also selectable.
+ * Shirt sizes offered on ticket types that include a shirt (none for Track & Crawl;
+ * the option stays for events that bundle one).
  */
 export const SHIRT_SIZES = ["2XS", "XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL", "6XL", "7XL", "8XL"] as const;
 export type ShirtSize = (typeof SHIRT_SIZES)[number];
@@ -56,8 +55,8 @@ export const SHIRT_SIZE_CHART: Record<ShirtSize, { width: number; length: number
   "8XL": { width: 29, length: 32, sleeve: 11 },
 };
 
-/** The supplier's chart image, served from /public. Shown alongside the table above. */
-export const SHIRT_SIZE_CHART_IMAGE = { src: "/shirt-size-chart.png", width: 2022, height: 1465 } as const;
+/** The supplier's size-chart picture shown above the table; null until one is uploaded in Settings. */
+export const SHIRT_SIZE_CHART_IMAGE: { src: string } | null = null;
 
 export function isShirtSize(value: string): value is ShirtSize {
   return (SHIRT_SIZES as readonly string[]).includes(value);
@@ -71,13 +70,13 @@ export function shirtSizeSummary(size: ShirtSize): string {
 
 /** Maximum tickets per online order. */
 export const MAX_QTY_PER_TYPE = 10;
-/** Passengers that can be added inside one VIP Car Display ticket. */
+/** Passengers that can be added inside one car ticket. */
 export const MAX_COMPANIONS_PER_CAR = 12;
 
 /**
  * Display details per payment method. Which online channels are actually
  * offered is decided by the events row: a channel shows up on the pay page and
- * in "I paid with" only when its *_qr_url is set. Currently only GoTyme is set.
+ * in "I paid with" only when its *_qr_url is set in Admin > Settings > Payments.
  */
 export interface PaymentChannel {
   /** Full name, shown on the payment card and in Admin. */

@@ -554,7 +554,7 @@ export function WalkinTally({
         <div className="card">
           <h2 className="font-semibold">Recent entries</h2>
           {recent.length === 0 ? (
-            <p className="mt-2 text-sm text-zinc-500">Nothing recorded yet. Tap + when you hand over a wristband.</p>
+            <p className="mt-2 text-sm text-zinc-500">Nothing recorded yet. Tap + {rules.terms.physical ? `when you hand over a ${rules.terms.one}` : "for each one sold at the gate"}.</p>
           ) : (
             // Scrolls inside the card so a busy gate day does not push the page down.
             <div className="mt-2 max-h-[min(28rem,60vh)] overflow-auto overscroll-contain">

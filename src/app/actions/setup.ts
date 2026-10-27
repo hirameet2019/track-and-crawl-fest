@@ -298,7 +298,7 @@ export async function saveTicketType(input: TicketTypeInput): Promise<ActionResu
       before = data as TicketTypeRow;
       if (before.code !== row.code) {
         const { count } = await admin.from("ticket_numbers").select("id", { count: "exact", head: true }).eq("ticket_type_id", id);
-        if (count) return { ok: false, error: `Code stays ${before.code}: ${count} wristband serials are already loaded under it` };
+        if (count) return { ok: false, error: `Code stays ${before.code}: ${count} ${(await getRules()).terms.one} numbers are already loaded under it` };
       }
     }
     const { data: clash } = await admin.from("ticket_types").select("id").eq("event_id", event.id).eq("code", row.code).maybeSingle();

@@ -1,6 +1,6 @@
-// Generated from Supabase project bcrxzihpyoahvfmrayej on 2026-09-11.
+// Generated from the Supabase schema (supabase/migrations), then extended by hand for later migrations.
 // Regenerate after schema changes:
-//   npx supabase gen types typescript --project-id bcrxzihpyoahvfmrayej > src/lib/supabase/database.types.ts
+//   npx supabase gen types typescript --project-id <id> > src/lib/supabase/database.types.ts
 export type Json =
   | string
   | number

@@ -10,7 +10,7 @@ import {
   SHIRT_SIZE_CHART_IMAGE,
   type PaymentChannel,
 } from "@/config/event";
-import { NOTES, STAFF } from "@/config/site";
+import { STAFF } from "@/config/site";
 import type { PaymentMethod } from "@/lib/supabase/types";
 
 /**
@@ -180,7 +180,7 @@ export const MAX_EXTRA_CHANNELS = 8;
 
 /**
  * The payment page (/pay/<order>): what shows and what it says. Text may use
- * {amount}, {order}, {name}, {email}, {minutes}, {app} and {scanHint} (" (or any
+ * {amount}, {order}, {name}, {email}, {minutes}, {app}, {item}, {items} and {scanHint} (" (or any
  * bank app with InstaPay QR)" or nothing); **double asterisks** make bold. The hold
  * note may place the live countdown with {timeLeft}; the after-submit text may
  * place the order status link with {statusLink}.
@@ -241,9 +241,9 @@ export const PAY_PAGE_DEFAULTS: PayPageSettings = {
     support: true,
   },
   title: "Pay {amount}",
-  holdNote: "Order #{order} for {name}. Your wristbands are held for {minutes} minutes, and {timeLeft} of that is left.",
-  holdWarning: "Pay and upload before the timer ends. When it runs out the order is cancelled, the wristbands go back to the pool, and this page stops accepting payment.",
-  holdWarningTl: "Naka-hold ang wristbands mo ng {minutes} minuto. Bayaran at i-upload ang proof bago matapos ang oras. Pag naubos ito, kanselado na ang order at kailangan mo nang mag-order ulit.",
+  holdNote: "Order #{order} for {name}. Your {items} are held for {minutes} minutes, and {timeLeft} of that is left.",
+  holdWarning: "Pay and upload before the timer ends. When it runs out the order is cancelled, the {items} go back to the pool, and this page stops accepting payment.",
+  holdWarningTl: "Naka-hold ang {items} mo ng {minutes} minuto. Bayaran at i-upload ang proof bago matapos ang oras. Pag naubos ito, kanselado na ang order at kailangan mo nang mag-order ulit.",
   summaryTitle: "Order summary",
   totalLabel: "Total to pay",
   step1Title: "Scan and pay the exact amount",
@@ -271,6 +271,27 @@ export const PAY_PAGE_DEFAULTS: PayPageSettings = {
   afterTextTl: "Pagkatapos i-submit, hintayin ang email na may receipt at QR tickets, hanggang 24 oras. Tingnan din ang Spam folder.",
 };
 
+/**
+ * What one registration is called on every page, email, PDF and staff screen.
+ * Track & Crawl sells registrations. An event that hands out wristbands would set
+ * "wristband" / "wristbands" / "Wristband no." with `physical` on.
+ */
+export interface Terms {
+  /** "registration" (lowercase; capitalised where a sentence starts). */
+  one: string;
+  /** "registrations". */
+  many: string;
+  /** Column and field label for its number, e.g. "Registration no.". */
+  numberLabel: string;
+  /** Something is handed over at the gate (a wristband): adds the "staff hand you ..." lines. */
+  physical: boolean;
+}
+
+export const TERMS_DEFAULTS: Terms = { one: "registration", many: "registrations", numberLabel: "Registration no.", physical: false };
+
+/** "registration" -> "Registration". */
+export const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
 /** Fill {pay}, {via} and {minutes} in page wording. Unknown tokens are left as typed. */
 export const fillText = (text: string, vars: Partial<Record<"pay" | "via" | "minutes", string | number>>) =>
   text.replace(/\{(pay|via|minutes)\}/g, (m, k: "pay" | "via" | "minutes") => (vars[k] !== undefined ? String(vars[k]) : m));
@@ -288,12 +309,12 @@ export interface Rules {
   /** Wording per payment method. `accent` is styling and stays in code. */
   channels: Record<PaymentMethod, PaymentChannel>;
   staffUsernameDomain: string;
-  drifterReferencePrefix: string;
   buyerForm: BuyerFormText;
   page: PageSettings;
   /** Payment channels added in Settings, after GoTyme / GCash / Maya, in this order. */
   extraChannels: ExtraChannel[];
   payPage: PayPageSettings;
+  terms: Terms;
 }
 
 export const RULE_DEFAULTS: Rules = {
@@ -303,14 +324,14 @@ export const RULE_DEFAULTS: Rules = {
   maxQtyPerType: MAX_QTY_PER_TYPE,
   maxCompanionsPerCar: MAX_COMPANIONS_PER_CAR,
   shirtChart: SHIRT_SIZES.map((size) => ({ size, ...SHIRT_SIZE_CHART[size] })),
-  shirtChartImage: SHIRT_SIZE_CHART_IMAGE.src,
+  shirtChartImage: SHIRT_SIZE_CHART_IMAGE?.src ?? null,
   channels: structuredClone(PAYMENT_CHANNELS),
   staffUsernameDomain: STAFF.usernameDomain,
-  drifterReferencePrefix: NOTES.drifterReferencePrefix,
   buyerForm: { ...BUYER_FORM_DEFAULTS },
   page: { ...PAGE_DEFAULTS, show: { ...PAGE_DEFAULTS.show } },
   extraChannels: [],
   payPage: { ...PAY_PAGE_DEFAULTS, show: { ...PAY_PAGE_DEFAULTS.show } },
+  terms: { ...TERMS_DEFAULTS },
 };
 
 /** Staff pickers (walk-in, drifters): every method, short name, cash first. */

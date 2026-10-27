@@ -1,6 +1,6 @@
 # Setting up a new event
 
-This app was built for Meet & Drift 3 but is set up to be reused. Almost
+This app runs Track & Crawl Fest 2026 and is set up to be reused. Almost
 everything event-specific is edited in **Admin > Settings** (admin login), with
 no code change and no redeploy:
 
@@ -10,16 +10,18 @@ Settings is split into tabs, one job each:
 |-----|----------------|
 | Overview | Setup checklist: what is ready and what is missing, each with a link to fix it |
 | Event | Name, tagline, venue, date, online sales window, receipt details, refund policy, "Need help?" link |
-| Tickets | Add / edit / hide ticket types (code, band colour, prices, where sold, inclusions, car tickets and companions, kids, drifter bands, caps) and the per-type online cut-offs |
-| Payments | QR codes and account names, time to pay, reminder timing, and how each channel is named in buyer instructions |
+| Tickets | Add / edit / hide ticket types (code, band colour, prices, where sold, inclusions, car tickets and companions, kids, caps) and the per-type online cut-offs |
+| Payments | QR codes and account names, more payment channels (bank transfers, other e-wallets), time to pay, reminder timing, and how each channel is named |
+| Payment page | What the payment page shows and its steps, labels and notes |
 | Ordering | Tickets per order, passengers per car, shirt sizes with measurements, size-chart image |
 | Look | Browser-tab suffix, logo, backdrop, share image, slideshow (images and videos), effects, colours, PDF ticket logo, banner and colours, staff note |
 | Email | SMTP / Resend sender |
-| Advanced | Staff login domain and drifter reference prefix (change between events, not during one); locale shown read-only |
+| Page | What the registration page shows and says, the "Your details" fields, and what a registration is called |
+| Advanced | Staff login domain (change between events, not during one); locale shown read-only |
 
 Uploads go to the public `event-assets` Storage bucket. What is never saved in
 Settings falls back to the defaults in `src/config/site.ts`, so a fresh install
-looks like Meet & Drift 3 until you change it, and **Back to defaults** returns
+looks like Track & Crawl Fest until you change it, and **Back to defaults** returns
 there.
 
 Still in code: locale and time zone (used by almost every screen), the
@@ -29,7 +31,7 @@ browser-tab icon (`src/app/icon.png`), and the Tailwind-wide colour retint
 ## 1. Make a copy
 
 Use a **new Supabase project** and a **new Vercel project** per event. Do not add
-a second event to the old database: the staff Orders/Verify/Drifters screens,
+a second event to the old database: the staff Orders/Verify screens,
 the export, the reminder cron and the **gate scanner** do not filter by event
 yet, so the old event's orders would show up and its QR codes would be accepted
 at the new gate.
@@ -67,7 +69,7 @@ repo.)
 Then copy `supabase/new-event.template.sql`, replace at least the slug, name
 and organizer, and run it once. Settings edits an event, it does not create
 one, so this gives it the first `events` row (and, if you like, starter
-ticket types). Do not run `supabase/seed.sql`; it is the old placeholder seed.
+ticket types).
 
 From here on use **Admin > Settings** (after step 4 gives you an admin login):
 start at the Overview tab: it lists what is still missing and links to the
@@ -88,18 +90,13 @@ The same fields appear in Settings > Ticket types with plain labels.
 | `included_companions` | Free passes bundled with one ticket of this type (they take the companion type's band). |
 | `is_child` | Shown as a kids ticket. |
 | `includes_shirt` / `_lanyard` / `_sticker` / `_car_pass` | Kit checklist on the ticket, PDF and gate screen. Shirt types ask for a size. |
-| `online_cap` | Max online sales for this type; null = limited only by wristbands. |
+| `online_cap` | Max online sales for this type; null = limited only by its numbers. |
 | `sales_close_at` | Per-type online cut-off. Easier to set in **Admin > Settings**. |
-| `drifter_family`, `free_allowance` | Handed out on the Drifters tab, N free bands per drifter. The Drifters tab and button disappear when no type has this. |
 
-## 4. Wristbands and staff
+## 4. Registration numbers and staff
 
-```bash
-python scripts/wristbands-from-xlsx.py "<Remaining Tickets.xlsx>" --push
-```
-
-Imports serials into the active event's types by letter. (Or run it without
-`--push` to get SQL.) Damaged bands can be voided later at **Admin > Numbers**.
+Import each type's numbers at **Admin > Numbers**, e.g. prefix C, 1 to 500, pad 3
+for C001 to C500 (or paste a list). A number can be voided there later.
 
 Staff: create each user in Supabase Auth, then add a `staff` row:
 
@@ -137,7 +134,7 @@ Keep files light: hero images 1600-2000 px wide, videos short and under ~5 MB
 Code-only extras in `src/config/site.ts`: `THEME.palette` (retint Tailwind's
 cyan / fuchsia / violet shades across the whole UI), `BRAND.pdf.palette` (PDF
 stripe and wordmark colours), `LOCALE`, `STAFF.usernameDomain`,
-`NOTES.drifterReferencePrefix`. Replace `src/app/icon.png` and
+`NOTES.salesSchedule`. Replace `src/app/icon.png` and
 `src/app/apple-icon.png` for the browser-tab and home-screen icon.
 
 ## 6. Payments, ordering and advanced: Admin > Settings
@@ -150,9 +147,8 @@ stripe and wordmark colours), `LOCALE`, `STAFF.usernameDomain`,
 - **Ordering**: tickets of one type per order, passengers per car, and the
   shirt sizes offered (in order, with width / length / sleeve in inches) plus an
   optional supplier chart image.
-- **Advanced**: staff login domain (short usernames become name@domain) and the
-  drifter reference prefix. Saving either asks for confirmation because it
-  changes logins and references immediately.
+- **Advanced**: staff login domain (short usernames become name@domain). Saving
+  asks for confirmation because it changes logins immediately.
 
 The values in `src/config/event.ts` are only the defaults now.
 
@@ -177,5 +173,3 @@ The values in `src/config/event.ts` are only the defaults now.
 - Gate phones keep an offline ticket cache in the browser (`ticket-cache-v1`).
   It is replaced on the first online sync, but clear the site data on reused
   gate phones before a new event to be safe.
-- `src/components/EventLogo.tsx` is an unused vector copy of the Meet & Drift 3
-  wordmark; ignore it or delete it.

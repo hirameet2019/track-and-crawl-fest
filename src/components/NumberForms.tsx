@@ -77,7 +77,7 @@ export function NumberForms({ ticketType, numbers }: { ticketType: TicketTypeRow
             <div><label className="label">End</label><input name="end" type="number" className="input" required /></div>
             <div><label className="label">Pad</label><input name="pad" type="number" className="input" defaultValue={4} /></div>
           </div>
-          <p className="text-xs text-zinc-500">Example: prefix VIP-, 1 to 500, pad 4 produces VIP-0001 to VIP-0500. Existing numbers are skipped.</p>
+          <p className="text-xs text-zinc-500">Example: prefix C, 1 to 500, pad 3 produces C001 to C500. Existing numbers are skipped.</p>
           <button className="btn-primary" disabled={pending}>Import range</button>
         </form>
         <form onSubmit={onList} className="card space-y-3">

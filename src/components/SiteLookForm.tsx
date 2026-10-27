@@ -28,7 +28,7 @@ const PDF_COLORS: { key: PdfSlot; label: string; builtIn: string }[] = [
   { key: "violet", label: "Accent 2 (stripe)", builtIn: "#b34dff" },
   { key: "cyan", label: "Accent 3 (stripe, ticket badges)", builtIn: "#29d9ff" },
   { key: "green", label: "Accent 4 (stripe, text logo line 2)", builtIn: "#5cfc7a" },
-  { key: "gold", label: "VIP badges and logo rule", builtIn: "#ffd140" },
+  { key: "gold", label: "Badges and logo rule", builtIn: "#ffd140" },
   { key: "pinkDark", label: "Line 1 outline", builtIn: "#4a054f" },
   { key: "teal", label: "Line 2 outline", builtIn: "#05363b" },
   { key: "goldDark", label: "Gold outline", builtIn: "#3b2400" },

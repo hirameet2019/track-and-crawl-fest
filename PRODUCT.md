@@ -8,12 +8,11 @@ web
 
 ## Current event
 
-**Track & Crawl Fest 2026** (fork of the Meet & Drift 3 build, own Supabase and Vercel): Tarlac Circuit Hill, Tarlac, Philippines, Nov 7 2026, 7AM-5PM. "Big cars. Small rigs. Same passion." Presented by 2S06, NoInvite and Philippine RC Expo. The site is a registration: PHP 500 per car (driver, plate, make/model and a car photo), 300 slots to start, paid by bank QR with proof upload and staff verification, as in Meet & Drift. Page order (user, 2026-10-27): event information with the hero first, then the registration and payment.
+**Track & Crawl Fest 2026** (own Supabase and Vercel): Tarlac Circuit Hill, Tarlac, Philippines, Nov 7 2026, 7AM-5PM. "Big cars. Small rigs. Same passion." Presented by 2S06, NoInvite and Philippine RC Expo. The site is a registration: PHP 500 per car (driver, plate, make/model and a car photo), 300 slots to start, paid by bank QR with proof upload and staff verification. Page order (user, 2026-10-27): event information with the hero first, then the registration and payment.
 
 ## Users
 
 - **Buyers** of event tickets, on phones and laptops in about equal measure. They pick tickets, give holder details (shirt size, car plate where needed, delivery address for shipped shirts), pay by bank QR (GoTyme InstaPay; GCash and Maya can be re-enabled), upload proof, and later open their tickets and receipt from email.
-- **Drifters** (competing drivers) who register a family/friends band list through a private link (`/drifters/[slug]`, `/d/[token]`).
 - **Staff** at a desk or on the move, on laptops and phones equally:
   - *staff* role: verify payment proofs, manage orders, sell at the walk-in desk, read the dashboard;
   - *gate* role: walk-in desk only;
@@ -31,7 +30,6 @@ A small-organizer ticketing system built around physical wristbands: each ticket
 
 ## Operating Context
 
-- Meet & Drift 3 ran on 2026-10-10: ~300 paid online orders, ~1,450 walk-in bands in one day across two walk-in desks, drifter family bands, a VIP shirt delivery list afterwards.
 - Event day is loud, bright, outdoors and fast: walk-in staff tap +1 repeatedly under queue pressure; gate staff scan wristbands one-handed on phones, sometimes offline.
 - Verification is manual: staff compare the buyer's uploaded screenshot with the bank reference.
 - Reconciliation happens after hours against the cash box per staff and the GoTyme account history; Excel exports are the hand-off format.
@@ -50,7 +48,7 @@ A small-organizer ticketing system built around physical wristbands: each ticket
 
 ## Brand Commitments
 
-- **Track & Crawl look** (user, 2026-10-27): follow the event poster, not the Meet & Drift neon: night-black ground, CRAWL red, bone white, sunset orange/amber, checkered flags, brush strokes, heavy condensed italic type, the Tarlac Circuit Hill photo. Placeholder art is cropped from the poster in public/tcf/ until the organizer sends originals (transparent logo, clean photos, sponsor logos).
+- **Track & Crawl look** (user, 2026-10-27): follow the event poster: night-black ground, CRAWL red, bone white, sunset orange/amber, checkered flags, brush strokes, heavy condensed italic type, the Tarlac Circuit Hill photo. Placeholder art is cropped from the poster in public/tcf/ until the organizer sends originals (transparent logo, clean photos, sponsor logos).
 
 
 - **Keep the current theme and colorway** (user, 2026-10-15): dark near-black background with a deep violet top (`#0a0a0c` / `#14061f` defaults) and the four-stop neon gradient pink `#ff3fd1` → violet `#b34cff` → cyan `#2fd8ff` → green `#6dff5c`, all still editable in Settings.
@@ -58,11 +56,9 @@ A small-organizer ticketing system built around physical wristbands: each ticket
 - **Keep on the public side** (user, 2026-10-15): the Settings-driven hero artwork and slideshow, the Orbitron display face, the cyan→green neon gradient buttons, and the hero motion effects (smoke, streaks, glow; toggled in Settings).
 - **Staff screens take the familiar admin layout** (user, 2026-10-15, after two re-rolls of novel structures): a conventional sidebar/top-bar admin executed at full craft inside the dark neon world, no novel navigation model. Quality bar: Linear, the Vercel dashboard, and Shopify admin.
 - **Priority** (user, 2026-10-15): the public buyer flow is redesigned first, then the staff screens, then scanner and login.
-- Existing assets for Meet & Drift 3: `public/logo.png`, `public/poster*.jpg`, `public/hero-drift.{jpg,mp4}`, `public/shirt-size-chart.png`, payment QR in `public/payment/`.
 
 ## Evidence on Hand
 
-- Live production data from Meet & Drift 3 (orders, walk-in sales, scans) for realistic content when designing; never put real buyer names or contacts into committed fixtures or screenshots.
 - No testimonials, press, or third-party claims exist; do not invent any.
 
 ## Product Principles

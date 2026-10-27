@@ -3,7 +3,7 @@ import { SITE_URL } from "@/config/event";
 import { isSalesOpen } from "@/lib/queries";
 import { fmtCutoff } from "@/lib/cutoff";
 import type { AvailabilityRow, EventRow, TicketTypeRow } from "@/lib/supabase/types";
-import type { ExtraChannel } from "@/lib/rules-types";
+import { cap, type ExtraChannel, type Terms } from "@/lib/rules-types";
 
 type Status = "done" | "todo" | "info";
 interface Item {
@@ -32,6 +32,7 @@ export function SetupOverview({
   lookCustomised,
   cronReady,
   extraChannels,
+  terms: T,
 }: {
   event: EventRow | null;
   types: TicketTypeRow[];
@@ -41,6 +42,7 @@ export function SetupOverview({
   cronReady: boolean;
   /** Payment channels added under Payments; one switched on counts as a way to pay. */
   extraChannels: ExtraChannel[];
+  terms: Terms;
 }) {
   const active = types.filter((t) => t.active);
   const online = active.filter((t) => t.sell_online);
@@ -74,8 +76,8 @@ export function SetupOverview({
         },
         {
           status: noBands.length ? "todo" : "done",
-          title: "Wristband serials loaded",
-          detail: noBands.length ? `No bands yet for ${noBands.map((t) => t.name).join(", ")}.` : "Every type on sale has bands in the pool.",
+          title: `${cap(T.one)} numbers loaded`,
+          detail: noBands.length ? `No ${T.one} numbers yet for ${noBands.map((t) => t.name).join(", ")}.` : `Every type on sale has ${T.one} numbers in the pool.`,
           href: "/admin/numbers",
           action: "Numbers",
         },
@@ -115,7 +117,7 @@ export function SetupOverview({
         {
           status: "info",
           title: "Look of the site",
-          detail: lookCustomised ? "Using your saved logo, artwork and colours." : "Still the built-in Meet & Drift 3 look.",
+          detail: lookCustomised ? "Using your saved logo, artwork and colours." : "Still the built-in look.",
           href: "?tab=look",
           action: "Look",
         },

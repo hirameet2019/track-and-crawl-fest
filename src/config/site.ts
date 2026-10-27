@@ -2,13 +2,12 @@
  * SITE DEFAULTS. Admins change the look of the site in Admin > Settings; what
  * they save is stored in the database (app_settings, key "site") and wins over
  * the values here. Anything never saved falls back to this file, so these are
- * the factory settings: they reproduce Track & Crawl Fest 2026 (forked from the
- * Meet & Drift 3 build).
+ * the factory settings: they reproduce Track & Crawl Fest 2026.
  *
  * Editable in Admin > Settings: BRAND (except pdf.palette), HERO, THEME (except
  * palette) and NOTES.salesSchedule. The rest is code-only on purpose: LOCALE is
  * used by almost every screen, STAFF.usernameDomain must match the Auth
- * accounts, and the drifter prefix is printed on references already handed out.
+ * accounts.
  *
  * The event itself and the ticket types live in the events / ticket_types tables,
  * also edited in Admin > Settings. src/config/event.ts holds the business rules.
@@ -41,7 +40,7 @@ export const BRAND = {
    */
   pdf: {
     // No file here yet: the PDF writes the event name as its wordmark until a
-    // logo is uploaded in Settings (the Meet & Drift logo must not print on these).
+    // logo is uploaded in Settings.
     logo: "src/lib/pdf/logo-event.png",
     banner: "public/tcf/hero-track.jpg",
     /**
@@ -50,7 +49,7 @@ export const BRAND = {
      * with. The keys are slots, not literal colours: "pink" is the first stripe
      * band and the wordmark's first line, "green" the second line, and so on.
      */
-    // The poster's red, orange and amber instead of the Meet & Drift neon stripe.
+    // The poster's red, orange and amber.
     palette: { pink: "#e8252b", pinkDark: "#a01116", green: "#ff6a1a", cyan: "#ffa21f", teal: "#dd5b02", gold: "#ffa21f", goldDark: "#b73d06", violet: "#c11015" } as Partial<Record<"pink" | "pinkDark" | "green" | "cyan" | "teal" | "gold" | "goldDark" | "violet", string>>,
   },
 } as const;
@@ -206,8 +205,5 @@ export const STAFF = {
  */
 export const NOTES = {
   /** Under Admin > Settings, beside the per-label sales cut-offs. */
-  salesSchedule:
-    "Organizer's schedule: Early Bird and Early Bird Kids close end of Oct 8; VIP Car Display and VIP Pass close end of Oct 4. The passenger included with each VIP Car ticket follows the VIP Pass cut-off." as string | null,
-  /** Short prefix on drifter desk references, e.g. MD3-4F2A. */
-  drifterReferencePrefix: "MD3",
+  salesSchedule: null as string | null,
 } as const;

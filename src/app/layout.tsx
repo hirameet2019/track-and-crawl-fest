@@ -17,7 +17,7 @@ const body = Barlow({ subsets: ["latin"], weight: ["400", "500", "600", "700"], 
 /**
  * Title and description come from the active event row, so a new event names
  * itself the moment its row is set active. Pages give only their own label, e.g.
- * "Drifter wristbands", and the template appends the event name. The suffix and
+ * "Settings", and the template appends the event name. The suffix and
  * share image come from Admin > Settings.
  */
 export async function generateMetadata(): Promise<Metadata> {

@@ -5,7 +5,7 @@ import { createOnlineOrder, type CreateOrderInput } from "@/app/actions/orders";
 import { COURIERS, SHIPPING_NOTE, SHIPPING_NOTE_TL, SHIRT_PROCESSING, type Courier } from "@/lib/shipping";
 import type { PaymentChannel } from "@/config/event";
 import { useRules } from "@/components/RulesProvider";
-import { fillText } from "@/lib/rules-types";
+import { cap, fillText } from "@/lib/rules-types";
 import { shrinkImage } from "@/lib/image";
 import { php } from "@/lib/money";
 import { fmtCutoff, hoursUntilCutoff, isTypeClosed } from "@/lib/cutoff";
@@ -96,7 +96,7 @@ function CarPhotoField({ preview, fileName, onPick, noun = "car" }: { preview: s
 
 export function OrderForm({ types, availability, channel }: { types: TicketTypeRow[]; availability: PublicAvailability[]; channel: PaymentChannel }) {
   // Limits, hold time and shirt sizes from Admin > Settings.
-  const { maxQtyPerType: MAX_QTY_PER_TYPE, maxCompanionsPerCar: MAX_COMPANIONS_PER_CAR, paymentWindowMinutes: PAYMENT_WINDOW_MINUTES, shirtChart, buyerForm: bf, page } = useRules();
+  const { maxQtyPerType: MAX_QTY_PER_TYPE, maxCompanionsPerCar: MAX_COMPANIONS_PER_CAR, paymentWindowMinutes: PAYMENT_WINDOW_MINUTES, shirtChart, buyerForm: bf, page, terms: T } = useRules();
   const fill = (text: string) => fillText(text, { pay: channel.payVia, via: channel.via, minutes: PAYMENT_WINDOW_MINUTES });
   const SHIRT_SIZES = shirtChart.map((r) => r.size);
   const SHIRT_SIZE_CHART = Object.fromEntries(shirtChart.map((r) => [r.size, r]));
@@ -250,7 +250,7 @@ export function OrderForm({ types, availability, channel }: { types: TicketTypeR
       }
     }
     if (companionType && companionsLeft < 0) {
-      setError(`Not enough ${companionType.name} wristbands are left for the extra companions in this order (${Math.max(0, poolSellable(companionType.id) - (qty[companionType.id] ?? 0))} left).`);
+      setError(`Not enough ${companionType.name} ${T.many} are left for the extra companions in this order (${Math.max(0, poolSellable(companionType.id) - (qty[companionType.id] ?? 0))} left).`);
       return;
     }
     setReview(true);
@@ -372,8 +372,8 @@ export function OrderForm({ types, availability, channel }: { types: TicketTypeR
                   {t.requires_vehicle && companionType && (
                     <p className="bill-desc text-emerald-300">
                       {t.included_companions > 0
-                        ? <>Includes a wristband for <b>{t.included_companions} passenger{t.included_companions === 1 ? "" : "s"}</b>. Bringing more people? Add companions inside this ticket at {php(companionPrice)} each, each a {companionType.name} with event t-shirt.</>
-                        : <>Bringing passengers? Add companions inside this ticket, {php(companionPrice)} each: a {companionType.name} wristband with event t-shirt, linked to your car.</>}
+                        ? <>Includes a {T.one} for <b>{t.included_companions} passenger{t.included_companions === 1 ? "" : "s"}</b>. Bringing more people? Add companions inside this ticket at {php(companionPrice)} each, each a {companionType.name} with event t-shirt.</>
+                        : <>Bringing passengers? Add companions inside this ticket, {php(companionPrice)} each: a {companionType.name} {T.one} with event t-shirt, linked to your car.</>}
                     </p>
                   )}
                   {(closed || soldOut || left <= 20 || t.sales_close_at) && (
@@ -456,8 +456,8 @@ export function OrderForm({ types, availability, channel }: { types: TicketTypeR
                             <div>
                               <div className="text-xs font-semibold uppercase tracking-wide text-emerald-300">Passengers riding with this car</div>
                               <p className="mt-0.5 text-xs text-zinc-400">
-                                {t.included_companions > 0 && <>This package includes a wristband for <b>{t.included_companions} passenger{t.included_companions === 1 ? "" : "s"}</b> at no extra cost: the same {t.band_color ? <><b>{t.band_color}</b> band</> : "wristband"} as the car, no shirt, since the package has one t-shirt for the driver. The name can be left blank for now. </>}
-                                {t.included_companions > 0 ? "Extra" : "Each"} companion{t.included_companions > 0 ? "s" : ""}: <b>{php(companionPrice)}</b> per person, a <b>{companionType.name}</b> wristband with event t-shirt, added to your total. Wristbands are linked to plate <b>{a.vehicle_plate.trim() || "…"}</b>. Up to {MAX_COMPANIONS_PER_CAR} passengers per car.
+                                {t.included_companions > 0 && <>This package includes a {T.one} for <b>{t.included_companions} passenger{t.included_companions === 1 ? "" : "s"}</b> at no extra cost: the same {t.band_color ? <><b>{t.band_color}</b> band</> : T.one} as the car, no shirt, since the package has one t-shirt for the driver. The name can be left blank for now. </>}
+                                {t.included_companions > 0 ? "Extra" : "Each"} companion{t.included_companions > 0 ? "s" : ""}: <b>{php(companionPrice)}</b> per person, a <b>{companionType.name}</b> {T.one} with event t-shirt, added to your total. {cap(T.many)} are linked to plate <b>{a.vehicle_plate.trim() || "…"}</b>. Up to {MAX_COMPANIONS_PER_CAR} passengers per car.
                               </p>
                             </div>
                             <button
@@ -483,7 +483,7 @@ export function OrderForm({ types, availability, channel }: { types: TicketTypeR
                                 />
                               </div>
                               {c.included ? (
-                                <div className="text-xs text-zinc-400 sm:pb-2">{t.band_color ? `${t.band_color} wristband` : "Wristband"}, lanyard and decal. No shirt.</div>
+                                <div className="text-xs text-zinc-400 sm:pb-2">{t.band_color ? `${t.band_color} ${T.one}` : cap(T.one)}, lanyard and decal. No shirt.</div>
                               ) : (
                                 <div>
                                   <label className="label">T-shirt size *</label>
@@ -507,7 +507,7 @@ export function OrderForm({ types, availability, channel }: { types: TicketTypeR
                               {a.companions.filter((c) => !c.included).length} extra companion{a.companions.filter((c) => !c.included).length === 1 ? "" : "s"} × {php(companionPrice)} = <b className="text-white">{php(a.companions.filter((c) => !c.included).length * companionPrice)}</b>
                             </div>
                           )}
-                          {companionsLeft <= 0 && <p className="mt-2 text-xs text-amber-300">No {companionType.name} wristbands are left for more companions.</p>}
+                          {companionsLeft <= 0 && <p className="mt-2 text-xs text-amber-300">No {companionType.name} {T.many} are left for more companions.</p>}
                           {a.companions.length >= MAX_COMPANIONS_PER_CAR && <p className="mt-2 text-xs text-amber-300">This car already has the maximum of {MAX_COMPANIONS_PER_CAR} companions.</p>}
                         </div>
                       )}

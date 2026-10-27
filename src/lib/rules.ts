@@ -128,6 +128,13 @@ const payPage = z.object({
   afterTextTl: line(300),
 });
 
+const terms = z.object({
+  one: z.string().trim().toLowerCase().min(1, "Say what one registration is called").max(30),
+  many: z.string().trim().toLowerCase().min(1, "Say what several are called").max(30),
+  numberLabel: z.string().trim().min(1, "The number label cannot be blank").max(40),
+  physical: z.boolean(),
+});
+
 export const rulesSchema = z.object({
   paymentWindowMinutes: z.number().int().min(15, "Give buyers at least 15 minutes to pay").max(24 * 60, "At most 24 hours to pay"),
   reminderMinutes: z.number().int().min(5).max(120),
@@ -142,11 +149,11 @@ export const rulesSchema = z.object({
   shirtChartImage: asset.nullable(),
   channels: z.object({ gotyme: channel, gcash: channel, maya: channel, cash: channel }),
   staffUsernameDomain: z.string().trim().toLowerCase().regex(/^[a-z0-9-]+(\.[a-z0-9-]+)+$/, "Domain looks wrong, e.g. drift.local"),
-  drifterReferencePrefix: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{1,6}$/, "Prefix is 1-6 letters or digits"),
   buyerForm,
   page,
   extraChannels,
   payPage,
+  terms,
 }).refine((r) => r.reminderMinutes < r.paymentWindowMinutes, { message: "The reminder must go out before the hold runs out", path: ["reminderMinutes"] });
 
 /** Lay stored values over the defaults field by field. Exported for tests. */
@@ -176,7 +183,6 @@ export function mergeRules(stored: unknown): Rules {
     shirtChartImage: "shirtChartImage" in s ? pick(base.shirtChartImage, s.shirtChartImage, d.shirtChartImage) : d.shirtChartImage,
     channels,
     staffUsernameDomain: pick(base.staffUsernameDomain, s.staffUsernameDomain, d.staffUsernameDomain),
-    drifterReferencePrefix: pick(base.drifterReferencePrefix, s.drifterReferencePrefix, d.drifterReferencePrefix),
     // Field by field over the defaults, so wording added to the form later still has text.
     buyerForm: pick(buyerForm, { ...d.buyerForm, ...(s.buyerForm as object | undefined) }, d.buyerForm),
     page: (() => {
@@ -184,6 +190,7 @@ export function mergeRules(stored: unknown): Rules {
       return pick(page, { ...d.page, ...sp, show: { ...d.page.show, ...(sp.show ?? {}) } }, d.page);
     })(),
     extraChannels: pick(extraChannels, s.extraChannels, d.extraChannels),
+    terms: pick(terms, { ...d.terms, ...(s.terms as object | undefined) }, d.terms),
     payPage: (() => {
       const sp = (s.payPage ?? {}) as Partial<PayPageSettings>;
       return pick(payPage, { ...d.payPage, ...sp, show: { ...d.payPage.show, ...(sp.show ?? {}) } }, d.payPage);

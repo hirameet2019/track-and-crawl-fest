@@ -41,6 +41,8 @@ export default async function PayPage({ params }: { params: Promise<{ orderId: s
     minutes: rules.paymentWindowMinutes,
     app: pc.app,
     scanHint: pc.scanHint ? ` (${pc.scanHint})` : "",
+    item: rules.terms.one,
+    items: rules.terms.many,
   };
   const slots = {
     timeLeft: order.expires_at ? <Countdown until={order.expires_at} /> : "a limited time",

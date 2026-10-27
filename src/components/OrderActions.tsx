@@ -7,6 +7,7 @@ import { approveOrder, getProofUrl, rejectOrder, resendTickets, settleOrderBalan
 import { ConvertOrderForm } from "@/components/ConvertOrderForm";
 import { php } from "@/lib/money";
 import type { OrderStatus } from "@/lib/supabase/types";
+import { useRules } from "@/components/RulesProvider";
 
 export function OrderActions({
   orderId, status, proofPath, hasEmail, isAdmin = false,
@@ -18,6 +19,7 @@ export function OrderActions({
   payApp: string;
 }) {
   const router = useRouter();
+  const { terms: T } = useRules();
   const [msg, setMsg] = useState<string | null>(null);
   const [reason, setReason] = useState("");
   const [settleNote, setSettleNote] = useState("");
@@ -83,7 +85,7 @@ export function OrderActions({
       {status === "paid" && isAdmin && (
         <div className="space-y-2 rounded-lg border border-red-200 bg-red-50 p-3">
           <div className="text-xs font-semibold text-red-900">Approved by mistake? Void the whole order</div>
-          <p className="text-xs text-red-900/80">Every unused ticket becomes invalid at the gate, the wristband numbers are retired, and the buyer gets an email with the reason. Tickets already scanned are kept. You can void single tickets from the table below instead, and any void can be undone.</p>
+          <p className="text-xs text-red-900/80">Every unused ticket becomes invalid at the gate, the {T.one} numbers are retired, and the buyer gets an email with the reason. Tickets already scanned are kept. You can void single tickets from the table below instead, and any void can be undone.</p>
           <input className="input" placeholder="Reason the buyer will see, e.g. Payment amount did not match" value={voidReason} onChange={(e) => { setVoidReason(e.target.value); setConfirmVoid(false); }} />
           {!confirmVoid ? (
             <button className="btn-danger w-full" disabled={pending || voidReason.trim().length < 3} onClick={() => setConfirmVoid(true)}>Void all tickets in this order…</button>

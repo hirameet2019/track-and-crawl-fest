@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { saveRulesSection } from "@/app/actions/setup";
 import { Group, SaveBar, changed, type SaveMsg } from "@/components/settings/SaveBar";
-import { BUYER_FORM_DEFAULTS, PAGE_DEFAULTS, type BuyerFormText, type PageSettings, type Rules } from "@/lib/rules-types";
+import { BUYER_FORM_DEFAULTS, PAGE_DEFAULTS, TERMS_DEFAULTS, type BuyerFormText, type PageSettings, type Rules, type Terms } from "@/lib/rules-types";
 
 type Show = keyof PageSettings["show"];
 type Text = Exclude<keyof PageSettings, "show">;
@@ -98,16 +98,17 @@ const BUYER_FIELDS: { name: string; label: keyof BuyerFormText; placeholder: key
  */
 export function PageForm({ rules }: { rules: Rules }) {
   const router = useRouter();
-  const initial = { page: rules.page, buyerForm: rules.buyerForm };
+  const initial = { page: rules.page, buyerForm: rules.buyerForm, terms: rules.terms };
   const [f, setF] = useState(initial);
   const [msg, setMsg] = useState<SaveMsg>(null);
   const [pending, start] = useTransition();
   const dirty = changed(f, initial);
-  const atDefaults = !changed(f, { page: PAGE_DEFAULTS, buyerForm: BUYER_FORM_DEFAULTS });
+  const atDefaults = !changed(f, { page: PAGE_DEFAULTS, buyerForm: BUYER_FORM_DEFAULTS, terms: TERMS_DEFAULTS });
 
   const setShow = (k: Show, v: boolean) => setF((p) => ({ ...p, page: { ...p.page, show: { ...p.page.show, [k]: v } } }));
   const setText = (k: Text, v: string) => setF((p) => ({ ...p, page: { ...p.page, [k]: v } }));
   const setBuyer = (k: keyof BuyerFormText, v: string) => setF((p) => ({ ...p, buyerForm: { ...p.buyerForm, [k]: v } }));
+  const setTerm = <K extends keyof Terms>(k: K, v: Terms[K]) => setF((p) => ({ ...p, terms: { ...p.terms, [k]: v } }));
 
   const save = () =>
     start(async () => {
@@ -119,6 +120,30 @@ export function PageForm({ rules }: { rules: Rules }) {
 
   return (
     <div className="card space-y-5">
+      <Group
+        title="What one registration is called"
+        hint="Used on every page, email, PDF and staff screen: “Your registrations are held for 60 minutes”, the number column on tickets, and so on. An event that hands out wristbands would set wristband / wristbands / Wristband no. and ticks the box."
+      >
+        <div className="grid gap-3 sm:grid-cols-3">
+          <div>
+            <label className="label" htmlFor="tm-one">One</label>
+            <input id="tm-one" className="input h-9" maxLength={30} value={f.terms.one} onChange={(e) => setTerm("one", e.target.value)} placeholder="registration" />
+          </div>
+          <div>
+            <label className="label" htmlFor="tm-many">Several</label>
+            <input id="tm-many" className="input h-9" maxLength={30} value={f.terms.many} onChange={(e) => setTerm("many", e.target.value)} placeholder="registrations" />
+          </div>
+          <div>
+            <label className="label" htmlFor="tm-number">Its number is called</label>
+            <input id="tm-number" className="input h-9" maxLength={40} value={f.terms.numberLabel} onChange={(e) => setTerm("numberLabel", e.target.value)} placeholder="Registration no." />
+          </div>
+        </div>
+        <label className="flex items-start gap-2 text-sm">
+          <input type="checkbox" className="mt-0.5" checked={f.terms.physical} onChange={(e) => setTerm("physical", e.target.checked)} />
+          <span>Something is handed over at the gate (e.g. a wristband)<span className="block text-[11px] text-zinc-500">Adds lines like &ldquo;staff will scan it and hand you the matching wristband&rdquo; to tickets and emails. Leave off when the QR code alone is the pass.</span></span>
+        </label>
+      </Group>
+
       <Group title="What the page shows" hint="Untick a part to hide it. Parts that come from other tabs (a blank tagline, no sponsors image) stay hidden whatever is ticked here.">
         <div className="grid gap-4 md:grid-cols-3">
           {SWITCHES.map((g) => (
@@ -210,7 +235,7 @@ export function PageForm({ rules }: { rules: Rules }) {
         onSave={save}
         onDiscard={() => { setF(initial); setMsg(null); }}
         extra={
-          <button type="button" className="btn-secondary" disabled={pending || atDefaults} onClick={() => { setF({ page: { ...PAGE_DEFAULTS, show: { ...PAGE_DEFAULTS.show } }, buyerForm: { ...BUYER_FORM_DEFAULTS } }); setMsg(null); }}>
+          <button type="button" className="btn-secondary" disabled={pending || atDefaults} onClick={() => { setF({ page: { ...PAGE_DEFAULTS, show: { ...PAGE_DEFAULTS.show } }, buyerForm: { ...BUYER_FORM_DEFAULTS }, terms: { ...TERMS_DEFAULTS } }); setMsg(null); }}>
             Use the original page
           </button>
         }

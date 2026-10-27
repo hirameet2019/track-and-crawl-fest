@@ -291,8 +291,7 @@ export interface ConvertContext {
  * Only labels without a ticket price are left out (the gate labels Y and O are
  * priced per tally and would collapse the order total to zero). Car labels are in:
  * the form collects each car's plate and model and its free passengers' names.
- * Drifter Family is priced, so it belongs here: the organizer asked for it so a
- * drifter's relative who bought an ordinary ticket can be moved onto the plain red band.
+ * Labels kept off the online sale can still be a conversion target, as long as they are priced.
  */
 export async function getConvertTargets(orderId: string): Promise<ConvertContext> {
   await assertStaff("admin");

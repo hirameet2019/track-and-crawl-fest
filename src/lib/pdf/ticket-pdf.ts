@@ -12,6 +12,8 @@ import type { OrderBundle } from "@/lib/queries";
 import { carNameOf, itemLabel } from "@/lib/items";
 import { getSiteSettings } from "@/lib/site-settings";
 import { paymentLabel } from "@/lib/payment-options";
+import { getRules } from "@/lib/rules";
+import type { Terms } from "@/lib/rules-types";
 
 const A4: [number, number] = [595.28, 841.89];
 
@@ -102,7 +104,7 @@ function rightTextColor(page: PDFPage, s: string, rightX: number, y: number, siz
   page.drawText(t, { x: rightX - font.widthOfTextAtSize(t, size), y, size, font, color });
 }
 
-function drawReceiptPage(doc: PDFDocument, f: Fonts, b: OrderBundle) {
+function drawReceiptPage(doc: PDFDocument, f: Fonts, b: OrderBundle, T: Terms) {
   const page = doc.addPage(A4);
   const { event, order, items } = b;
   const W = A4[0], right = W - MARGIN, contentW = W - 2 * MARGIN;
@@ -223,7 +225,13 @@ function drawReceiptPage(doc: PDFDocument, f: Fonts, b: OrderBundle) {
   const fy = 96;
   page.drawLine({ start: { x: MARGIN, y: fy + 30 }, end: { x: right, y: fy + 30 }, thickness: 0.6, color: LINE });
   let fyy = fy + 16;
-  fyy = paragraph(page, "Thank you for registering. Your registration passes follow on the next pages, one for each car or motorcycle. Present each QR code at the venue gate and staff will hand you the matching numbered wristband and vehicle pass.", MARGIN, fyy, 8.5, f.regular, contentW, MUTED);
+  fyy = paragraph(
+    page,
+    T.physical
+      ? `Thank you for registering. Your registration passes follow on the next pages, one for each car or motorcycle. Present each QR code at the venue gate and staff will hand you the matching numbered ${T.one} and vehicle pass.`
+      : "Thank you for registering. Your registration passes follow on the next pages, one for each car or motorcycle. Present each QR code at the venue gate, where staff scan it once.",
+    MARGIN, fyy, 8.5, f.regular, contentW, MUTED,
+  );
   if (event.refund_policy) fyy = paragraph(page, `Refund policy: ${event.refund_policy}`, MARGIN, fyy - 2, 8.5, f.regular, contentW, MUTED);
   text(page, "This is a system-generated document and does not require a signature.", MARGIN, fyy - 4, 7.5, f.regular, MUTED);
 }
@@ -292,6 +300,8 @@ interface PdfArt {
   logo: string;
   banner: string;
   colors: PdfColors;
+  /** What a registration is called, and whether something is handed over at the gate. */
+  terms: Terms;
 }
 
 /**
@@ -419,7 +429,7 @@ async function drawTicketPage(doc: PDFDocument, f: Fonts, b: OrderBundle, t: Ord
   const vehicle = vehicleWords(tt).noun;
   const Vehicle = vehicle[0].toUpperCase() + vehicle.slice(1);
   /** What this ticket is called on the badges: a bundled passenger is not a car. */
-  const typeLabel = t.companion_of && t.included && tt.requires_vehicle ? "VIP Car Passenger" : tt.name;
+  const typeLabel = t.companion_of && t.included && tt.requires_vehicle ? `${tt.name} passenger` : tt.name;
 
   // ---------------------------------------------------------- banner
   const bannerH = 222;
@@ -464,7 +474,7 @@ async function drawTicketPage(doc: PDFDocument, f: Fonts, b: OrderBundle, t: Ord
   // left: wristband number + details
   const lx = MARGIN + 24;
   let y = cardTop - 26;
-  text(page, "WRISTBAND / TICKET NO.", lx, y, 7.5, f.bold, MUTED);
+  text(page, art.terms.numberLabel.toUpperCase(), lx, y, 7.5, f.bold, MUTED);
   y -= 42;
   {
     // shrink to fit between the left edge and the QR panel
@@ -478,7 +488,7 @@ async function drawTicketPage(doc: PDFDocument, f: Fonts, b: OrderBundle, t: Ord
     const key = tt.band_color.toLowerCase();
     const c = Object.keys(BAND_COLORS).find((k) => key.includes(k));
     page.drawRectangle({ x: lx, y: y - 2, width: 12, height: 12, color: c ? BAND_COLORS[c] : rgb(0.6, 0.6, 0.6), borderColor: rgb(0.3, 0.3, 0.3), borderWidth: 0.5 });
-    text(page, `${tt.band_color} wristband`, lx + 18, y, 10, f.regular, INK);
+    text(page, `${tt.band_color} ${art.terms.one}`, lx + 18, y, 10, f.regular, INK);
   }
   y -= 30;
   y = labelValue(page, f, isCarPass ? vehicleWords(tt).person.toUpperCase() : "HOLDER", t.holder_name ?? order.buyer_name, lx, y, 13);
@@ -503,10 +513,15 @@ async function drawTicketPage(doc: PDFDocument, f: Fonts, b: OrderBundle, t: Ord
 
   // gate steps, anchored to the bottom of the card
   {
+    const band = `${tt.band_color ? tt.band_color.toLowerCase() + " " : ""}${art.terms.one}`;
+    // Step 3 is what is handed over: the wristband (and what comes with it), or just the extras.
+    const third = art.terms.physical
+      ? (includes.length ? `Receive your ${band} and: ${includes.join(", ")}.` : `Receive your ${band} and keep it on all day.`)
+      : includes.length ? `Receive: ${includes.join(", ")}.` : null;
     const steps: [string, string][] = [
       ["1", "Show this QR code at the gate, on your phone or printed."],
       ["2", "Staff scan it once. A second scan is refused."],
-      ["3", includes.length ? `Receive your ${tt.band_color ? tt.band_color.toLowerCase() + " " : ""}wristband and: ${includes.join(", ")}.` : `Receive your ${tt.band_color ? tt.band_color.toLowerCase() + " " : ""}wristband and keep it on all day.`],
+      ...(third ? [["3", third] as [string, string]] : []),
     ];
     const boxX = lx - 8, boxW = right - 20 - 224 - 12 - boxX, boxY = cardBottom + 14;
     // Size the box from its content; shrink the type a notch if the fields above leave little room.
@@ -606,8 +621,8 @@ async function drawTicketPage(doc: PDFDocument, f: Fonts, b: OrderBundle, t: Ord
   text(
     page,
     isCarPass
-      ? `Good for one entry of this ${vehicle}. Keep your wristband on and the pass with the ${vehicle} all day. Do not share screenshots of this QR code.`
-      : "Each QR code admits one person once. Keep your wristband on for the whole event. Do not share screenshots of your QR code.",
+      ? `Good for one entry of this ${vehicle}. ${art.terms.physical ? `Keep your ${art.terms.one} on and the pass` : "Keep the pass"} with the ${vehicle} all day. Do not share screenshots of this QR code.`
+      : `Each QR code admits one person once.${art.terms.physical ? ` Keep your ${art.terms.one} on for the whole event.` : ""} Do not share screenshots of your QR code.`,
     MARGIN, 44, 7.5, f.regular, MUTED,
   );
   text(page, `Ticket ID ${t.id}   |   ${safe(event.org_name)}`, MARGIN, 32, 7, f.regular, rgb(0.6, 0.6, 0.65));
@@ -647,9 +662,9 @@ export async function buildOrderPdf(bundle: OrderBundle): Promise<Uint8Array> {
   };
   doc.setTitle(`${bundle.event.name} - Order #${bundle.order.order_no}`);
   // Uploaded artwork from Admin > Settings, else the files that ship with the app.
-  const site = await getSiteSettings();
-  const art: PdfArt = { logo: site.pdfLogo ?? SITE_BRAND.pdf.logo, banner: site.pdfBanner ?? SITE_BRAND.pdf.banner, colors: pdfColors(site.pdfPalette) };
-  drawReceiptPage(doc, f, bundle);
+  const [site, { terms }] = await Promise.all([getSiteSettings(), getRules()]);
+  const art: PdfArt = { logo: site.pdfLogo ?? SITE_BRAND.pdf.logo, banner: site.pdfBanner ?? SITE_BRAND.pdf.banner, colors: pdfColors(site.pdfPalette), terms };
+  drawReceiptPage(doc, f, bundle, terms);
   // A ticket converted to another type gave its band back to the pool; it is not the
   // buyer's any more, so it gets no page. Ordinary voids keep theirs, stamped VOID.
   for (const t of bundle.tickets.filter((t) => t.ticket_number_id !== null)) await drawTicketPage(doc, f, bundle, t, art);

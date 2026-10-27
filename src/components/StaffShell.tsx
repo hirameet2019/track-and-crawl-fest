@@ -9,9 +9,8 @@ import { recordSignOut } from "@/app/actions/auth";
 import { hasRole, homeFor } from "@/lib/roles";
 import type { StaffRole } from "@/lib/supabase/types";
 
-type Item = { href: string; label: string; min: StaffRole; icon: keyof typeof ICONS; drifters?: true; system?: true; scan?: true };
+type Item = { href: string; label: string; min: StaffRole; icon: keyof typeof ICONS; system?: true; scan?: true };
 
-// `drifters`: shown only when the event sells drifter family bands (see the staff layout).
 // `system`: Numbers, Audit and Settings, only for an admin with system access.
 // `scan`: hidden for an account with Scan turned off (staff.can_scan).
 const GROUPS: { title: string; items: Item[] }[] = [
@@ -22,7 +21,6 @@ const GROUPS: { title: string; items: Item[] }[] = [
       { href: "/admin/verify", label: "Verify", min: "staff", icon: "verify" },
       { href: "/admin/orders", label: "Orders", min: "staff", icon: "orders" },
       { href: "/admin/walkin", label: "Walk-in", min: "gate", icon: "walkin" },
-      { href: "/admin/drifters", label: "Drifters", min: "staff", icon: "drifters", drifters: true },
     ],
   },
   { title: "Gate", items: [{ href: "/scan", label: "Scan", min: "scanner", icon: "scan", scan: true }] },
@@ -43,7 +41,6 @@ const ICONS = {
   verify: <><path d="M12 3.5l7 3v5.2c0 4.3-3 7.6-7 8.8-4-1.2-7-4.5-7-8.8V6.5z" /><path d="M8.8 12.2l2.2 2.2 4.3-4.6" /></>,
   orders: <><path d="M6 3.5h12v17l-3-1.8-3 1.8-3-1.8-3 1.8z" /><path d="M9 8h6M9 11.5h6M9 15h3.5" /></>,
   walkin: <><path d="M4 8.5a2 2 0 012-2h12a2 2 0 012 2v1.5a2 2 0 000 4V15.5a2 2 0 01-2 2H6a2 2 0 01-2-2V14a2 2 0 000-4z" /><path d="M14.5 6.5v11" strokeDasharray="1.6 2" /></>,
-  drifters: <><circle cx="12" cy="12" r="8.5" /><circle cx="12" cy="12" r="2.5" /><path d="M12 3.5v6M5.2 16.5l4.7-3M18.8 16.5l-4.7-3" /></>,
   scan: <><path d="M4 8V5.5A1.5 1.5 0 015.5 4H8M16 4h2.5A1.5 1.5 0 0120 5.5V8M20 16v2.5a1.5 1.5 0 01-1.5 1.5H16M8 20H5.5A1.5 1.5 0 014 18.5V16" /><path d="M4 12h16" /></>,
   reports: <><path d="M4 20h16" /><path d="M7 16.5V11M12 16.5V6.5M17 16.5v-4" /></>,
   numbers: <><path d="M9 4L7 20M17 4l-2 16M4.5 9h15M3.5 15h15" /></>,
@@ -64,8 +61,8 @@ function Icon({ name, className = "h-[18px] w-[18px]" }: { name: keyof typeof IC
 }
 
 export function StaffShell({
-  name, role, system, scan, eventName, drifters, logo, children,
-}: { name: string; role: StaffRole; system: boolean; scan: boolean; eventName: string; drifters: boolean; logo: string; children: ReactNode }) {
+  name, role, system, scan, eventName, logo, children,
+}: { name: string; role: StaffRole; system: boolean; scan: boolean; eventName: string; logo: string; children: ReactNode }) {
   const path = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -85,7 +82,7 @@ export function StaffShell({
 
   const groups = GROUPS.map((g) => ({
     ...g,
-    items: g.items.filter((l) => hasRole(role, l.min) && (!l.drifters || drifters) && (!l.system || system) && (!l.scan || scan)),
+    items: g.items.filter((l) => hasRole(role, l.min) && (!l.system || system) && (!l.scan || scan)),
   })).filter((g) => g.items.length);
   const isActive = (href: string) => (href === "/admin" ? path === "/admin" : path.startsWith(href));
   const current = groups.flatMap((g) => g.items).find((l) => isActive(l.href));

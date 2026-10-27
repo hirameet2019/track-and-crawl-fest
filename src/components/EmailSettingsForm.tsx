@@ -55,7 +55,7 @@ export function EmailSettingsForm({ current, defaultEmail }: { current: EmailSet
 
   const status =
     current.provider === "smtp" ? `SMTP via ${current.smtp_host}:${current.smtp_port} as ${current.smtp_user || "(no login)"}${current.smtp_user && !current.has_smtp_pass ? " — password not set, sending will fail" : ""}` :
-    current.provider === "resend" ? "Resend API" : "Not configured. Emails are logged on the server and not sent.";
+    current.provider === "resend" ? "Resend API" : "Not configured. Buyer emails wait in the Outbox below until this is set up.";
 
   return (
     <div className="space-y-5">
@@ -103,7 +103,7 @@ export function EmailSettingsForm({ current, defaultEmail }: { current: EmailSet
         )}
         <div>
           <label className="label">From (shown to buyers)</label>
-          <input name="from" className="input" defaultValue={current.from} placeholder='Drift Event Tickets <tickets@yourdomain.com>' />
+          <input name="from" className="input" defaultValue={current.from} placeholder='Track & Crawl Fest <tickets@yourdomain.com>' />
           <p className="mt-1 text-xs text-zinc-500">Must be the mailbox above or an address it is allowed to send as.</p>
         </div>
         <details className="text-sm">

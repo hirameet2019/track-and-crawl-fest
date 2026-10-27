@@ -8,9 +8,6 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { actionMeta, describe } from "@/lib/audit";
 import { buildTicketsWorkbook } from "@/lib/export-xlsx";
 import { buildStaffSalesWorkbook } from "@/lib/export-staff-xlsx";
-import { SITE_URL } from "@/config/event";
-import { drifterLink, drifterReference } from "@/lib/drifter";
-import { getRules } from "@/lib/rules";
 
 export const dynamic = "force-dynamic";
 
@@ -50,12 +47,13 @@ async function tallyRows(): Promise<TallyRow[]> {
   return data as unknown as TallyRow[];
 }
 
-/** Bands given away inside a drifter's free allowance are never charged. */
+/** Bands given away free (a car's included passengers) are never charged. */
 const tallyAmount = (r: TallyRow) => (r.qty - r.free_qty) * r.unit_price_centavos;
 const manilaTime = (iso: string) => new Date(iso).toLocaleString(LOCALE.locale, { timeZone: LOCALE.timeZone });
 
-/** Walk-in tally entries, one row per tap. Drifter family bands have their own export. */
+/** Walk-in tally entries, one row per tap. */
 async function walkinCsv() {
+  // Rows from an old drift event's drifter desk are not gate sales.
   const rows = (await tallyRows()).filter((r) => !r.drifter_name);
   return csv([
     // sales = qty - free_qty: one band, or one car whose passenger bands are included
@@ -64,97 +62,6 @@ async function walkinCsv() {
       manilaTime(r.created_at), r.ticket_type?.code, r.ticket_type?.walkin_name ?? r.ticket_type?.name, r.ticket_type?.band_color,
       r.qty - r.free_qty, r.qty, (r.unit_price_centavos / 100).toFixed(2), (tallyAmount(r) / 100).toFixed(2), r.shirt_size ?? "", r.holder_name ?? "", r.vehicle_plate ?? "",
       r.payment_method, r.payment_ref ?? "", r.staff?.full_name, r.shipping ? shippingOneLine(r.shipping) : "",
-    ]),
-  ]);
-}
-
-/**
- * Drifter family bands. Two blocks, because a band reaches a family two ways:
- * handed out at the gate (tallied per drifter) or issued by converting a paid
- * order. Only both together account for the bands missing from the pool.
- */
-async function driftersCsv() {
-  const admin = createAdminClient();
-  const rows = (await tallyRows()).filter((r) => r.drifter_name);
-  const byDrifter = new Map<string, { name: string; team: string; bands: number; free: number; amount: number }>();
-  for (const r of rows) {
-    const key = (r.drifter_name ?? "").toLowerCase();
-    const d = byDrifter.get(key) ?? { name: r.drifter_name ?? "", team: "", bands: 0, free: 0, amount: 0 };
-    if (r.team_name) d.team = r.team_name;
-    d.bands += r.qty;
-    d.free += r.free_qty;
-    d.amount += tallyAmount(r);
-    byDrifter.set(key, d);
-  }
-  return csv([
-    ["drifter", "team", "bands", "free_bands", "charged_bands", "amount_php"],
-    ...[...byDrifter.values()]
-      .sort((a, b) => a.name.localeCompare(b.name))
-      .map((d) => [d.name, d.team, d.bands, d.free, d.bands - d.free, (d.amount / 100).toFixed(2)]),
-    [],
-    ["time_manila", "drifter", "team", "qty", "free_qty", "charged_qty", "unit_price_php", "amount_php", "payment_method", "payment_ref", "payment_confirmed", "rules_confirmed", "staff"],
-    ...rows.map((r) => [
-      manilaTime(r.created_at), r.drifter_name, r.team_name, r.qty, r.free_qty, r.qty - r.free_qty,
-      (r.unit_price_centavos / 100).toFixed(2), (tallyAmount(r) / 100).toFixed(2), r.payment_method,
-      r.payment_ref ?? "", r.qty - r.free_qty > 0 ? (r.payment_confirmed ? "yes" : "no") : "",
-      r.qty > 0 ? (r.rules_ack ? "yes" : "no") : "", r.staff?.full_name,
-    ]),
-    [],
-    ["issued through a converted order"],
-    ["order_no", "buyer", "holder", "wristband_no", "status", "unit_price_php"],
-    ...(await orderBandRows(admin)),
-  ]);
-}
-
-/** One row per wristband issued out of a drifter label by an order conversion. */
-async function orderBandRows(admin: ReturnType<typeof createAdminClient>) {
-  const { data: types } = await admin.from("ticket_types").select("id").eq("drifter_family", true);
-  const ids = (types ?? []).map((t) => t.id as string);
-  if (ids.length === 0) return [];
-  const [{ data: tickets }, { data: lines }] = await Promise.all([
-    admin
-      .from("tickets")
-      .select("number, holder_name, status, order_id, order:orders(order_no, buyer_name)")
-      .in("ticket_type_id", ids)
-      .in("status", ["issued", "redeemed"])
-      .order("number"),
-    admin.from("order_items").select("order_id, unit_price_centavos").in("ticket_type_id", ids),
-  ]);
-  type Row = { number: string; holder_name: string | null; status: string; order_id: string; order: { order_no: number; buyer_name: string } | null };
-  const price = new Map((lines ?? []).map((l) => [l.order_id as string, Number(l.unit_price_centavos)]));
-  return ((tickets ?? []) as unknown as Row[]).map((t) => [
-    t.order?.order_no, t.order?.buyer_name, t.holder_name, t.number, t.status,
-    ((price.get(t.order_id) ?? 0) / 100).toFixed(2),
-  ]);
-}
-
-/**
- * The drifter entry list with each private link, ready to paste into Messenger.
- * One row per drifter, plus where their list stands.
- */
-async function drifterLinksCsv() {
-  const prefix = (await getRules()).drifterReferencePrefix;
-  const admin = createAdminClient();
-  const { data } = await admin
-    .from("drifter_entries")
-    .select("drifter_name, team_name, car_no, contact_email, token, self_registered, band_count, bands_given, submitted_at, rules_ack_at, handed_over_at, paid_centavos, payment_method, payment_ref, people")
-    .eq("active", true)
-    .order("drifter_name");
-  type Row = {
-    drifter_name: string; team_name: string | null; car_no: string | null; token: string; self_registered: boolean; band_count: number | null;
-    submitted_at: string | null; rules_ack_at: string | null; handed_over_at: string | null; people: { name: string; role: string }[];
-    paid_centavos: number; payment_method: string | null; payment_ref: string | null; contact_email: string | null; bands_given: number;
-  };
-  const rows = (data ?? []) as Row[];
-  return csv([
-    ["drifter", "team", "car_no", "email", "added_by", "link", "reference", "status", "bands", "collected", "rules_confirmed_manila", "handed_over_manila", "paid_php", "payment_method", "payment_ref", "people"],
-    ...rows.map((r) => [
-      r.drifter_name, r.team_name, r.car_no, r.contact_email ?? "", r.self_registered ? "self sign-up" : "organizer",
-      drifterLink(SITE_URL, r.token), drifterReference(r.token, prefix),
-      r.handed_over_at ? "handed over" : r.bands_given > 0 ? "partly collected" : r.submitted_at ? "list sent" : "waiting",
-      r.band_count ?? "", r.bands_given ?? 0, r.rules_ack_at ? manilaTime(r.rules_ack_at) : "", r.handed_over_at ? manilaTime(r.handed_over_at) : "",
-      (Number(r.paid_centavos ?? 0) / 100).toFixed(2), r.payment_method ?? "", r.payment_ref ?? "",
-      (r.people ?? []).map((p) => `${p.name} (${p.role}${(p as { given_at?: string }).given_at ? ", collected" : ""})`).join("; "),
     ]),
   ]);
 }
@@ -180,10 +87,9 @@ async function auditCsv() {
 }
 
 /**
- * Exports. `?type=walkin` (CSV) for the gate tally, `?type=drifters` (CSV) for the
- * drifter family bands, `?type=audit` (CSV, admin) for the audit
- * trail, `?type=csv` for the flat one-row-per-ticket CSV. Default is the Excel workbook with
- * a Summary sheet and one colour-coded sheet per wristband label. Staff only.
+ * Exports. `?type=walkin` (CSV) for the gate tally, `?type=audit` (CSV, admin) for
+ * the audit trail, `?type=csv` for the flat one-row-per-ticket CSV. Default is the
+ * Excel workbook with a Summary sheet and one sheet per ticket type. Staff only.
  */
 export async function GET(req: NextRequest) {
   const session = await getStaff();
@@ -194,11 +100,6 @@ export async function GET(req: NextRequest) {
     return new NextResponse("Forbidden", { status: 403 });
   }
   if (type === "walkin") return download(await walkinCsv(), "walkin-tally");
-  if (type === "drifters") return download(await driftersCsv(), "drifter-family-bands");
-  if (type === "drifter-links") {
-    if (session.staff.role !== "admin") return new NextResponse("Forbidden", { status: 403 });
-    return download(await drifterLinksCsv(), "drifter-links");
-  }
   if (type === "audit") {
     if (session.staff.role !== "admin" || !session.staff.system_access) return new NextResponse("Forbidden", { status: 403 });
     return download(await auditCsv(), "audit-log");
@@ -222,7 +123,7 @@ export async function GET(req: NextRequest) {
     return new NextResponse(new Uint8Array(xlsx), {
       headers: {
         "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "Content-Disposition": `attachment; filename="tickets-by-wristband-${new Date().toISOString().slice(0, 10)}.xlsx"`,
+        "Content-Disposition": `attachment; filename="tickets-by-type-${new Date().toISOString().slice(0, 10)}.xlsx"`,
         "Cache-Control": "private, no-store",
       },
     });
@@ -248,7 +149,7 @@ export async function GET(req: NextRequest) {
   const rows = (data ?? []) as unknown as Row[];
 
   const out = csv([
-    ["wristband_no", "code", "ticket_type", "band_color", "ticket_status", "holder", "shirt_size", "plate", "vehicle", "car_photo", "companion_of", "ship_shirt_to", "redeemed_at", "order_no", "receipt_no", "order_status", "channel", "buyer", "email", "mobile", "order_total_php", "payment_method", "reference", "paid_at"],
+    ["number", "code", "ticket_type", "band_color", "ticket_status", "holder", "shirt_size", "plate", "vehicle", "car_photo", "companion_of", "ship_shirt_to", "redeemed_at", "order_no", "receipt_no", "order_status", "channel", "buyer", "email", "mobile", "order_total_php", "payment_method", "reference", "paid_at"],
     ...rows.map((t) => [
       t.number, t.ticket_type?.code, t.ticket_type?.name, t.ticket_type?.band_color, t.status, t.holder_name, t.shirt_size, t.vehicle_plate, t.vehicle_model, t.vehicle_photo_path ? "yes" : "", t.companion_of,
       !t.included && shirtShips(t.ticket_type, t.order) ? shippingOneLine(t.order!.shipping!) : "", t.redeemed_at,

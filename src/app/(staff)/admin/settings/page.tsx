@@ -2,6 +2,8 @@ import Link from "next/link";
 import { requireSystem } from "@/lib/auth";
 import { getEmailSettings } from "@/lib/settings";
 import { EmailSettingsForm } from "@/components/EmailSettingsForm";
+import { EmailOutbox } from "@/components/settings/EmailOutbox";
+import type { OutboxRow, OutboxStatus } from "@/lib/outbox";
 import { SalesScheduleForm } from "@/components/SalesScheduleForm";
 import { EventDetailsForm } from "@/components/EventDetailsForm";
 import { TicketTypesEditor, type TypeStock } from "@/components/TicketTypesEditor";
@@ -31,8 +33,8 @@ const TABS = [
   { id: "ordering", label: "Ordering", blurb: "Limits per order and the shirt sizes offered." },
   { id: "page", label: "Page", blurb: "What the registration page shows, and its headings, steps and notes." },
   { id: "look", label: "Look", blurb: "Logo, artwork, slideshow, colours and the PDF ticket." },
-  { id: "email", label: "Email", blurb: "The mailbox tickets and receipts are sent from." },
-  { id: "advanced", label: "Advanced", blurb: "Staff login domain, drifter references, locale." },
+  { id: "email", label: "Email", blurb: "The mailbox tickets and receipts are sent from, and the outbox of every email to buyers." },
+  { id: "advanced", label: "Advanced", blurb: "Staff login domain and locale." },
 ] as const;
 type TabId = (typeof TABS)[number]["id"];
 
@@ -63,6 +65,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           lookCustomised={customised}
           cronReady={!!process.env.CRON_SECRET}
           extraChannels={rules.extraChannels}
+          terms={rules.terms}
         />
       );
       break;
@@ -109,8 +112,9 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       break;
     }
     case "email": {
-      const s = await getEmailSettings();
+      const [s, outbox] = await Promise.all([getEmailSettings(), loadOutbox()]);
       body = (
+        <>
         <EmailSettingsForm
           defaultEmail={session.email ?? ""}
           current={{
@@ -125,6 +129,10 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
             from: s.from,
           }}
         />
+        <div className="mt-5">
+          <EmailOutbox rows={outbox.rows} counts={outbox.counts} ready={s.provider !== "dry-run"} missing={outbox.missing} />
+        </div>
+        </>
       );
       break;
     }
@@ -178,4 +186,21 @@ function NoEvent() {
       No active event. Create one first with the new-event SQL template (SETUP-NEW-EVENT.md, step 3); its details then appear here.
     </p>
   );
+}
+
+/** Latest outbox emails and the total per status. `missing` while the migration has not been run. */
+async function loadOutbox(): Promise<{ rows: OutboxRow[]; counts: Record<OutboxStatus, number>; missing: boolean }> {
+  const admin = createAdminClient();
+  const statuses: OutboxStatus[] = ["held", "failed", "sent", "skipped"];
+  const [list, ...tallies] = await Promise.all([
+    admin
+      .from("email_outbox")
+      .select("id, created_at, kind, order_id, to_email, subject, has_pdf, status, error, attempts, sent_at, order:orders(order_no, status)")
+      .order("id", { ascending: false })
+      .limit(200),
+    ...statuses.map((st) => admin.from("email_outbox").select("id", { count: "exact", head: true }).eq("status", st)),
+  ]);
+  const counts = Object.fromEntries(statuses.map((st, i) => [st, tallies[i].count ?? 0])) as Record<OutboxStatus, number>;
+  if (list.error) return { rows: [], counts, missing: true };
+  return { rows: (list.data ?? []) as unknown as OutboxRow[], counts, missing: false };
 }

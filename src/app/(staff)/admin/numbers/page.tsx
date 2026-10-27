@@ -2,13 +2,15 @@ import { requireSystem } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getActiveEvent, getAvailability, getTicketTypes } from "@/lib/queries";
 import { NumberForms } from "@/components/NumberForms";
+import { getRules } from "@/lib/rules";
+import { cap } from "@/lib/rules-types";
 
 export default async function NumbersPage({ searchParams }: { searchParams: Promise<{ type?: string }> }) {
   await requireSystem();
   const { type } = await searchParams;
   const event = await getActiveEvent();
   if (!event) return <p>No active event.</p>;
-  const [types, availability] = await Promise.all([getTicketTypes(event.id), getAvailability(event.id)]);
+  const [types, availability, { terms: T }] = await Promise.all([getTicketTypes(event.id), getAvailability(event.id), getRules()]);
   const selected = types.find((t) => t.id === type) ?? types[0];
 
   const admin = createAdminClient();
@@ -19,8 +21,8 @@ export default async function NumbersPage({ searchParams }: { searchParams: Prom
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Wristband numbers</h1>
-        <p className="text-sm text-zinc-500">Import the serials printed on the wristbands, per ticket type. The system hands them out in order as tickets are paid. Void a number if a band is damaged; it will be skipped.</p>
+        <h1 className="text-2xl font-bold">{cap(T.one)} numbers</h1>
+        <p className="text-sm text-zinc-500">Import the {T.one} numbers, per ticket type. The system hands them out in order as tickets are paid.{T.physical ? ` Void a number if a ${T.one} is damaged; it will be skipped.` : " Void a number to skip it."}</p>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -39,7 +41,7 @@ export default async function NumbersPage({ searchParams }: { searchParams: Prom
 
       {selected?.pool_type_id ? (
         <p className="card text-sm text-zinc-400">
-          {selected.name} has no serials of its own: it hands out the next free {types.find((t) => t.id === selected.pool_type_id)?.code} wristband, first come first served with {types.find((t) => t.id === selected.pool_type_id)?.name}. Import or void those numbers on {types.find((t) => t.id === selected.pool_type_id)?.name}.
+          {selected.name} has no serials of its own: it hands out the next free {types.find((t) => t.id === selected.pool_type_id)?.code} {T.one}, first come first served with {types.find((t) => t.id === selected.pool_type_id)?.name}. Import or void those numbers on {types.find((t) => t.id === selected.pool_type_id)?.name}.
         </p>
       ) : (
         selected && <NumberForms ticketType={selected} numbers={numbers ?? []} />
