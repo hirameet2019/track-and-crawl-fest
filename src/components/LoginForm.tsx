@@ -36,18 +36,18 @@ export function LoginForm({ next, signedOutFirst = false }: { next?: string; sig
   }
 
   return (
-    <form onSubmit={submit} className="card space-y-4">
+    <form onSubmit={submit} className="card space-y-5 p-5 sm:p-6">
       <div>
-        <label className="label">Username or email</label>
-        <input className="input" type="text" inputMode="email" autoCapitalize="none" autoCorrect="off" spellCheck={false} autoComplete="username" placeholder="e.g. walkin1" value={email} onChange={(e) => setEmail(e.target.value)} required />
+        <label className="label" htmlFor="login-id">Username or email</label>
+        <input id="login-id" className="input h-11" type="text" inputMode="email" autoCapitalize="none" autoCorrect="off" spellCheck={false} autoComplete="username" placeholder="e.g. walkin1" value={email} onChange={(e) => setEmail(e.target.value)} required />
       </div>
       <div>
-        <label className="label">Password</label>
-        <PasswordInput autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+        <label className="label" htmlFor="login-password">Password</label>
+        <PasswordInput id="login-password" className="input h-11" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
       </div>
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      <button className="btn-primary w-full" disabled={busy}>{busy ? "Signing in..." : "Sign in"}</button>
-      <p className="text-xs text-zinc-500">Accounts are created by the administrator in Supabase Auth and added to the staff table.</p>
+      {error && <p role="alert" className="rounded-lg border border-red-400/40 bg-red-500/10 px-3 py-2 text-sm text-red-300">{error}</p>}
+      <button className="btn-primary h-11 w-full text-base" disabled={busy}>{busy ? "Signing in..." : "Sign in"}</button>
+      <p className="border-t border-white/10 pt-4 text-xs text-zinc-400">Forgot your password or need an account? Ask the event admin.</p>
     </form>
   );
 }

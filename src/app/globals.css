@@ -545,6 +545,23 @@ table, .tabular { font-variant-numeric: tabular-nums; }
 .site-logo-xl .site-logo-accent { display: block; }
 img.site-logo-sm, img.site-logo-md, img.site-logo-xl { -webkit-text-stroke: 0; }
 
+/* Staff login: poster panel beside the form (a banner above it on phones) */
+.login-poster-shade {
+  background:
+    linear-gradient(180deg, rgb(0 0 0 / 0.55) 0%, rgb(0 0 0 / 0.15) 35%, color-mix(in srgb, var(--brand-bg) 92%, transparent) 100%),
+    radial-gradient(700px 360px at 15% 100%, color-mix(in srgb, var(--neon-cyan) 22%, transparent), transparent 70%);
+}
+@media (min-width: 1024px) {
+  .login-poster-shade {
+    background:
+      linear-gradient(90deg, transparent 55%, var(--brand-bg) 100%),
+      linear-gradient(180deg, rgb(0 0 0 / 0.5) 0%, rgb(0 0 0 / 0.1) 40%, rgb(0 0 0 / 0.75) 100%),
+      radial-gradient(800px 420px at 10% 100%, color-mix(in srgb, var(--neon-cyan) 24%, transparent), transparent 70%);
+  }
+}
+.site-logo.login-logo { font-size: clamp(2.9rem, 9vw, 5.6rem); }
+img.login-logo { width: min(100%, 26rem); height: auto; }
+
 /* Event information block */
 .info-section {
   position: relative; isolation: isolate;
