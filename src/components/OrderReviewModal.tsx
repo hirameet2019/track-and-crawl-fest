@@ -57,7 +57,7 @@ export function OrderReviewModal({
   onClose: () => void;
   onConfirm: () => void;
 }) {
-  const { paymentWindowMinutes: PAYMENT_WINDOW_MINUTES, terms: T } = useRules();
+  const { paymentDeadline, paymentWindowMinutes: PAYMENT_WINDOW_MINUTES, terms: T } = useRules();
   const [agreed, setAgreed] = useState(false);
   const titleId = useId();
   const companionsOf = (attendees: ReviewAttendee[]) => attendees.reduce((n, a) => n + (a.companions?.length ?? 0), 0);
@@ -188,11 +188,11 @@ export function OrderReviewModal({
           <section className="rounded-2xl border border-cyan-400/20 bg-cyan-400/5 p-4 text-sm">
             <div className="text-[11px] font-semibold uppercase tracking-wide text-cyan-300">What happens next</div>
             <ol className="mt-2 space-y-1.5 text-zinc-300">
-              <li className="flex gap-2"><span className="grid h-5 w-5 shrink-0 place-items-center rounded bg-cyan-300 text-[11px] font-black text-black">1</span><span>Your {T.many} are held for <b className="text-white">{PAYMENT_WINDOW_MINUTES} minutes</b>.</span></li>
+              <li className="flex gap-2"><span className="grid h-5 w-5 shrink-0 place-items-center rounded bg-cyan-300 text-[11px] font-black text-black">1</span><span>{paymentDeadline ? <>Your {T.many} are held for <b className="text-white">{PAYMENT_WINDOW_MINUTES} minutes</b>.</> : <>Your {T.many} are reserved for you until you pay.</>}</span></li>
               <li className="flex gap-2"><span className="grid h-5 w-5 shrink-0 place-items-center rounded bg-cyan-300 text-[11px] font-black text-black">2</span><span>Pay exactly <b className="text-white">{php(total)}</b> via {channel.payVia} and upload the confirmation screenshot.</span></li>
               <li className="flex gap-2"><span className="grid h-5 w-5 shrink-0 place-items-center rounded bg-cyan-300 text-[11px] font-black text-black">3</span><span>A team member verifies the payment by hand and emails your QR tickets and receipt <b className="text-white">within 24 hours</b>, usually much sooner. <span className="text-amber-200">Check your Spam or Junk folder if it does not show up in your inbox.</span></span></li>
             </ol>
-            <p className="mt-2 text-xs text-zinc-400">Sa Tagalog: naka-hold ang {T.many} ng {PAYMENT_WINDOW_MINUTES} minuto. Bayaran ang eksaktong {php(total)} via {channel.app}, i-upload ang screenshot, at ipapadala ang tickets sa email pagkatapos ma-verify.</p>
+            <p className="mt-2 text-xs text-zinc-400">Sa Tagalog: {paymentDeadline ? `naka-hold ang ${T.many} ng ${PAYMENT_WINDOW_MINUTES} minuto.` : `naka-reserve ang ${T.many} hanggang makapagbayad ka.`} Bayaran ang eksaktong {php(total)} via {channel.app}, i-upload ang screenshot, at ipapadala ang tickets sa email pagkatapos ma-verify.</p>
           </section>
 
           <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-white/10 bg-black/30 p-3 text-sm">

@@ -104,7 +104,7 @@ export async function createOnlineOrder(formData: FormData): Promise<ActionResul
   let includedTotal = 0;
   const companionsPerCar = new Map<string, number>();
   const includedPerCar = new Map<string, number>();
-  const { maxQtyPerType: MAX_QTY_PER_TYPE, maxCompanionsPerCar: MAX_COMPANIONS_PER_CAR, paymentWindowMinutes: PAYMENT_WINDOW_MINUTES, shirtChart, terms: T } = await getRules();
+  const { maxQtyPerType: MAX_QTY_PER_TYPE, maxCompanionsPerCar: MAX_COMPANIONS_PER_CAR, paymentDeadline, paymentWindowMinutes: PAYMENT_WINDOW_MINUTES, shirtChart, terms: T } = await getRules();
   const sizes = new Set(shirtChart.map((r) => r.size));
   // Free companions come with a car package: included_companions per car of that label
   // (VIP Car Display with shirt has one; the no-shirt car has none).
@@ -199,7 +199,8 @@ export async function createOnlineOrder(formData: FormData): Promise<ActionResul
     p_buyer_email: parsed.data.buyer_email,
     p_buyer_mobile: parsed.data.buyer_mobile,
     p_items: parsed.data.items,
-    p_expires_minutes: PAYMENT_WINDOW_MINUTES,
+    // Null leaves expires_at empty: the order never expires on its own.
+    p_expires_minutes: paymentDeadline ? PAYMENT_WINDOW_MINUTES : null,
   });
   if (error || !orderId) return { ok: false, error: error?.message ?? "Could not create order" };
   // The address goes on the order straight after it is made. Should that fail, the

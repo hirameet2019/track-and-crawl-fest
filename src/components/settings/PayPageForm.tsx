@@ -10,8 +10,8 @@ type Show = keyof PayPageSettings["show"];
 type Text = Exclude<keyof PayPageSettings, "show">;
 
 const SWITCHES: { key: Show; label: string }[] = [
-  { key: "holdNote", label: "Order number, hold time and countdown" },
-  { key: "holdWarning", label: "\"Pay before the timer ends\" warning" },
+  { key: "holdNote", label: "Order number note (with the countdown when there is a deadline)" },
+  { key: "holdWarning", label: "\"Pay before the timer ends\" warning (only with a deadline)" },
   { key: "summary", label: "Order summary" },
   { key: "accountName", label: "Account name on each channel" },
   { key: "accountNumber", label: "Account number on each channel" },
@@ -25,9 +25,10 @@ const SWITCHES: { key: Show; label: string }[] = [
 const TEXTS: { title: string; items: { key: Text; label: string; area?: boolean; required?: boolean }[] }[] = [
   { title: "Top of the page", items: [
     { key: "title", label: "Title", required: true },
-    { key: "holdNote", label: "Hold note ({timeLeft} is the live countdown)", area: true },
-    { key: "holdWarning", label: "Warning", area: true },
-    { key: "holdWarningTl", label: "Warning, second line (Taglish)", area: true },
+    { key: "holdNote", label: "Hold note, with a payment deadline ({timeLeft} is the live countdown)", area: true },
+    { key: "holdNoteOpen", label: "Order note, no payment deadline", area: true },
+    { key: "holdWarning", label: "Warning (only with a payment deadline)", area: true },
+    { key: "holdWarningTl", label: "Warning, second line (Taglish, only with a deadline)", area: true },
   ] },
   { title: "Order summary", items: [
     { key: "summaryTitle", label: "Title", required: true },

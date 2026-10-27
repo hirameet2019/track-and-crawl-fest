@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
   // state and an order cannot be picked up as both "expiring" and "expired".
   await admin.rpc("expire_stale_orders", {});
 
-  const { reminderMinutes: REMINDER_MINUTES_BEFORE_EXPIRY, expiryNoticeMaxAgeHours: EXPIRY_NOTICE_MAX_AGE_HOURS } = await getRules();
+  const { paymentReminder, reminderMinutes: REMINDER_MINUTES_BEFORE_EXPIRY, expiryNoticeMaxAgeHours: EXPIRY_NOTICE_MAX_AGE_HOURS } = await getRules();
   const now = Date.now();
   const reminderCutoff = new Date(now + REMINDER_MINUTES_BEFORE_EXPIRY * 60_000).toISOString();
   const noticeFloor = new Date(now - EXPIRY_NOTICE_MAX_AGE_HOURS * 3_600_000).toISOString();
@@ -90,7 +90,8 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  await sweep(expiringSoon ?? [], "reminder_sent_at", (bundle, row) => {
+  // Orders with no deadline never match either query: their expires_at is null.
+  if (paymentReminder) await sweep(expiringSoon ?? [], "reminder_sent_at", (bundle, row) => {
     const msLeft = row.expires_at ? new Date(row.expires_at).getTime() - Date.now() : 0;
     return sendPaymentReminderEmail(bundle, Math.max(1, Math.round(msLeft / 60_000)));
   }, "reminders");

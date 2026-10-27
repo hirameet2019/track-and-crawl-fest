@@ -67,6 +67,34 @@ export async function rejectOrder(orderId: string, reason: string): Promise<Acti
   }
 }
 
+/**
+ * Cancel an order that was never paid (no proof uploaded), putting its numbers
+ * back on sale. With the payment deadline switched off this is the only way an
+ * abandoned order goes away. No email: the buyer never paid.
+ */
+export async function cancelUnpaidOrder(orderId: string): Promise<ActionResult> {
+  try {
+    const { userId } = await assertStaff("staff");
+    const admin = createAdminClient();
+    const { data, error } = await admin
+      .from("orders")
+      .update({ status: "cancelled" })
+      .eq("id", z.string().uuid().parse(orderId))
+      .eq("status", "pending_payment")
+      .select("order_no")
+      .maybeSingle();
+    if (error) return { ok: false, error: error.message };
+    if (!data) return { ok: false, error: "Only an order still waiting for payment can be cancelled here." };
+    await audit(admin, { actor: userId, action: "order.cancelled", entity: "order", entity_id: orderId, data: { order_no: data.order_no } });
+    revalidatePath("/admin");
+    revalidatePath("/admin/orders");
+    revalidatePath(`/admin/orders/${orderId}`);
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
 export async function resendTickets(orderId: string): Promise<ActionResult> {
   try {
     const { userId } = await assertStaff("staff");

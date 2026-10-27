@@ -96,7 +96,8 @@ function CarPhotoField({ preview, fileName, onPick, noun = "car" }: { preview: s
 
 export function OrderForm({ types, availability, channel }: { types: TicketTypeRow[]; availability: PublicAvailability[]; channel: PaymentChannel }) {
   // Limits, hold time and shirt sizes from Admin > Settings.
-  const { maxQtyPerType: MAX_QTY_PER_TYPE, maxCompanionsPerCar: MAX_COMPANIONS_PER_CAR, paymentWindowMinutes: PAYMENT_WINDOW_MINUTES, shirtChart, buyerForm: bf, page, terms: T } = useRules();
+  const { maxQtyPerType: MAX_QTY_PER_TYPE, maxCompanionsPerCar: MAX_COMPANIONS_PER_CAR, paymentDeadline, paymentWindowMinutes: PAYMENT_WINDOW_MINUTES, shirtChart, buyerForm: bf, page, terms: T } = useRules();
+  const payNote = paymentDeadline ? page.payNote : page.payNoteOpen;
   const fill = (text: string) => fillText(text, { pay: channel.payVia, via: channel.via, minutes: PAYMENT_WINDOW_MINUTES });
   const SHIRT_SIZES = shirtChart.map((r) => r.size);
   const SHIRT_SIZE_CHART = Object.fromEntries(shirtChart.map((r) => [r.size, r]));
@@ -687,8 +688,8 @@ export function OrderForm({ types, availability, channel }: { types: TicketTypeR
             {pending ? "Reserving..." : fill(page.submitButton)}
           </button>
         </div>
-        {(page.payNote || page.payNoteTl) && (
-          <p className="mt-3 text-xs text-zinc-400">{fill(page.payNote)}{page.payNote && page.payNoteTl && " "}{page.payNoteTl && <span className="text-zinc-500">{fill(page.payNoteTl)}</span>}</p>
+        {(payNote || page.payNoteTl) && (
+          <p className="mt-3 text-xs text-zinc-400">{fill(payNote)}{payNote && page.payNoteTl && " "}{page.payNoteTl && <span className="text-zinc-500">{fill(page.payNoteTl)}</span>}</p>
         )}
       </Reveal>
     </form>

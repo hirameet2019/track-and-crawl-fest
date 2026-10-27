@@ -207,7 +207,7 @@ export async function sendOrderReceivedEmail(b: OrderBundle) {
     <p style="color:#777;font-size:12px">After we verify your payment, your receipt and QR tickets are emailed here within 24 hours. Check your order any time: <a href="${SITE_URL}/order/${b.order.id}">${SITE_URL}/order/${b.order.id}</a></p>
     <p style="color:#777;font-size:12px">Found this in Spam or Promotions? Mark it as "Not spam" so your tickets land in your inbox.</p>
   </div>`;
-  return send({ to: b.order.buyer_email, subject: `Order #${b.order.order_no} received - pay ${total} within ${PAYMENT_WINDOW_MINUTES} minutes`, html, kind: "received", orderId: b.order.id });
+  return send({ to: b.order.buyer_email, subject: `Order #${b.order.order_no} received - pay ${total}${deadline ? ` within ${PAYMENT_WINDOW_MINUTES} minutes` : ""}`, html, kind: "received", orderId: b.order.id });
 }
 
 /**

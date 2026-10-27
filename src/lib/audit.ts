@@ -38,6 +38,7 @@ const ACTIONS: Record<string, { cat: AuditCategory; label: string }> = {
   "order.proof_submitted": { cat: "payments", label: "Payment proof submitted" },
   "order.issued": { cat: "payments", label: "Payment approved, tickets issued" },
   "order.rejected": { cat: "payments", label: "Payment rejected" },
+  "order.cancelled": { cat: "orders", label: "Unpaid order cancelled" },
   "order.resent": { cat: "orders", label: "Tickets re-sent by email" },
   "order.reverted": { cat: "orders", label: "Paid order reverted, number released" },
   "ticket.redeemed": { cat: "tickets", label: "Ticket scanned at gate" },

@@ -3,7 +3,7 @@
 import { LOCALE } from "@/config/site";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { approveOrder, getProofUrl, rejectOrder, resendTickets, settleOrderBalance, voidOrder } from "@/app/actions/admin";
+import { approveOrder, cancelUnpaidOrder, getProofUrl, rejectOrder, resendTickets, settleOrderBalance, voidOrder } from "@/app/actions/admin";
 import { ConvertOrderForm } from "@/components/ConvertOrderForm";
 import { php } from "@/lib/money";
 import type { OrderStatus } from "@/lib/supabase/types";
@@ -25,6 +25,7 @@ export function OrderActions({
   const [settleNote, setSettleNote] = useState("");
   const [voidReason, setVoidReason] = useState("");
   const [confirmVoid, setConfirmVoid] = useState(false);
+  const [confirmCancel, setConfirmCancel] = useState(false);
   const [pending, start] = useTransition();
 
   const run = (fn: () => Promise<{ ok: boolean; error?: string; warning?: string }>, okMsg: string) =>
@@ -49,6 +50,20 @@ export function OrderActions({
             <button className="btn-danger w-full" disabled={pending} onClick={() => run(() => rejectOrder(orderId, reason), "Rejected")}>Reject</button>
           </div>
         </>
+      )}
+      {status === "pending_payment" && (
+        <div className="space-y-2 rounded-lg border border-zinc-300 p-3">
+          <div className="text-xs font-semibold">Never paid? Cancel the order</div>
+          <p className="text-xs text-zinc-500">No proof was uploaded. Cancelling puts the {T.many} back on sale. The buyer gets no email.</p>
+          {!confirmCancel ? (
+            <button className="btn-secondary w-full" disabled={pending} onClick={() => setConfirmCancel(true)}>Cancel unpaid order…</button>
+          ) : (
+            <div className="flex gap-2">
+              <button className="btn-danger flex-1" disabled={pending} onClick={() => { setConfirmCancel(false); run(() => cancelUnpaidOrder(orderId), "Order cancelled"); }}>Yes, cancel it</button>
+              <button className="btn-secondary flex-1" disabled={pending} onClick={() => setConfirmCancel(false)}>Keep it</button>
+            </div>
+          )}
+        </div>
       )}
       {(status === "paid" || status === "voided") && (
         <a href={`/api/orders/${orderId}/pdf`} target="_blank" className="btn-secondary w-full">Open PDF</a>

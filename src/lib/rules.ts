@@ -67,6 +67,7 @@ const page = z.object({
   shippingSub: line(240),
   submitButton: label("The continue button"),
   payNote: line(300),
+  payNoteOpen: line(300),
   payNoteTl: line(300),
   closedTitle: label("The sales-closed title"),
   closedText: line(300),
@@ -99,6 +100,7 @@ const payPage = z.object({
   show: z.object(Object.fromEntries(Object.keys(PAY_PAGE_DEFAULTS.show).map((k) => [k, z.boolean()])) as Record<keyof PayPageSettings["show"], z.ZodBoolean>),
   title: label("The payment page title"),
   holdNote: line(300),
+  holdNoteOpen: line(300),
   holdWarning: line(400),
   holdWarningTl: line(400),
   summaryTitle: label("The summary title"),
@@ -136,6 +138,8 @@ const terms = z.object({
 });
 
 export const rulesSchema = z.object({
+  paymentDeadline: z.boolean(),
+  paymentReminder: z.boolean(),
   paymentWindowMinutes: z.number().int().min(15, "Give buyers at least 15 minutes to pay").max(24 * 60, "At most 24 hours to pay"),
   reminderMinutes: z.number().int().min(5).max(120),
   expiryNoticeMaxAgeHours: z.number().int().min(1).max(48),
@@ -174,6 +178,8 @@ export function mergeRules(stored: unknown): Rules {
     }),
   ) as Rules["channels"];
   const merged: Rules = {
+    paymentDeadline: pick(base.paymentDeadline, s.paymentDeadline, d.paymentDeadline),
+    paymentReminder: pick(base.paymentReminder, s.paymentReminder, d.paymentReminder),
     paymentWindowMinutes: pick(base.paymentWindowMinutes, s.paymentWindowMinutes, d.paymentWindowMinutes),
     reminderMinutes: pick(base.reminderMinutes, s.reminderMinutes, d.reminderMinutes),
     expiryNoticeMaxAgeHours: pick(base.expiryNoticeMaxAgeHours, s.expiryNoticeMaxAgeHours, d.expiryNoticeMaxAgeHours),

@@ -26,7 +26,9 @@ export default async function PayPage({ params }: { params: Promise<{ orderId: s
 
   const { event, order, items } = b;
   const rules = await getRules();
-  const t = rules.payPage;
+  // Orders placed with the deadline switched off have no expires_at: no countdown, no warning.
+  const open = !order.expires_at;
+  const t = open ? { ...rules.payPage, holdNote: rules.payPage.holdNoteOpen, holdWarning: "", holdWarningTl: "" } : rules.payPage;
   const show = t.show;
   const pc = primaryChannel(event, rules.channels, rules.extraChannels);
   // Cards for every channel switched on in Settings: built-ins with a QR, then added

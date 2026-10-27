@@ -72,7 +72,8 @@ const TEXTS: { title: string; items: { key: Text; label: string; area?: boolean;
   ] },
   { title: "Total bar", items: [
     { key: "submitButton", label: "Continue button", required: true },
-    { key: "payNote", label: "Payment note", area: true },
+    { key: "payNote", label: "Payment note (with a payment deadline)", area: true },
+    { key: "payNoteOpen", label: "Payment note (no payment deadline)", area: true },
     { key: "payNoteTl", label: "Second line (Taglish)", area: true },
   ] },
   { title: "When online sales are closed", items: [

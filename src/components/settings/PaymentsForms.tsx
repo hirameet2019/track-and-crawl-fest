@@ -183,7 +183,9 @@ const CHANNEL_ORDER: PaymentMethod[] = ["gotyme", "gcash", "maya", "cash"];
 export function PaymentRulesForm({ rules }: { rules: Rules }) {
   const router = useRouter();
   const pick = (r: Rules) => ({
+    paymentDeadline: r.paymentDeadline,
     paymentWindowMinutes: r.paymentWindowMinutes,
+    paymentReminder: r.paymentReminder,
     reminderMinutes: r.reminderMinutes,
     expiryNoticeMaxAgeHours: r.expiryNoticeMaxAgeHours,
     channels: r.channels,
@@ -209,12 +211,34 @@ export function PaymentRulesForm({ rules }: { rules: Rules }) {
     <div className="card space-y-5">
       <h2 className="font-semibold">Payment timing and wording</h2>
 
-      <Group title="Timing" hint="Orders already placed keep the deadline they were given.">
-        <div className="grid gap-3 sm:grid-cols-3">
-          <NumberField label="Time to pay" suffix="minutes" min={15} max={1440} value={f.paymentWindowMinutes} onChange={(v) => setF((p) => ({ ...p, paymentWindowMinutes: v }))} hint={`${cap(rules.terms.many)} are held this long.`} />
-          <NumberField label="Reminder email" suffix="min before" min={5} max={120} value={f.reminderMinutes} onChange={(v) => setF((p) => ({ ...p, reminderMinutes: v }))} hint="Keep it above the 5-minute cron interval." />
-          <NumberField label="Skip expiry notices after" suffix="hours" min={1} max={48} value={f.expiryNoticeMaxAgeHours} onChange={(v) => setF((p) => ({ ...p, expiryNoticeMaxAgeHours: v }))} hint="Stops a stale backlog going out at once." />
-        </div>
+      <Group title="Timing" hint="Orders already placed keep the deadline they were given (or none).">
+        <label className="flex items-start gap-2 text-sm">
+          <input type="checkbox" className="mt-0.5" checked={f.paymentDeadline} onChange={(e) => setF((p) => ({ ...p, paymentDeadline: e.target.checked }))} />
+          <span>
+            Cancel unpaid orders automatically
+            <span className="block text-[11px] text-zinc-500">
+              {f.paymentDeadline
+                ? `An order with no proof uploaded in time is cancelled and its ${rules.terms.many} go back on sale.`
+                : `Off: unpaid orders have no deadline and keep their ${rules.terms.many} until staff cancel them (open the order under Orders, Awaiting payment, then Cancel unpaid order).`}
+            </span>
+          </span>
+        </label>
+        {f.paymentDeadline && (
+          <>
+            <label className="flex items-start gap-2 text-sm">
+              <input type="checkbox" className="mt-0.5" checked={f.paymentReminder} onChange={(e) => setF((p) => ({ ...p, paymentReminder: e.target.checked }))} />
+              <span>
+                Email a reminder before the deadline
+                <span className="block text-[11px] text-zinc-500">Needs email sending set up and the reminder job scheduled on the server.</span>
+              </span>
+            </label>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <NumberField label="Time to pay" suffix="minutes" min={15} max={1440} value={f.paymentWindowMinutes} onChange={(v) => setF((p) => ({ ...p, paymentWindowMinutes: v }))} hint={`${cap(rules.terms.many)} are held this long.`} />
+              {f.paymentReminder && <NumberField label="Reminder email" suffix="min before" min={5} max={120} value={f.reminderMinutes} onChange={(v) => setF((p) => ({ ...p, reminderMinutes: v }))} hint="Keep it above the 5-minute cron interval." />}
+              <NumberField label="Skip expiry notices after" suffix="hours" min={1} max={48} value={f.expiryNoticeMaxAgeHours} onChange={(v) => setF((p) => ({ ...p, expiryNoticeMaxAgeHours: v }))} hint="Stops a stale backlog going out at once." />
+            </div>
+          </>
+        )}
       </Group>
 
       <Group title="How each channel is named" hint="Used on the payment page, in emails and on staff screens.">

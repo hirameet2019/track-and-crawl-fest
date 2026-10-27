@@ -102,6 +102,8 @@ export interface PageSettings {
   shippingSub: string;
   submitButton: string;
   payNote: string;
+  /** Shown instead of payNote when there is no payment deadline. */
+  payNoteOpen: string;
   payNoteTl: string;
   closedTitle: string;
   closedText: string;
@@ -142,6 +144,7 @@ export const PAGE_DEFAULTS: PageSettings = {
   shippingSub: "Saan ipapadala ang shirt.",
   submitButton: "Review & continue",
   payNote: "You will have {minutes} minutes to pay via {via} and upload your proof of payment.",
+  payNoteOpen: "Next you pay via {via} and upload your proof of payment.",
   payNoteTl: "Sa susunod na page ang QR at ang pag-upload ng screenshot.",
   closedTitle: "Online sales are closed",
   closedText: "Tickets may still be available at the venue gate.",
@@ -199,6 +202,8 @@ export interface PayPageSettings {
   };
   title: string;
   holdNote: string;
+  /** Shown instead of holdNote (and with no warning) when there is no payment deadline. */
+  holdNoteOpen: string;
   holdWarning: string;
   holdWarningTl: string;
   summaryTitle: string;
@@ -242,6 +247,7 @@ export const PAY_PAGE_DEFAULTS: PayPageSettings = {
   },
   title: "Pay {amount}",
   holdNote: "Order #{order} for {name}. Your {items} are held for {minutes} minutes, and {timeLeft} of that is left.",
+  holdNoteOpen: "Order #{order} for {name}. Your {items} are reserved for you until you pay and upload your proof.",
   holdWarning: "Pay and upload before the timer ends. When it runs out the order is cancelled, the {items} go back to the pool, and this page stops accepting payment.",
   holdWarningTl: "Naka-hold ang {items} mo ng {minutes} minuto. Bayaran at i-upload ang proof bago matapos ang oras. Pag naubos ito, kanselado na ang order at kailangan mo nang mag-order ulit.",
   summaryTitle: "Order summary",
@@ -297,7 +303,14 @@ export const fillText = (text: string, vars: Partial<Record<"pay" | "via" | "min
   text.replace(/\{(pay|via|minutes)\}/g, (m, k: "pay" | "via" | "minutes") => (vars[k] !== undefined ? String(vars[k]) : m));
 
 export interface Rules {
+  /**
+   * Unpaid orders are cancelled automatically once paymentWindowMinutes pass. Off:
+   * they have no deadline and hold their numbers until staff cancel them.
+   */
+  paymentDeadline: boolean;
   paymentWindowMinutes: number;
+  /** Email the buyer reminderMinutes before the deadline (needs the deadline and the cron). */
+  paymentReminder: boolean;
   reminderMinutes: number;
   expiryNoticeMaxAgeHours: number;
   maxQtyPerType: number;
@@ -318,7 +331,9 @@ export interface Rules {
 }
 
 export const RULE_DEFAULTS: Rules = {
+  paymentDeadline: true,
   paymentWindowMinutes: PAYMENT_WINDOW_MINUTES,
+  paymentReminder: true,
   reminderMinutes: REMINDER_MINUTES_BEFORE_EXPIRY,
   expiryNoticeMaxAgeHours: EXPIRY_NOTICE_MAX_AGE_HOURS,
   maxQtyPerType: MAX_QTY_PER_TYPE,
