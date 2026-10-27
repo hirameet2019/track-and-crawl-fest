@@ -6,6 +6,7 @@ import { resetSiteSettingsAction, saveSiteSettingsAction } from "@/app/actions/s
 import { AssetField } from "@/components/AssetField";
 import type { HeroSlide } from "@/config/site";
 import type { PdfSlot, SiteSettings } from "@/lib/site-settings";
+import { GalleryEditor } from "@/components/settings/GalleryEditor";
 import { SaveBar, changed, type SaveMsg } from "@/components/settings/SaveBar";
 
 const NEON: { key: keyof SiteSettings["theme"]["neon"]; label: string }[] = [
@@ -244,6 +245,13 @@ export function SiteLookForm({ current, defaults, customised }: { current: SiteS
           <AssetField label="Presented by" value={s.info.presentedBy} onChange={(v) => set("info", { ...s.info, presentedBy: v })} hint="Strip of presenter logos. Blank hides the row." />
           <AssetField label="Sponsors" value={s.info.sponsors} onChange={(v) => set("info", { ...s.info, sponsors: v })} hint="Sponsor logo strip. Blank hides it." />
         </div>
+      </section>
+
+      {/* ---------------------------------------------------------- gallery */}
+      <section className="space-y-4 border-t border-white/10 pt-5">
+        <h3 className="text-sm font-semibold text-white/90">Past event photos</h3>
+        <p className="text-xs text-zinc-500">A photo mosaic in the information block, above the sponsors. The first photo is the large tile.</p>
+        <GalleryEditor value={s.gallery} onChange={(v) => set("gallery", v)} />
       </section>
 
       {/* ---------------------------------------------------------- note */}

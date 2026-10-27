@@ -76,6 +76,24 @@ export async function EventInfo({ event }: { event: EventRow }) {
           )}
         </Reveal>
       </div>
+      {site.gallery.photos.length > 0 && (
+        <div className="mx-auto max-w-5xl px-4 pb-16 sm:px-8 md:pb-24">
+          {site.gallery.title && (
+            <Reveal from="left" className="mb-5">
+              <h3 className="info-fact-label">{site.gallery.title}</h3>
+            </Reveal>
+          )}
+          {/* The first photo is the large tile; the last spans the row on phones so the grid closes evenly. */}
+          <ul className="info-gallery" aria-label={site.gallery.title || "Photos from past events"}>
+            {site.gallery.photos.map((p, i) => (
+              <Reveal key={p.src} as="li" from="zoom" delay={i * 70} className="info-gallery-tile">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={p.src} alt={p.alt} loading="lazy" decoding="async" style={p.position ? { objectPosition: p.position } : undefined} />
+              </Reveal>
+            ))}
+          </ul>
+        </div>
+      )}
       {site.info.sponsors && (
         <div className="mx-auto max-w-5xl px-4 pb-14 sm:px-8">
           <div className="checker" aria-hidden />

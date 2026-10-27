@@ -1,6 +1,6 @@
 import { cache } from "react";
 import { z } from "zod";
-import { BRAND, HERO, INFO, NOTES, THEME, type HeroSlide } from "@/config/site";
+import { BRAND, GALLERY, HERO, INFO, NOTES, THEME, type GalleryPhoto, type HeroSlide } from "@/config/site";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 /**
@@ -33,6 +33,8 @@ export interface SiteSettings {
   salesScheduleNote: string | null;
   /** The information block under the hero. */
   info: { endTime: string; presentedBy: string; sponsors: string };
+  /** Past-event photos in the information block; the first is the large tile. */
+  gallery: { title: string; photos: GalleryPhoto[] };
 }
 
 const KEY = "site";
@@ -62,7 +64,11 @@ export const SITE_DEFAULTS: SiteSettings = {
   },
   salesScheduleNote: NOTES.salesSchedule,
   info: { ...INFO },
+  gallery: { title: GALLERY.title, photos: GALLERY.photos.map((p) => ({ ...p })) },
 };
+
+/** Most photos the gallery takes; the mosaic stops reading as a highlight reel past this. */
+export const MAX_GALLERY_PHOTOS = 24;
 
 /* ------------------------------------------------------------- validation */
 
@@ -80,6 +86,12 @@ const slide = z.object({
   position: z.string().trim().max(40).regex(/^[a-z0-9%. -]*$/i, "Focus point looks wrong").optional(),
   size: z.enum(["cover", "contain"]).optional(),
   video: asset.optional(),
+});
+
+const galleryPhoto = z.object({
+  src: asset,
+  alt: z.string().trim().min(1, "Every photo needs a short description").max(120),
+  position: z.string().trim().max(40).regex(/^[a-z0-9%. -]*$/i, "Focus point looks wrong").optional(),
 });
 
 export const siteSettingsSchema = z.object({
@@ -108,6 +120,12 @@ export const siteSettingsSchema = z.object({
     presentedBy: asset.or(z.literal("")),
     sponsors: asset.or(z.literal("")),
   }),
+  gallery: z.object({
+    /** Blank hides the heading above the photos. */
+    title: z.string().trim().max(60),
+    /** Empty hides the gallery. */
+    photos: z.array(galleryPhoto).max(MAX_GALLERY_PHOTOS, `At most ${MAX_GALLERY_PHOTOS} photos`),
+  }),
 });
 
 /**
@@ -123,6 +141,7 @@ export function mergeSiteSettings(stored: unknown): SiteSettings {
   const shape = siteSettingsSchema.shape;
   const hero = (s.hero ?? {}) as Record<string, unknown>;
   const theme = (s.theme ?? {}) as Record<string, unknown>;
+  const gallery = (s.gallery ?? {}) as Record<string, unknown>;
   const d = SITE_DEFAULTS;
   return {
     titleSuffix: pick(shape.titleSuffix, s.titleSuffix, d.titleSuffix),
@@ -145,6 +164,10 @@ export function mergeSiteSettings(stored: unknown): SiteSettings {
     },
     salesScheduleNote: "salesScheduleNote" in s ? pick(shape.salesScheduleNote, s.salesScheduleNote, d.salesScheduleNote) : d.salesScheduleNote,
     info: pick(shape.info, s.info, d.info),
+    gallery: {
+      title: "title" in gallery ? pick(shape.gallery.shape.title, gallery.title, d.gallery.title) : d.gallery.title,
+      photos: pick(shape.gallery.shape.photos, gallery.photos, d.gallery.photos),
+    },
   };
 }
 

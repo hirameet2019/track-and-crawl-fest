@@ -142,6 +142,31 @@ export const INFO = {
   sponsors: "/tcf/sponsors.png",
 } as const;
 
+export interface GalleryPhoto {
+  src: string;
+  /** What the photo shows, for screen readers. */
+  alt: string;
+  /** CSS object-position. Pick the part that must stay in frame when cropped. */
+  position?: string;
+}
+
+/**
+ * Photos from past events, shown in the information block. The first is the large
+ * tile. These are the built-in defaults: admins upload, reorder and remove photos
+ * in Admin > Settings > Look, which overrides this list. An empty list hides it.
+ */
+export const GALLERY = {
+  title: "From past events",
+  photos: [
+    { src: "/tcf/past/mustang-smoke.jpg", alt: "A red Mustang laying tyre smoke on the circuit", position: "60% 60%" },
+    { src: "/tcf/past/civic-pits.jpg", alt: "A blue Honda Civic with a GT wing parked by the photobooth", position: "65% 55%" },
+    { src: "/tcf/past/gr86-paddock.jpg", alt: "A red Toyota 86 with a carbon hood in the paddock", position: "45% 60%" },
+    { src: "/tcf/past/crew-photo.jpg", alt: "Club members posing together at the track", position: "50% 45%" },
+    { src: "/tcf/past/crew-shirts.jpg", alt: "Two spectators in matching event shirts watching from the barrier", position: "50% 40%" },
+    { src: "/tcf/past/convoy.jpg", alt: "A convoy of club cars rolling through a corner of the circuit", position: "50% 55%" },
+  ] satisfies readonly GalleryPhoto[] as readonly GalleryPhoto[],
+} as const;
+
 /* ----------------------------------------------------------------- locale */
 
 /**

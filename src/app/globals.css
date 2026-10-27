@@ -566,6 +566,28 @@ img.site-logo-sm, img.site-logo-md, img.site-logo-xl { -webkit-text-stroke: 0; }
   font-family: var(--font-display), "Arial Narrow", sans-serif; font-weight: 800; font-style: italic; text-transform: uppercase;
   font-size: clamp(2rem, 4.6vw, 3.2rem); line-height: 1; letter-spacing: 0.04em; color: #fff;
 }
+/* Past-event photos: a 2-column grid on phones, a 3-column mosaic with the first photo 2x2 from md up */
+.info-gallery { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 9.5rem; gap: 0.6rem; }
+.info-gallery-tile { position: relative; overflow: hidden; border-radius: 0.5rem; background: color-mix(in srgb, var(--brand-bg-deep) 60%, #000); }
+.info-gallery-tile:first-child { grid-column: span 2; grid-row: span 2; }
+/* Close the last row whatever the photo count: phones pair tiles after the large one, so an even count leaves the last alone */
+.info-gallery-tile:last-child:nth-child(even) { grid-column: span 2; }
+.info-gallery-tile img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.6s cubic-bezier(0.2, 0.7, 0.2, 1), filter 0.6s; filter: saturate(0.92); }
+.info-gallery-tile::after { content: ""; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.08); pointer-events: none; }
+.info-gallery-tile.settled:hover img { transform: scale(1.04); filter: saturate(1.05); }
+@media (min-width: 768px) {
+  .info-gallery { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-auto-rows: 12.5rem; gap: 0.75rem; }
+  /* Large tile plus two beside it, then rows of three; the last tile stretches over whatever its row has left */
+  .info-gallery-tile:last-child:nth-child(even) { grid-column: auto; }
+  .info-gallery-tile:only-child { grid-column: span 3; }
+  .info-gallery-tile:nth-child(2):last-child { grid-row: span 2; }
+  .info-gallery-tile:nth-child(3n + 4):last-child { grid-column: span 3; }
+  .info-gallery-tile:nth-child(3n + 5):last-child { grid-column: span 2; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .info-gallery-tile img { transition: none; }
+  .info-gallery-tile.settled:hover img { transform: none; }
+}
 .info-tagline::after {
   content: ""; display: block; width: min(100%, 24rem); height: 16px; margin-top: 0.7rem; background: var(--neon-cyan);
   -webkit-mask: var(--brush) center / 100% 100% no-repeat; mask: var(--brush) center / 100% 100% no-repeat;
