@@ -1,0 +1,7 @@
+.env*
+.impeccable
+supabase/.temp
+src/app/dev-preview
+node_modules
+.next
+*.patch
