@@ -602,7 +602,13 @@ async function drawTicketPage(doc: PDFDocument, f: Fonts, b: OrderBundle, t: Ord
   }
 
   // ---------------------------------------------------------- footer
-  text(page, "Each QR code admits one person once. Keep your wristband on for the whole event. Do not share screenshots of your QR code.", MARGIN, 44, 7.5, f.regular, MUTED);
+  text(
+    page,
+    isCarPass
+      ? `Good for one entry of this ${vehicle}. Keep your wristband on and the pass with the ${vehicle} all day. Do not share screenshots of this QR code.`
+      : "Each QR code admits one person once. Keep your wristband on for the whole event. Do not share screenshots of your QR code.",
+    MARGIN, 44, 7.5, f.regular, MUTED,
+  );
   text(page, `Ticket ID ${t.id}   |   ${safe(event.org_name)}`, MARGIN, 32, 7, f.regular, rgb(0.6, 0.6, 0.65));
 }
 
