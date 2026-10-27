@@ -2,6 +2,7 @@ import { LOCALE } from "@/config/site";
 import { getRules } from "@/lib/rules";
 import { getSiteSettings } from "@/lib/site-settings";
 import { Reveal } from "@/components/Reveal";
+import { CircuitGuide } from "@/components/CircuitGuide";
 import type { EventRow } from "@/lib/supabase/types";
 
 const fmtTime = (d: Date) => d.toLocaleTimeString(LOCALE.locale, { hour: "numeric", minute: "2-digit", timeZone: LOCALE.timeZone }).replace(":00", "").replace(/\s/g, "").toUpperCase();
@@ -82,6 +83,7 @@ export async function EventInfo({ event }: { event: EventRow }) {
       )}
       {/* Keep the hero from butting into whatever comes first when the details are all off. */}
       {!facts && !tagline && <div className="h-16 md:h-24" aria-hidden />}
+      {show.circuit && <CircuitGuide title={site.circuit.title} venueName={place || undefined} photos={site.circuit.photos} />}
       {/* The presenters are the headline sponsors: their own centred band, wider than the column allowed. */}
       {show.presenters && site.info.presentedBy && (
         <Reveal from="up" className="mx-auto max-w-5xl px-4 pb-16 text-center sm:px-8 md:pb-24">

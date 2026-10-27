@@ -25,13 +25,14 @@ const SWITCHES: { title: string; hint?: string; items: { key: Show; label: strin
   },
   {
     title: "Event details",
-    hint: "The block under the hero. Venue, date and tagline come from Event; presenters, gallery and sponsors from Look.",
+    hint: "The block under the hero. Venue, date and tagline come from Event; presenters, gallery, circuit photos and sponsors from Look.",
     items: [
       { key: "venue", label: "Venue" },
       { key: "mapsLink", label: "Open in Google Maps link" },
       { key: "date", label: "Event date" },
       { key: "time", label: "Time" },
       { key: "tagline", label: "Tagline" },
+      { key: "circuit", label: "Circuit photos and map" },
       { key: "presenters", label: "Presented by" },
       { key: "gallery", label: "Past event photos" },
       { key: "sponsors", label: "Sponsors" },

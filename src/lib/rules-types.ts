@@ -84,6 +84,7 @@ export interface PageSettings {
     tagline: boolean;
     presenters: boolean;
     gallery: boolean;
+    circuit: boolean;
     sponsors: boolean;
     sideNote: boolean;
     support: boolean;
@@ -126,6 +127,7 @@ export const PAGE_DEFAULTS: PageSettings = {
     tagline: true,
     presenters: true,
     gallery: true,
+    circuit: true,
     sponsors: true,
     sideNote: true,
     support: true,
