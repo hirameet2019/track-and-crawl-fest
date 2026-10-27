@@ -67,15 +67,16 @@ export async function EventInfo({ event }: { event: EventRow }) {
         </Reveal>
         <Reveal from="right" className="space-y-10">
           {event.tagline && <p className="info-tagline">{event.tagline}</p>}
-          {site.info.presentedBy && (
-            <div>
-              <div className="info-fact-label">Presented by</div>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={site.info.presentedBy} alt="Event presenters" className="mt-3 h-auto w-full max-w-md" />
-            </div>
-          )}
         </Reveal>
       </div>
+      {/* The presenters are the headline sponsors: their own centred band, wider than the column allowed. */}
+      {site.info.presentedBy && (
+        <Reveal from="up" className="mx-auto max-w-5xl px-4 pb-16 text-center sm:px-8 md:pb-24">
+          <div className="info-fact-label">Presented by</div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={site.info.presentedBy} alt="Event presenters" className="mx-auto mt-4 h-auto w-full max-w-xl" />
+        </Reveal>
+      )}
       {site.gallery.photos.length > 0 && (
         <div className="mx-auto max-w-5xl px-4 pb-16 sm:px-8 md:pb-24">
           {site.gallery.title && (
