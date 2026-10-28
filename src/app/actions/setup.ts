@@ -1,12 +1,15 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { z } from "zod";
 import { assertSystem } from "@/lib/auth";
 import { audit } from "@/lib/audit";
+import type { TraceResult, TraceSource } from "@/lib/circuit-map-types";
+import { traceCircuit } from "@/lib/circuit-trace";
 import { fromManilaLocalInput } from "@/lib/cutoff";
 import { getActiveEvent } from "@/lib/queries";
-import { getSiteSettings, resetSiteSettings, saveSiteSettings, siteSettingsSchema, type SiteSettings } from "@/lib/site-settings";
+import { getSiteSettings, resetSiteSettings, saveSiteSettings, siteSettingsSchema, traceSourceSchema, type SiteSettings } from "@/lib/site-settings";
 import { getRules, rulesSchema, saveRules } from "@/lib/rules";
 import type { Rules } from "@/lib/rules-types";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -57,6 +60,48 @@ export async function createAssetUpload(
     if (error || !data) return { ok: false, error: error?.message ?? "Could not start the upload" };
     const publicUrl = admin.storage.from("event-assets").getPublicUrl(path).data.publicUrl;
     return { ok: true, path: data.path, token: data.token, publicUrl };
+  } catch (e) {
+    return fail(e) as { ok: false; error: string };
+  }
+}
+
+/* ------------------------------------------------------------ circuit map */
+
+const MAX_TRACE_MB = 15;
+
+/**
+ * Reads the photo to trace. Only this site's own /public files and this project's
+ * event-assets bucket are fetched, so the action cannot be pointed at other hosts.
+ */
+async function readTraceImage(image: string): Promise<Buffer> {
+  let url: string;
+  if (image.startsWith("/")) {
+    const h = await headers();
+    const host = h.get("x-forwarded-host") ?? h.get("host");
+    if (!host) throw new Error("Could not work out this site's address");
+    url = `${h.get("x-forwarded-proto") ?? "https"}://${host}${image}`;
+  } else {
+    const bucket = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/event-assets/`;
+    if (!image.startsWith(bucket)) throw new Error("Upload the photo here first, then trace it");
+    url = image;
+  }
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) throw new Error(`Could not load the photo (${res.status})`);
+  const type = res.headers.get("content-type") ?? "";
+  if (!type.startsWith("image/")) throw new Error("That file is not an image");
+  const buf = Buffer.from(await res.arrayBuffer());
+  if (buf.length > MAX_TRACE_MB * 1024 * 1024) throw new Error(`Use a photo under ${MAX_TRACE_MB} MB`);
+  return buf;
+}
+
+/** Traces the track in an overhead photo for the map editor. Nothing is saved until Save look. */
+export async function traceCircuitAction(source: TraceSource): Promise<{ ok: true; trace: TraceResult } | { ok: false; error: string }> {
+  try {
+    await assertSystem();
+    const parsed = traceSourceSchema.safeParse(source);
+    if (!parsed.success) return { ok: false, error: firstIssue(parsed.error) };
+    const { image, ...params } = parsed.data;
+    return { ok: true, trace: await traceCircuit(await readTraceImage(image), params) };
   } catch (e) {
     return fail(e) as { ok: false; error: string };
   }

@@ -611,7 +611,8 @@ img.login-logo { width: min(100%, 26rem); height: auto; }
 .circuit-layout { display: grid; gap: 0.75rem; }
 @media (min-width: 768px) {
   .circuit-layout { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); align-items: stretch; }
-  .circuit-layout-solo { grid-template-columns: minmax(0, 1fr); max-width: 44rem; }
+  .circuit-layout-solo { grid-template-columns: minmax(0, 1fr); }
+  .circuit-layout-solo > .circuit-card { max-width: 44rem; }
 }
 .circuit-card {
   position: relative; display: flex; flex-direction: column; border-radius: 0.75rem; padding: 1rem 1rem 0.9rem;
@@ -621,27 +622,27 @@ img.login-logo { width: min(100%, 26rem); height: auto; }
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--neon-pink) 10%, transparent);
 }
 .circuit-map { display: block; width: 100%; height: auto; }
-.circuit-asphalt { fill: color-mix(in srgb, var(--neon-pink) 15%, var(--brand-bg)); stroke: color-mix(in srgb, var(--neon-pink) 70%, transparent); stroke-width: 1.6; }
+/* Map strokes scale with --u, the traced track's size, set on the <svg> by CircuitMap. */
+.circuit-asphalt { fill: color-mix(in srgb, var(--neon-pink) 15%, var(--brand-bg)); stroke: color-mix(in srgb, var(--neon-pink) 70%, transparent); stroke-width: calc(1.6px * var(--u, 1)); }
 .circuit-shadow { fill: #000; opacity: 0.45; }
-.circuit-curb-base, .circuit-curb-stripe { fill: none; stroke-width: 5; stroke-linecap: butt; }
+.circuit-curb-base, .circuit-curb-stripe { fill: none; stroke-width: calc(5px * var(--u, 1)); stroke-linecap: butt; }
 .circuit-curb-base { stroke: var(--neon-pink); }
-.circuit-curb-stripe { stroke: var(--neon-cyan); stroke-dasharray: 6 6; }
+.circuit-curb-stripe { stroke: var(--neon-cyan); stroke-dasharray: calc(6px * var(--u, 1)); }
 .circuit-grid { fill: none; stroke: color-mix(in srgb, var(--neon-pink) 55%, transparent); stroke-width: 1.4; }
 .circuit-checker-light { fill: var(--neon-pink); }
 .circuit-checker-dark { fill: var(--brand-bg); }
 .circuit-arrow { fill: none; stroke: var(--neon-violet); stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round; }
-.circuit-pit { fill: none; stroke: color-mix(in srgb, var(--neon-pink) 12%, transparent); stroke-width: 14; stroke-linecap: round; }
-.circuit-building { fill: color-mix(in srgb, var(--neon-pink) 14%, var(--brand-bg)); stroke: color-mix(in srgb, var(--neon-pink) 30%, transparent); stroke-width: 1.2; }
-.circuit-parking { fill: none; stroke: color-mix(in srgb, var(--neon-pink) 28%, transparent); stroke-width: 1.2; stroke-dasharray: 5 4; }
-.circuit-leader { fill: none; stroke: color-mix(in srgb, var(--neon-pink) 55%, transparent); stroke-width: 1.2; stroke-dasharray: 3 3; }
+.circuit-zone { fill: color-mix(in srgb, var(--neon-pink) 12%, transparent); }
+.circuit-building { fill: color-mix(in srgb, var(--neon-pink) 14%, var(--brand-bg)); stroke: color-mix(in srgb, var(--neon-pink) 30%, transparent); stroke-width: calc(1.2px * var(--u, 1)); }
+.circuit-parking { fill: none; stroke: color-mix(in srgb, var(--neon-pink) 28%, transparent); stroke-width: calc(1.2px * var(--u, 1)); stroke-dasharray: calc(5px * var(--u, 1)) calc(4px * var(--u, 1)); }
+.circuit-leader { fill: none; stroke: color-mix(in srgb, var(--neon-pink) 55%, transparent); stroke-width: calc(1.2px * var(--u, 1)); stroke-dasharray: calc(3px * var(--u, 1)); }
+/* Font size is set per label (LABEL_PX x --u); bold labels carry a dark halo, soft ones sit quietly on the asphalt. */
 .circuit-label {
   font-family: var(--font-display), "Arial Narrow", sans-serif; font-weight: 800; font-style: italic; text-transform: uppercase;
-  font-size: 24px; letter-spacing: 0.08em; fill: var(--neon-pink);
-  paint-order: stroke fill; stroke: var(--brand-bg); stroke-width: 5px; stroke-linejoin: round;
+  letter-spacing: 0.08em; fill: var(--neon-pink);
+  paint-order: stroke fill; stroke: var(--brand-bg); stroke-width: calc(5px * var(--u, 1)); stroke-linejoin: round;
 }
-.circuit-label-track { font-size: 19px; letter-spacing: 0.16em; fill: color-mix(in srgb, var(--neon-pink) 70%, transparent); stroke: none; }
-.circuit-label-zone { font-size: 26px; }
-.circuit-label-small { font-size: 15px; letter-spacing: 0.14em; font-weight: 700; fill: color-mix(in srgb, var(--neon-pink) 65%, transparent); stroke: none; }
+.circuit-label-soft { letter-spacing: 0.15em; font-weight: 700; fill: color-mix(in srgb, var(--neon-pink) 68%, transparent); stroke: none; }
 .circuit-legend {
   display: flex; flex-wrap: wrap; gap: 0.5rem 1.1rem; margin-top: 0.75rem; padding-top: 0.75rem;
   border-top: 1px solid color-mix(in srgb, var(--neon-pink) 10%, transparent);
@@ -653,6 +654,18 @@ img.login-logo { width: min(100%, 26rem); height: auto; }
 .circuit-key-flag { height: 0.7rem; width: 0.7rem; background: repeating-conic-gradient(var(--neon-pink) 0 25%, var(--brand-bg) 0 50%) 0 0 / 0.35rem 0.35rem; box-shadow: 0 0 0 1px color-mix(in srgb, var(--neon-pink) 40%, transparent); }
 .circuit-key-arrow { width: auto; height: auto; font-size: 1.3rem; line-height: 0.6; font-weight: 800; color: var(--neon-violet); }
 .circuit-key-paddock { height: 0.7rem; width: 0.9rem; border-radius: 2px; background: color-mix(in srgb, var(--neon-pink) 14%, var(--brand-bg)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--neon-pink) 30%, transparent); }
+/* Settings > Look: the map editor. Thin or unfilled items take clicks across their whole box. */
+.circuit-editor { touch-action: none; outline: none; overflow: hidden; background: color-mix(in srgb, var(--brand-bg-deep) 35%, var(--brand-bg)); box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.08); }
+.circuit-editor:focus-visible { box-shadow: inset 0 0 0 2px var(--color-cyan-400); }
+.circuit-editor image, .circuit-editor .circuit-shadow { pointer-events: none; }
+.circuit-editor .circuit-parking, .circuit-editor .circuit-zone { pointer-events: all; }
+.circuit-editor [data-item="sf"], .circuit-editor .circuit-arrow { pointer-events: bounding-box; }
+.circuit-editor-select [data-item^="label"], .circuit-editor-select [data-item^="block"], .circuit-editor-select [data-item^="arrow"], .circuit-editor-select [data-item="sf"] { cursor: move; }
+.circuit-editor-label, .circuit-editor-building, .circuit-editor-parking, .circuit-editor-zone, .circuit-editor-arrow, .circuit-editor-sf { cursor: crosshair; }
+.circuit-curb-hit { fill: none; stroke: transparent; pointer-events: stroke; cursor: pointer; }
+.circuit-curb-hit:hover { stroke: rgb(248 113 113 / 0.5); }
+.circuit-sel { fill: none; stroke: var(--color-cyan-400); stroke-width: 2px; stroke-dasharray: 6 4; vector-effect: non-scaling-stroke; pointer-events: none; }
+.circuit-handle { fill: var(--color-cyan-400); stroke: #000; stroke-width: 2px; vector-effect: non-scaling-stroke; cursor: grab; }
 /* Photos: two across under a wide first one on phones; a column beside the map from md up */
 .circuit-photos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 8.5rem; gap: 0.6rem; }
 .circuit-photo { position: relative; overflow: hidden; border-radius: 0.5rem; background: color-mix(in srgb, var(--brand-bg-deep) 60%, #000); }
@@ -665,6 +678,8 @@ img.login-logo { width: min(100%, 26rem); height: auto; }
   /* contain: size lets the map card alone set the row height; the photos share it */
   .circuit-photos { grid-template-columns: minmax(0, 1fr); grid-auto-rows: minmax(0, 1fr); gap: 0.75rem; contain: size; }
   .circuit-photo:first-child, .circuit-photo:last-child:nth-child(even) { grid-column: auto; grid-row: auto; }
+  /* No map: the photos get the row to themselves, three across */
+  .circuit-photos-solo { contain: none; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-auto-rows: 12.5rem; }
 }
 @media (prefers-reduced-motion: reduce) {
   .circuit-photo img { transition: none; }

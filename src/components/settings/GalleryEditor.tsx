@@ -7,7 +7,23 @@ import { shrinkImage } from "@/lib/image";
 import { MAX_GALLERY_PHOTOS, type SiteSettings } from "@/lib/site-settings";
 import { createClient } from "@/lib/supabase/client";
 
-type Gallery = SiteSettings["gallery"];
+type Gallery = Pick<SiteSettings["gallery"], "title" | "photos">;
+
+/** Words that differ between the past-event gallery and other photo sets that reuse this editor. */
+interface GalleryCopy {
+  heading: string;
+  newAlt: string;
+  empty: string;
+  firstTile: string;
+  list: string;
+}
+const GALLERY_COPY: GalleryCopy = {
+  heading: "From past events",
+  newAlt: "Photo from a past event",
+  empty: "No photos: the gallery is hidden on the page.",
+  firstTile: "Large tile",
+  list: "Past event photos, in page order",
+};
 
 const FOCUS = [
   { value: "", label: "Center" },
@@ -29,14 +45,28 @@ const ACCEPT = "image/png,image/jpeg,image/webp";
  * same with a mouse and a finger: the list reorders live as the pointer passes
  * over another tile. Arrow buttons do the same for keyboards.
  */
-export function GalleryEditor({ value, onChange }: { value: Gallery; onChange: (v: Gallery) => void }) {
+export function GalleryEditor<T extends Gallery>({
+  value,
+  onChange,
+  max = MAX_GALLERY_PHOTOS,
+  id = "gallery",
+  copy: copyIn,
+}: {
+  value: T;
+  onChange: (v: T) => void;
+  max?: number;
+  /** Prefix for element ids, so two editors can share a page. */
+  id?: string;
+  copy?: Partial<GalleryCopy>;
+}) {
+  const copy = { ...GALLERY_COPY, ...copyIn };
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [dragging, setDragging] = useState<number | null>(null);
   const [dropping, setDropping] = useState(false);
   const photos = value.photos;
-  const room = MAX_GALLERY_PHOTOS - photos.length;
+  const room = max - photos.length;
 
   const setPhotos = (next: GalleryPhoto[]) => onChange({ ...value, photos: next });
   const setPhoto = (i: number, patch: Partial<GalleryPhoto>) => setPhotos(photos.map((p, j) => (j === i ? { ...p, ...patch } : p)));
@@ -52,7 +82,7 @@ export function GalleryEditor({ value, onChange }: { value: Gallery; onChange: (
     setErr(null);
     const picked = files.filter((f) => f.type.startsWith("image/")).slice(0, room);
     if (!picked.length) {
-      setErr(room <= 0 ? `The gallery is full (${MAX_GALLERY_PHOTOS} photos).` : "Choose PNG, JPG or WebP images.");
+      setErr(room <= 0 ? `That is the most it takes (${max} photos).` : "Choose PNG, JPG or WebP images.");
       return;
     }
     const added: GalleryPhoto[] = [];
@@ -64,7 +94,7 @@ export function GalleryEditor({ value, onChange }: { value: Gallery; onChange: (
         if (!r.ok) throw new Error(r.error);
         const { error } = await createClient().storage.from("event-assets").uploadToSignedUrl(r.path, r.token, file, { contentType: file.type });
         if (error) throw new Error(error.message);
-        added.push({ src: r.publicUrl, alt: "Photo from a past event" });
+        added.push({ src: r.publicUrl, alt: copy.newAlt });
       }
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Upload failed");
@@ -84,8 +114,8 @@ export function GalleryEditor({ value, onChange }: { value: Gallery; onChange: (
   }
   function dragMove(e: React.PointerEvent<HTMLElement>) {
     if (dragging === null) return;
-    const over = document.elementFromPoint(e.clientX, e.clientY)?.closest<HTMLElement>("[data-gallery-index]");
-    const to = over ? Number(over.dataset.galleryIndex) : NaN;
+    const over = document.elementFromPoint(e.clientX, e.clientY)?.closest<HTMLElement>(`[data-photo-list="${id}"] [data-photo-index]`);
+    const to = over ? Number(over.dataset.photoIndex) : NaN;
     if (Number.isInteger(to) && to !== dragging) {
       move(dragging, to);
       setDragging(to);
@@ -97,10 +127,10 @@ export function GalleryEditor({ value, onChange }: { value: Gallery; onChange: (
     <div className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-[minmax(0,20rem)_1fr] sm:items-end">
         <div>
-          <label className="label" htmlFor="gallery-title">Heading</label>
-          <input id="gallery-title" className="input h-9" value={value.title} onChange={(e) => onChange({ ...value, title: e.target.value })} maxLength={60} placeholder="From past events" />
+          <label className="label" htmlFor={`${id}-title`}>Heading</label>
+          <input id={`${id}-title`} className="input h-9" value={value.title} onChange={(e) => onChange({ ...value, title: e.target.value })} maxLength={60} placeholder={copy.heading} />
         </div>
-        <p className="text-xs text-zinc-500">Blank hides the heading. No photos hides the whole gallery.</p>
+        <p className="text-xs text-zinc-500">Blank hides the heading.</p>
       </div>
 
       <div
@@ -110,11 +140,11 @@ export function GalleryEditor({ value, onChange }: { value: Gallery; onChange: (
         onDrop={(e) => { e.preventDefault(); setDropping(false); if (!busy) void upload([...e.dataTransfer.files]); }}
       >
         {photos.length > 0 ? (
-          <ol className="grid grid-cols-2 gap-3 md:grid-cols-3" aria-label="Past event photos, in page order">
+          <ol className="grid grid-cols-2 gap-3 md:grid-cols-3" aria-label={copy.list} data-photo-list={id}>
             {photos.map((p, i) => (
               <li
                 key={p.src}
-                data-gallery-index={i}
+                data-photo-index={i}
                 className={`rounded-lg border bg-black/25 p-2 transition-shadow ${dragging === i ? "border-cyan-400 shadow-[0_0_0_2px_var(--color-cyan-400)]" : "border-white/10"}`}
               >
                 <div
@@ -131,14 +161,14 @@ export function GalleryEditor({ value, onChange }: { value: Gallery; onChange: (
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={p.src} alt="" draggable={false} className="pointer-events-none h-full w-full object-cover" style={p.position ? { objectPosition: p.position } : undefined} />
                   <span className="absolute left-1.5 top-1.5 rounded bg-black/70 px-1.5 py-0.5 text-[11px] font-semibold text-white">
-                    {i + 1}{i === 0 ? " · Large tile" : ""}
+                    {i + 1}{i === 0 ? ` · ${copy.firstTile}` : ""}
                   </span>
                   <svg viewBox="0 0 24 24" className="absolute right-1.5 top-1.5 h-6 w-6 rounded bg-black/70 p-1 text-white" fill="currentColor" aria-hidden>
                     <circle cx="9" cy="6" r="1.6" /><circle cx="15" cy="6" r="1.6" /><circle cx="9" cy="12" r="1.6" /><circle cx="15" cy="12" r="1.6" /><circle cx="9" cy="18" r="1.6" /><circle cx="15" cy="18" r="1.6" />
                   </svg>
                 </div>
-                <label className="sr-only" htmlFor={`gallery-alt-${i}`}>Description of photo {i + 1}</label>
-                <input id={`gallery-alt-${i}`} className="input mt-2 h-8 text-xs" value={p.alt} onChange={(e) => setPhoto(i, { alt: e.target.value })} maxLength={120} placeholder="What the photo shows" />
+                <label className="sr-only" htmlFor={`${id}-alt-${i}`}>Description of photo {i + 1}</label>
+                <input id={`${id}-alt-${i}`} className="input mt-2 h-8 text-xs" value={p.alt} onChange={(e) => setPhoto(i, { alt: e.target.value })} maxLength={120} placeholder="What the photo shows" />
                 <div className="mt-2 flex items-center gap-1">
                   <select className="input h-8 min-w-0 flex-1 px-2 text-xs" value={p.position ?? ""} onChange={(e) => setPhoto(i, { position: e.target.value || undefined })} aria-label={`Focus point of photo ${i + 1}`} title="Which part stays in frame when the tile crops the photo">
                     {FOCUS.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
@@ -152,14 +182,14 @@ export function GalleryEditor({ value, onChange }: { value: Gallery; onChange: (
             ))}
           </ol>
         ) : (
-          <p className="py-6 text-center text-sm text-zinc-500">No photos: the gallery is hidden on the page.</p>
+          <p className="py-6 text-center text-sm text-zinc-500">{copy.empty}</p>
         )}
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <button type="button" className="btn-secondary text-sm" disabled={!!busy || room <= 0} onClick={() => input.current?.click()}>
             {busy ?? "+ Add photos"}
           </button>
           <span className="text-xs text-zinc-500">
-            {photos.length} of {MAX_GALLERY_PHOTOS} · or drop image files here. Large photos are shrunk to 1600 px before upload.
+            {photos.length} of {max} · or drop image files here. Large photos are shrunk to 1600 px before upload.
           </span>
         </div>
       </div>
