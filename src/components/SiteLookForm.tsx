@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { resetSiteSettingsAction, saveSiteSettingsAction } from "@/app/actions/setup";
 import { AssetField } from "@/components/AssetField";
 import type { HeroSlide } from "@/config/site";
-import type { PdfSlot, SiteSettings } from "@/lib/site-settings";
+import { MAX_CIRCUIT_PHOTOS, type PdfSlot, type SiteSettings } from "@/lib/site-settings";
+import { CircuitMapEditor } from "@/components/settings/CircuitMapEditor";
 import { GalleryEditor } from "@/components/settings/GalleryEditor";
 import { SaveBar, changed, type SaveMsg } from "@/components/settings/SaveBar";
 
@@ -252,6 +253,22 @@ export function SiteLookForm({ current, defaults, customised }: { current: SiteS
         <h3 className="text-sm font-semibold text-white/90">Past event photos</h3>
         <p className="text-xs text-zinc-500">A photo mosaic in the information block, above the sponsors. The first photo is the large tile.</p>
         <GalleryEditor value={s.gallery} onChange={(v) => set("gallery", v)} />
+      </section>
+
+      {/* ---------------------------------------------------------- circuit */}
+      <section className="space-y-4 border-t border-white/10 pt-5">
+        <h3 className="text-sm font-semibold text-white/90">Circuit</h3>
+        <p className="text-xs text-zinc-500">
+          The venue band in the information block: photos beside a map of the track. Settings &gt; Page &gt; Circuit photos and map switches it off.
+        </p>
+        <GalleryEditor
+          id="circuit"
+          value={s.circuit}
+          onChange={(v) => set("circuit", v)}
+          max={MAX_CIRCUIT_PHOTOS}
+          copy={{ heading: "The circuit", newAlt: "Photo of the circuit", empty: "No photos: the map shows on its own.", firstTile: "Top", list: "Circuit photos, in page order" }}
+        />
+        <CircuitMapEditor value={s.circuit.map} onChange={(map) => setS((p) => ({ ...p, circuit: { ...p.circuit, map } }))} />
       </section>
 
       {/* ---------------------------------------------------------- note */}

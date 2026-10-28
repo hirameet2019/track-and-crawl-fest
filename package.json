@@ -22,6 +22,7 @@
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "resend": "^6.27.0",
+    "sharp": "^0.35.5",
     "zod": "^4.6.2"
   },
   "devDependencies": {

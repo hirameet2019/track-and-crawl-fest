@@ -1,6 +1,8 @@
 import { cache } from "react";
 import { z } from "zod";
+import { CIRCUIT_MAP_DEFAULT } from "@/config/circuit-map";
 import { BRAND, CIRCUIT, GALLERY, HERO, INFO, NOTES, THEME, type GalleryPhoto, type HeroSlide } from "@/config/site";
+import { MAP_LIMITS, type CircuitMapData } from "@/lib/circuit-map-types";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 /**
@@ -35,8 +37,8 @@ export interface SiteSettings {
   info: { endTime: string; presentedBy: string; sponsors: string };
   /** Past-event photos in the information block; the first is the large tile. */
   gallery: { title: string; photos: GalleryPhoto[] };
-  /** The venue: circuit and paddock photos beside the circuit map. */
-  circuit: { title: string; photos: GalleryPhoto[] };
+  /** The venue: circuit and paddock photos beside the circuit map (null hides the map). */
+  circuit: { title: string; photos: GalleryPhoto[]; map: CircuitMapData | null };
 }
 
 const KEY = "site";
@@ -67,8 +69,11 @@ export const SITE_DEFAULTS: SiteSettings = {
   salesScheduleNote: NOTES.salesSchedule,
   info: { ...INFO },
   gallery: { title: GALLERY.title, photos: GALLERY.photos.map((p) => ({ ...p })) },
-  circuit: { title: CIRCUIT.title, photos: CIRCUIT.photos.map((p) => ({ ...p })) },
+  circuit: { title: CIRCUIT.title, photos: CIRCUIT.photos.map((p) => ({ ...p })), map: CIRCUIT_MAP_DEFAULT },
 };
+
+/** Most photos beside the circuit map; past this the column of photos gets too thin. */
+export const MAX_CIRCUIT_PHOTOS = 6;
 
 /** Most photos the gallery takes; the mosaic stops reading as a highlight reel past this. */
 export const MAX_GALLERY_PHOTOS = 24;
@@ -95,6 +100,52 @@ const galleryPhoto = z.object({
   src: asset,
   alt: z.string().trim().min(1, "Every photo needs a short description").max(120),
   position: z.string().trim().max(40).regex(/^[a-z0-9%. -]*$/i, "Focus point looks wrong").optional(),
+});
+
+/* The circuit map. Paths come from the tracer, which only writes M, C and Z with numbers. */
+const coord = z.number().finite().min(-5000).max(10000);
+const degrees = z.number().finite().min(-720).max(720);
+const mapItemId = z.string().regex(/^[a-z0-9]{1,16}$/i);
+const pathData = (max: number) => z.string().max(max, "The map outline is too detailed; trace with more smoothing").regex(/^[MCZ0-9 .-]*$/, "The map outline looks wrong; trace it again");
+
+export const traceSourceSchema = z.object({
+  image: asset,
+  color: z.tuple([z.number().int().min(0).max(255), z.number().int().min(0).max(255), z.number().int().min(0).max(255)]),
+  tolerance: z.number().int().min(4).max(80),
+  closeGaps: z.number().int().min(0).max(12),
+  removeThin: z.number().int().min(0).max(12),
+  smooth: z.number().int().min(1).max(6),
+  curbs: z.boolean(),
+});
+
+export const circuitMapSchema = z.object({
+  width: z.number().int().min(50).max(4000),
+  height: z.number().int().min(50).max(4000),
+  bounds: z.tuple([coord, coord, coord, coord]),
+  asphalt: pathData(150_000).min(10, "The map has no track outline"),
+  curbs: z.array(pathData(20_000)).max(MAP_LIMITS.curbs),
+  startFinish: z
+    .object({ x: coord, y: coord, angle: degrees, halfWidth: z.number().finite().min(2).max(300), gridBoxes: z.number().int().min(0).max(MAP_LIMITS.gridBoxes) })
+    .nullable(),
+  arrows: z.array(z.object({ id: mapItemId, x: coord, y: coord, angle: degrees })).max(MAP_LIMITS.arrows, `At most ${MAP_LIMITS.arrows} arrows`),
+  blocks: z
+    .array(z.object({ id: mapItemId, kind: z.enum(["building", "parking", "zone"]), x: coord, y: coord, w: z.number().finite().min(2).max(5000), h: z.number().finite().min(2).max(5000), angle: degrees }))
+    .max(MAP_LIMITS.blocks, `At most ${MAP_LIMITS.blocks} blocks`),
+  labels: z
+    .array(
+      z.object({
+        id: mapItemId,
+        x: coord,
+        y: coord,
+        text: z.string().trim().min(1, "Every map label needs text").max(MAP_LIMITS.text),
+        angle: degrees,
+        size: z.enum(["s", "m", "l"]),
+        soft: z.boolean(),
+        leader: z.object({ x: coord, y: coord }).nullable(),
+      }),
+    )
+    .max(MAP_LIMITS.labels, `At most ${MAP_LIMITS.labels} labels`),
+  source: traceSourceSchema.nullable(),
 });
 
 export const siteSettingsSchema = z.object({
@@ -133,7 +184,9 @@ export const siteSettingsSchema = z.object({
     /** Blank hides the heading. */
     title: z.string().trim().max(60),
     /** Empty leaves the map on its own. */
-    photos: z.array(galleryPhoto).max(6, "At most 6 circuit photos"),
+    photos: z.array(galleryPhoto).max(MAX_CIRCUIT_PHOTOS, `At most ${MAX_CIRCUIT_PHOTOS} circuit photos`),
+    /** Null hides the map. */
+    map: circuitMapSchema.nullable(),
   }),
 });
 
@@ -181,6 +234,7 @@ export function mergeSiteSettings(stored: unknown): SiteSettings {
     circuit: {
       title: "title" in circuit ? pick(shape.circuit.shape.title, circuit.title, d.circuit.title) : d.circuit.title,
       photos: pick(shape.circuit.shape.photos, circuit.photos, d.circuit.photos),
+      map: "map" in circuit ? pick(shape.circuit.shape.map, circuit.map, d.circuit.map) : d.circuit.map,
     },
   };
 }
