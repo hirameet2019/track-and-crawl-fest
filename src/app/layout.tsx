@@ -5,6 +5,7 @@ import { SITE_URL, primaryChannel } from "@/config/event";
 import { getActiveEvent } from "@/lib/queries";
 import { getSiteSettings } from "@/lib/site-settings";
 import { getRules } from "@/lib/rules";
+import { siteText } from "@/lib/site-text";
 import { RulesProvider } from "@/components/RulesProvider";
 import { themeCss } from "@/lib/theme";
 import "./globals.css";
@@ -23,8 +24,9 @@ const body = Barlow({ subsets: ["latin"], weight: ["400", "500", "600", "700"], 
 export async function generateMetadata(): Promise<Metadata> {
   const [event, site, rules] = await Promise.all([getActiveEvent(), getSiteSettings(), getRules()]);
   const name = event?.name ?? site.titleSuffix;
-  const where = event?.venue ? ` at ${event.venue}` : "";
-  const description = event ? `Buy tickets for ${event.name}${where}. Pay via ${primaryChannel(event, rules.channels, rules.extraChannels).payVia}.` : undefined;
+  const description = event
+    ? siteText(rules.text)("meta.description", { event: event.name, at: event.venue ? ` at ${event.venue}` : "", pay: primaryChannel(event, rules.channels, rules.extraChannels).payVia })
+    : undefined;
   return {
     metadataBase: new URL(SITE_URL),
     title: { default: event ? [event.name, site.titleSuffix].filter(Boolean).join(" · ") : site.titleSuffix, template: `%s · ${name}` },

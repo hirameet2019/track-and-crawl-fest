@@ -11,6 +11,7 @@ import {
   type PaymentChannel,
 } from "@/config/event";
 import { STAFF } from "@/config/site";
+import type { TextOverrides } from "@/lib/site-text";
 import type { PaymentMethod } from "@/lib/supabase/types";
 
 /**
@@ -330,6 +331,8 @@ export interface Rules {
   extraChannels: ExtraChannel[];
   payPage: PayPageSettings;
   terms: Terms;
+  /** Website text an admin changed (Settings > Website text); the rest is SITE_TEXT. */
+  text: TextOverrides;
 }
 
 export const RULE_DEFAULTS: Rules = {
@@ -349,6 +352,7 @@ export const RULE_DEFAULTS: Rules = {
   extraChannels: [],
   payPage: { ...PAY_PAGE_DEFAULTS, show: { ...PAY_PAGE_DEFAULTS.show } },
   terms: { ...TERMS_DEFAULTS },
+  text: {},
 };
 
 /** Staff pickers (walk-in, drifters): every method, short name, cash first. */

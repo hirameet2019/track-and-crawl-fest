@@ -12,6 +12,7 @@ import { php } from "@/lib/money";
 import { primaryChannel } from "@/config/event";
 import { getRules } from "@/lib/rules";
 import { fillText } from "@/lib/rules-types";
+import { siteText } from "@/lib/site-text";
 
 export const dynamic = "force-dynamic";
 
@@ -21,17 +22,20 @@ export const dynamic = "force-dynamic";
 export async function generateMetadata(): Promise<Metadata> {
   const [event, rules] = await Promise.all([getActiveEvent(), getRules()]);
   return {
-    description: event ? `${event.name}${event.venue ? ` at ${event.venue}` : ""}. Pay via ${primaryChannel(event, rules.channels, rules.extraChannels).payVia}.` : undefined,
+    description: event
+      ? siteText(rules.text)("meta.homeDescription", { event: event.name, at: event.venue ? ` at ${event.venue}` : "", pay: primaryChannel(event, rules.channels, rules.extraChannels).payVia })
+      : undefined,
   };
 }
 
 export default async function HomePage() {
   const [event, rules] = await Promise.all([getActiveEvent(), getRules()]);
+  const tx = siteText(rules.text);
   if (!event) {
     return (
       <main className="mx-auto max-w-2xl p-8 text-center">
-        <h1 className="text-2xl font-bold">No event is on sale right now.</h1>
-        <p className="mt-2 text-zinc-600">Run the database migration and seed, then refresh.</p>
+        <h1 className="text-2xl font-bold">{tx("home.noEventTitle")}</h1>
+        {tx("home.noEventText") && <p className="mt-2 text-zinc-600">{tx("home.noEventText")}</p>}
       </main>
     );
   }
@@ -45,7 +49,7 @@ export default async function HomePage() {
   const channel = primaryChannel(event, rules.channels, rules.extraChannels);
   const fill = (text: string) => fillText(text, { pay: channel.payVia, via: channel.via, minutes: rules.paymentWindowMinutes });
 
-  const prices = types.map((t) => ({ label: t.requires_vehicle ? `per ${vehicleWords(t).noun}` : t.name, price: php(t.price_centavos) }));
+  const prices = types.map((t) => ({ label: t.requires_vehicle ? tx("hero.pricePer", { noun: vehicleWords(t).noun }) : t.name, price: php(t.price_centavos) }));
 
   // overflow-x-clip (not hidden): off-screen reveal transforms and hero glows
   // must not create a sideways scroll on phones, and clip keeps the sticky
@@ -68,7 +72,7 @@ export default async function HomePage() {
         ) : (
           <Reveal from="up" className="border-y border-white/10 py-10 text-center sm:py-14">
             <h3 className="display-title text-[1.7rem] text-white sm:text-[2.4rem]" style={{ textShadow: "0 0 32px color-mix(in srgb, var(--neon-pink) 40%, transparent)" }}>{fill(page.closedTitle)}</h3>
-            <p className="mx-auto mt-4 max-w-xl text-zinc-300">{lastClose ? `Online sales ended ${fmtCutoff(lastClose)}. ` : ""}{fill(page.closedText)}</p>
+            <p className="mx-auto mt-4 max-w-xl text-zinc-300">{lastClose ? `${tx("home.salesEnded", { date: fmtCutoff(lastClose) })} ` : ""}{fill(page.closedText)}</p>
             {page.closedTextTl && <p className="mt-1 text-sm text-zinc-500">{fill(page.closedTextTl)}</p>}
           </Reveal>
         )}
@@ -77,7 +81,7 @@ export default async function HomePage() {
         {((page.show.footerNote && page.footerNote) || page.show.staffLink) && (
           <p className="mt-3 text-center text-xs text-zinc-500">
             {page.show.footerNote && page.footerNote && <>{fill(page.footerNote)} </>}
-            {page.show.staffLink && <Link href="/login" className="underline">Staff login</Link>}
+            {page.show.staffLink && <Link href="/login" className="underline">{tx("home.staffLink")}</Link>}
           </p>
         )}
       </section>

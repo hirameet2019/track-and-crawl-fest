@@ -2,9 +2,11 @@
 
 import { useEffect, useId, useState } from "react";
 import type { PaymentChannel } from "@/config/event";
-import { useRules } from "@/components/RulesProvider";
+import { useRules, useText } from "@/components/RulesProvider";
+import { RichText } from "@/components/RichText";
+import { regVars } from "@/lib/site-text";
 import { php } from "@/lib/money";
-import { SHIPPING_NOTE, type Shipping } from "@/lib/shipping";
+import type { Shipping } from "@/lib/shipping";
 import type { TicketTypeRow } from "@/lib/supabase/types";
 import { BandSwatch } from "@/components/BandSwatch";
 import { cap } from "@/lib/rules-types";
@@ -58,6 +60,8 @@ export function OrderReviewModal({
   onConfirm: () => void;
 }) {
   const { paymentDeadline, paymentWindowMinutes: PAYMENT_WINDOW_MINUTES, terms: T } = useRules();
+  const tx = useText();
+  const reg = regVars(T);
   const [agreed, setAgreed] = useState(false);
   const titleId = useId();
   const companionsOf = (attendees: ReviewAttendee[]) => attendees.reduce((n, a) => n + (a.companions?.length ?? 0), 0);
@@ -96,9 +100,9 @@ export function OrderReviewModal({
 
         <header className="relative flex items-start justify-between gap-4 px-5 pt-5 sm:px-7">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-cyan-300">Step 1 of 3 · Review</p>
-            <h2 id={titleId} className="display-title mt-1 text-2xl leading-tight">Check your order</h2>
-            <p className="mt-1 text-sm text-zinc-400">Nothing is reserved yet. Make sure every name is spelled the way it should appear on the ticket.</p>
+            {tx("review.kicker") && <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-cyan-300">{tx("review.kicker")}</p>}
+            <h2 id={titleId} className="display-title mt-1 text-2xl leading-tight">{tx("review.title")}</h2>
+            {tx("review.intro") && <p className="mt-1 text-sm text-zinc-400">{tx("review.intro")}</p>}
           </div>
           <button type="button" onClick={onClose} disabled={pending} className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-white/15 bg-white/5 text-zinc-300 hover:bg-white/10 hover:text-white" aria-label="Close and keep editing">
             <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden><path d="M6 6l12 12M18 6L6 18" /></svg>
@@ -109,7 +113,7 @@ export function OrderReviewModal({
           {/* tickets */}
           <section className="rounded-2xl border border-white/10 bg-white/[0.04]">
             <div className="flex items-center justify-between border-b border-white/10 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-zinc-400">
-              <span>Tickets</span><span>{count} total</span>
+              <span>{tx("review.tickets")}</span><span>{tx("review.count", { n: count })}</span>
             </div>
             <ul className="divide-y divide-white/10">
               {lines.map(({ type: t, qty, attendees }) => (
@@ -164,7 +168,7 @@ export function OrderReviewModal({
 
           {/* buyer */}
           <section className="grid gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-4 sm:grid-cols-3">
-            <div className="sm:col-span-3 text-[11px] font-semibold uppercase tracking-wide text-zinc-400">Tickets will be sent to</div>
+            <div className="sm:col-span-3 text-[11px] font-semibold uppercase tracking-wide text-zinc-400">{tx("review.sendTo")}</div>
             <div><div className="text-[10px] uppercase text-zinc-500">Name</div><div className="font-medium">{buyer.buyer_name}</div></div>
             <div className="min-w-0"><div className="text-[10px] uppercase text-zinc-500">Email</div><div className="break-all font-medium text-cyan-200">{buyer.buyer_email}</div></div>
             <div><div className="text-[10px] uppercase text-zinc-500">Mobile</div><div className="font-medium">{buyer.buyer_mobile}</div></div>
@@ -173,43 +177,45 @@ export function OrderReviewModal({
           {/* the shirt that ships, and where to */}
           {shipping && (
             <section className="space-y-2 rounded-2xl border border-violet-400/25 bg-violet-400/[0.06] p-4 text-sm">
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-violet-200">Shirt ships to</div>
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-violet-200">{tx("review.shipTo")}</div>
               <div className="text-zinc-200">
                 <div className="font-medium">{shipping.name} · {shipping.mobile}</div>
                 <div>{shipping.address}</div>
                 <div>{shipping.city}, {shipping.province} {shipping.zip}</div>
-                <div className="text-zinc-400">via {shipping.courier}</div>
+                <div className="text-zinc-400">{tx("ship.via", { courier: shipping.courier })}</div>
               </div>
-              <p className="text-xs text-violet-100/80">{SHIPPING_NOTE}</p>
+              <p className="text-xs text-violet-100/80">{tx("ship.note", { time: tx("form.shirtProcessing") })}</p>
             </section>
           )}
 
           {/* what happens next */}
           <section className="rounded-2xl border border-cyan-400/20 bg-cyan-400/5 p-4 text-sm">
-            <div className="text-[11px] font-semibold uppercase tracking-wide text-cyan-300">What happens next</div>
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-cyan-300">{tx("review.nextTitle")}</div>
             <ol className="mt-2 space-y-1.5 text-zinc-300">
-              <li className="flex gap-2"><span className="grid h-5 w-5 shrink-0 place-items-center rounded bg-cyan-300 text-[11px] font-black text-black">1</span><span>{paymentDeadline ? <>Your {T.many} are held for <b className="text-white">{PAYMENT_WINDOW_MINUTES} minutes</b>.</> : <>Your {T.many} are reserved for you until you pay.</>}</span></li>
-              <li className="flex gap-2"><span className="grid h-5 w-5 shrink-0 place-items-center rounded bg-cyan-300 text-[11px] font-black text-black">2</span><span>Pay exactly <b className="text-white">{php(total)}</b> via {channel.payVia} and upload the confirmation screenshot.</span></li>
-              <li className="flex gap-2"><span className="grid h-5 w-5 shrink-0 place-items-center rounded bg-cyan-300 text-[11px] font-black text-black">3</span><span>A team member verifies the payment by hand and emails your QR tickets and receipt <b className="text-white">within 24 hours</b>, usually much sooner. <span className="text-amber-200">Check your Spam or Junk folder if it does not show up in your inbox.</span></span></li>
+              <li className="flex gap-2"><span className="grid h-5 w-5 shrink-0 place-items-center rounded bg-cyan-300 text-[11px] font-black text-black">1</span><span><RichText strong="text-white" text={paymentDeadline ? tx("review.stepHold", { ...reg, minutes: PAYMENT_WINDOW_MINUTES }) : tx("review.stepOpen", reg)} /></span></li>
+              <li className="flex gap-2"><span className="grid h-5 w-5 shrink-0 place-items-center rounded bg-cyan-300 text-[11px] font-black text-black">2</span><span><RichText strong="text-white" text={tx("review.stepPay", { total: php(total), pay: channel.payVia })} /></span></li>
+              <li className="flex gap-2"><span className="grid h-5 w-5 shrink-0 place-items-center rounded bg-cyan-300 text-[11px] font-black text-black">3</span><span><RichText strong="text-white" text={tx("review.stepVerify")} />{tx("review.spam") && <> <span className="text-amber-200">{tx("review.spam")}</span></>}</span></li>
             </ol>
-            <p className="mt-2 text-xs text-zinc-400">Sa Tagalog: {paymentDeadline ? `naka-hold ang ${T.many} ng ${PAYMENT_WINDOW_MINUTES} minuto.` : `naka-reserve ang ${T.many} hanggang makapagbayad ka.`} Bayaran ang eksaktong {php(total)} via {channel.app}, i-upload ang screenshot, at ipapadala ang tickets sa email pagkatapos ma-verify.</p>
+            {(paymentDeadline ? tx("review.tlHold", { ...reg, minutes: PAYMENT_WINDOW_MINUTES, total: php(total), app: channel.app }) : tx("review.tlOpen", { ...reg, total: php(total), app: channel.app })) && (
+              <p className="mt-2 text-xs text-zinc-400">{paymentDeadline ? tx("review.tlHold", { ...reg, minutes: PAYMENT_WINDOW_MINUTES, total: php(total), app: channel.app }) : tx("review.tlOpen", { ...reg, total: php(total), app: channel.app })}</p>
+            )}
           </section>
 
           <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-white/10 bg-black/30 p-3 text-sm">
             <input type="checkbox" className="mt-0.5 h-5 w-5 accent-cyan-300" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />
-            <span>The names and details above are correct. I understand each {T.one} is matched to the name on it and cannot be renamed after payment.</span>
+            <span>{tx("review.agree", reg)}</span>
           </label>
         </div>
 
         <footer className="relative flex flex-col-reverse gap-2 border-t border-white/10 bg-black/40 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-7">
-          <button type="button" onClick={onClose} disabled={pending} className="btn-secondary">&larr; Go back and edit</button>
+          <button type="button" onClick={onClose} disabled={pending} className="btn-secondary">{tx("review.back")}</button>
           <div className="flex items-center justify-between gap-4 sm:justify-end">
             <div className="text-right">
               <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-400">Total</div>
               <div className="total-amount">{php(total)}</div>
             </div>
             <button type="button" onClick={onConfirm} disabled={!agreed || pending} className="btn-neon">
-              {pending ? "Reserving…" : "Confirm & reserve"}
+              {pending ? "Reserving…" : tx("review.confirm")}
             </button>
           </div>
         </footer>

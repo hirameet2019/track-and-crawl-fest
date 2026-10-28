@@ -7,6 +7,8 @@ import { getStaff } from "@/lib/auth";
 import { homeFor, roleRank } from "@/lib/roles";
 import { getActiveEvent } from "@/lib/queries";
 import { getSiteSettings } from "@/lib/site-settings";
+import { getRules } from "@/lib/rules";
+import { siteText } from "@/lib/site-text";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +24,8 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   // bouncing between pages it cannot open.
   if (session && roleRank(session.staff.role) > 0) redirect(next && next.startsWith("/") ? next : homeFor(session.staff.role));
   const notStaff = reason === "not_staff";
-  const [event, site] = await Promise.all([getActiveEvent(), getSiteSettings()]);
+  const [event, site, rules] = await Promise.all([getActiveEvent(), getSiteSettings(), getRules()]);
+  const tx = siteText(rules.text);
   const day = event?.starts_at
     ? new Date(event.starts_at).toLocaleDateString(LOCALE.locale, { weekday: "short", month: "short", day: "numeric", year: "numeric", timeZone: LOCALE.timeZone })
     : null;
@@ -30,7 +33,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   return (
     <main className="relative isolate grid flex-1 bg-brand text-white lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
       <Link href="/" className="absolute left-4 top-4 z-10 inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-black/45 px-3 py-1.5 text-sm text-zinc-200 backdrop-blur-sm transition hover:bg-white/10 hover:text-white sm:left-6 sm:top-6">
-        <span aria-hidden>&larr;</span> Back to registration
+        <span aria-hidden>&larr;</span> {tx("nav.back")}
       </Link>
 
       {/* ---------------------------------------------------------- poster */}
@@ -50,12 +53,14 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
       {/* ---------------------------------------------------------- form */}
       <section className="flex items-start justify-center px-4 pb-14 pt-8 sm:px-8 lg:items-center lg:px-14 lg:py-16">
         <div className="w-full max-w-sm">
-          <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-zinc-400">
-            <span className="h-1.5 w-1.5 rounded-full bg-[var(--neon-cyan)]" aria-hidden />
-            Staff only
-          </p>
-          <h1 className="display-title mt-2 text-[2.6rem] leading-none sm:text-5xl">Staff login</h1>
-          <p className="mt-3 text-sm text-zinc-300">Verify payments, check in drivers and riders at the gate, and manage registrations.</p>
+          {tx("login.kicker") && (
+            <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-zinc-400">
+              <span className="h-1.5 w-1.5 rounded-full bg-[var(--neon-cyan)]" aria-hidden />
+              {tx("login.kicker")}
+            </p>
+          )}
+          <h1 className="display-title mt-2 text-[2.6rem] leading-none sm:text-5xl">{tx("login.title")}</h1>
+          {tx("login.intro") && <p className="mt-3 text-sm text-zinc-300">{tx("login.intro")}</p>}
           {notStaff && (
             <div className="mt-6 rounded-xl border border-amber-400/40 bg-amber-400/10 p-3 text-sm text-amber-200">
               <b>{who || "This account"}</b> can sign in, but it is not on the staff list yet. Ask an administrator to add it in the

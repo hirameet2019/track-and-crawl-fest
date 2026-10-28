@@ -1,5 +1,6 @@
 import { LOCALE } from "@/config/site";
-import Link from "next/link";
+import { RichText } from "@/components/RichText";
+import { siteText } from "@/lib/site-text";
 import { notFound } from "next/navigation";
 import QRCode from "qrcode";
 import { TicketStatusBadge } from "@/components/StatusBadge";
@@ -27,8 +28,9 @@ export default async function TicketPage({ params }: { params: Promise<{ token: 
     ticket_type: TicketTypeRow;
     order: { order_no: number; buyer_name: string; event: EventRow };
   };
-  const [qr, { terms: T }] = await Promise.all([QRCode.toDataURL(ticketUrl(t.qr_token), { margin: 1, width: 320 }), getRules()]);
+  const [qr, { terms: T, text }] = await Promise.all([QRCode.toDataURL(ticketUrl(t.qr_token), { margin: 1, width: 320 }), getRules()]);
 
+  const tx = siteText(text);
   return (
     <main className="dark-zone flex-1 bg-brand"><div className="mx-auto w-full max-w-md px-4 py-10">
       <div className="card text-center">
@@ -39,18 +41,20 @@ export default async function TicketPage({ params }: { params: Promise<{ token: 
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={qr} alt="Ticket QR" className="mx-auto my-5 h-56 w-56 rounded-2xl bg-white p-3" />
         <p className="font-medium">{t.holder_name ?? t.order.buyer_name}</p>
-        <p className="text-sm text-zinc-500">Order #{t.order.order_no}</p>
+        <p className="text-sm text-zinc-500">{tx("ticket.order", { no: t.order.order_no })}</p>
         <div className="mt-3"><TicketStatusBadge status={t.status} /></div>
         {t.status === "void" && (
-          <p className="mt-1 text-xs text-rose-300">Not valid for entry{t.void_reason ? `: ${t.void_reason}` : ""}. Contact the organizer with order #{t.order.order_no} if this is unexpected.</p>
+          <p className="mt-1 text-xs text-rose-300">{tx("ticket.void", { reason: t.void_reason ? `: ${t.void_reason}` : "", no: t.order.order_no })}</p>
         )}
         {t.status === "redeemed" && t.redeemed_at && (
-          <p className="mt-1 text-xs text-zinc-500">Entered {new Date(t.redeemed_at).toLocaleString(LOCALE.locale, { timeZone: LOCALE.timeZone })}</p>
+          <p className="mt-1 text-xs text-zinc-500">{tx("ticket.entered", { date: new Date(t.redeemed_at).toLocaleString(LOCALE.locale, { timeZone: LOCALE.timeZone }) })}</p>
         )}
       </div>
-      <p className="mt-4 text-center text-xs text-zinc-400">
-        Staff: open the <Link href="/scan" className="underline">scanner</Link> to admit this ticket.
-      </p>
+      {tx("ticket.staffNote") && (
+        <p className="mt-4 text-center text-xs text-zinc-400">
+          <RichText text={tx("ticket.staffNote")} />
+        </p>
+      )}
     </div></main>
   );
 }

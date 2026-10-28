@@ -5,6 +5,7 @@ import { ProofForm } from "@/components/ProofForm";
 import { EventBanner } from "@/components/EventHero";
 import { Countdown } from "@/components/Countdown";
 import { RichText } from "@/components/RichText";
+import { siteText } from "@/lib/site-text";
 import { getOrderBundle } from "@/lib/queries";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { php } from "@/lib/money";
@@ -26,6 +27,7 @@ export default async function PayPage({ params }: { params: Promise<{ orderId: s
 
   const { event, order, items } = b;
   const rules = await getRules();
+  const tx = siteText(rules.text);
   // Orders placed with the deadline switched off have no expires_at: no countdown, no warning.
   const open = !order.expires_at;
   const t = open ? { ...rules.payPage, holdNote: rules.payPage.holdNoteOpen, holdWarning: "", holdWarningTl: "" } : rules.payPage;
@@ -48,7 +50,7 @@ export default async function PayPage({ params }: { params: Promise<{ orderId: s
   };
   const slots = {
     timeLeft: order.expires_at ? <Countdown until={order.expires_at} /> : "a limited time",
-    statusLink: <Link href={`/order/${order.id}`} className="font-semibold underline">this status page</Link>,
+    statusLink: <Link href={`/order/${order.id}`} className="font-semibold underline">{tx("pay.statusLink")}</Link>,
   };
   const rich = (text: string) => <RichText text={text} vars={vars} slots={slots} />;
 
@@ -91,8 +93,8 @@ export default async function PayPage({ params }: { params: Promise<{ orderId: s
             <div key={c.id} className="card text-center">
               <h3 className={`font-semibold ${c.accent}`}>{c.label}</h3>
               {c.qr && <Image src={c.qr} alt={`${c.label} QR code`} width={320} height={320} className="mx-auto my-3 h-auto w-64 rounded-lg sm:w-72" unoptimized />}
-              {show.accountName && c.accountName && <p className="text-sm text-zinc-600">Account: <b>{c.accountName}</b></p>}
-              {show.accountNumber && c.accountNumber && <p className="mt-1 text-sm text-zinc-600">Account no.: <b className="font-mono tracking-wide">{c.accountNumber}</b></p>}
+              {show.accountName && c.accountName && <p className="text-sm text-zinc-600">{tx("pay.accountName")} <b>{c.accountName}</b></p>}
+              {show.accountNumber && c.accountNumber && <p className="mt-1 text-sm text-zinc-600">{tx("pay.accountNumber")} <b className="font-mono tracking-wide">{c.accountNumber}</b></p>}
               {c.hint && <p className="mt-1 text-xs text-zinc-500">{c.hint}</p>}
             </div>
           ))}

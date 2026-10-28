@@ -1,10 +1,12 @@
 "use client";
 
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { createOnlineOrder, type CreateOrderInput } from "@/app/actions/orders";
-import { COURIERS, SHIPPING_NOTE, SHIPPING_NOTE_TL, SHIRT_PROCESSING, type Courier } from "@/lib/shipping";
+import { COURIERS, type Courier } from "@/lib/shipping";
 import type { PaymentChannel } from "@/config/event";
-import { useRules } from "@/components/RulesProvider";
+import { useRules, useText } from "@/components/RulesProvider";
+import { RichText } from "@/components/RichText";
+import { regVars } from "@/lib/site-text";
 import { cap, fillText } from "@/lib/rules-types";
 import { shrinkImage } from "@/lib/image";
 import { php } from "@/lib/money";
@@ -42,7 +44,7 @@ const emptyAttendee = (included = 0): Attendee => ({
  * can pick an existing photo from the gallery. Desktop browsers ignore
  * `capture` and show the normal file dialog for both.
  */
-function CarPhotoField({ preview, fileName, onPick, noun = "car" }: { preview: string | null; fileName: string | null; onPick: (file: File | null) => void; noun?: string }) {
+function CarPhotoField({ preview, fileName, onPick, noun = "car", hint }: { preview: string | null; fileName: string | null; onPick: (file: File | null) => void; noun?: string; hint: string }) {
   const cameraRef = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
   const handle = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -87,7 +89,7 @@ function CarPhotoField({ preview, fileName, onPick, noun = "car" }: { preview: s
         </div>
         <p className="mt-2 text-xs text-zinc-500">
           {fileName ? <>Selected: <span className="text-zinc-300">{fileName}</span>. </> : null}
-          On your phone, <b>Take photo</b> opens the camera. A clear shot of the whole {noun}; it is compressed automatically before upload.
+          <RichText text={hint} />
         </p>
       </div>
     </div>
@@ -98,6 +100,10 @@ export function OrderForm({ types, availability, channel }: { types: TicketTypeR
   // Limits, hold time and shirt sizes from Admin > Settings.
   const { maxQtyPerType: MAX_QTY_PER_TYPE, maxCompanionsPerCar: MAX_COMPANIONS_PER_CAR, paymentDeadline, paymentWindowMinutes: PAYMENT_WINDOW_MINUTES, shirtChart, buyerForm: bf, page, terms: T } = useRules();
   const payNote = paymentDeadline ? page.payNote : page.payNoteOpen;
+  const tx = useText();
+  const reg = regVars(T);
+  const processing = tx("form.shirtProcessing");
+  const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? "" : "s"}`;
   const fill = (text: string) => fillText(text, { pay: channel.payVia, via: channel.via, minutes: PAYMENT_WINDOW_MINUTES });
   const SHIRT_SIZES = shirtChart.map((r) => r.size);
   const SHIRT_SIZE_CHART = Object.fromEntries(shirtChart.map((r) => [r.size, r]));
@@ -143,10 +149,8 @@ export function OrderForm({ types, availability, channel }: { types: TicketTypeR
   /** VIP Pass wristbands still free after direct VIP Pass tickets and paid companions. */
   const companionsLeft = companionType ? poolSellable(companionType.id) - (qty[companionType.id] ?? 0) - paidCompanionCount : 0;
 
-  const total = useMemo(
-    () => types.reduce((sum, t) => sum + (qty[t.id] ?? 0) * t.price_centavos, 0) + paidCompanionCount * companionPrice,
-    [types, qty, paidCompanionCount, companionPrice],
-  );
+  // A sum over a handful of ticket types; the React Compiler memoizes it.
+  const total = types.reduce((sum, t) => sum + (qty[t.id] ?? 0) * t.price_centavos, 0) + paidCompanionCount * companionPrice;
   const count = Object.values(qty).reduce((a, b) => a + b, 0) + companionCount;
   const anySelected = count > 0;
   // Live contact checks: the server validates again, but a wrong digit or a
@@ -364,23 +368,23 @@ export function OrderForm({ types, availability, channel }: { types: TicketTypeR
                   {t.band_color && <span aria-hidden className="bill-strap" style={bandSwatchStyle(t.band_color)} />}
                   <div className="bill-tags">
                     <BandSwatch color={t.band_color} size={16} className="bill-tag" />
-                    {t.includes_shirt && <span className="bill-tag bill-tag-cyan">Event t-shirt</span>}
-                    {t.ships_shirt && <span className="bill-tag bill-tag-violet">Ships to you in {SHIRT_PROCESSING}</span>}
-                    {t.requires_vehicle && <span className="bill-tag bill-tag-amber">Photo, plate and model of the {vehicleWords(t).noun} needed</span>}
-                    {t.includes_shirt && <ShirtSizeChartButton label="Size chart" />}
+                    {t.includes_shirt && <span className="bill-tag bill-tag-cyan">{tx("form.tagShirt")}</span>}
+                    {t.ships_shirt && <span className="bill-tag bill-tag-violet">{tx("form.tagShips", { time: processing })}</span>}
+                    {t.requires_vehicle && <span className="bill-tag bill-tag-amber">{tx("form.tagVehicle", { noun: vehicleWords(t).noun })}</span>}
+                    {t.includes_shirt && <ShirtSizeChartButton label={tx("form.sizeChart")} />}
                   </div>
                   {t.description && <p className="bill-desc">{t.description}</p>}
                   {t.requires_vehicle && companionType && (
                     <p className="bill-desc text-emerald-300">
                       {t.included_companions > 0
-                        ? <>Includes a {T.one} for <b>{t.included_companions} passenger{t.included_companions === 1 ? "" : "s"}</b>. Bringing more people? Add companions inside this ticket at {php(companionPrice)} each, each a {companionType.name} with event t-shirt.</>
-                        : <>Bringing passengers? Add companions inside this ticket, {php(companionPrice)} each: a {companionType.name} {T.one} with event t-shirt, linked to your car.</>}
+                        ? <RichText text={tx("form.companionsIncluded", { ...reg, passengers: plural(t.included_companions, "passenger"), price: php(companionPrice), companion: companionType.name })} />
+                        : <RichText text={tx("form.companionsPaid", { ...reg, price: php(companionPrice), companion: companionType.name })} />}
                     </p>
                   )}
                   {(closed || soldOut || left <= 20 || t.sales_close_at) && (
                     <p className="bill-status">
-                      {closed ? <span className="font-semibold text-rose-400">Online sales closed {fmtCutoff(t.sales_close_at!, { withTime: false })}</span> : soldOut ? <span className="font-semibold text-rose-400">Sold out</span> : left <= 20 ? <span className="font-semibold text-amber-300">Only {left} left</span> : null}
-                      {!closed && t.sales_close_at && <span className={closingSoon ? "font-semibold text-amber-300" : "text-zinc-400"}>Online sales until {fmtCutoff(t.sales_close_at)}</span>}
+                      {closed ? <span className="font-semibold text-rose-400">{tx("form.salesClosed", { date: fmtCutoff(t.sales_close_at!, { withTime: false }) })}</span> : soldOut ? <span className="font-semibold text-rose-400">{tx("form.soldOut")}</span> : left <= 20 ? <span className="font-semibold text-amber-300">{tx("form.onlyLeft", { n: left })}</span> : null}
+                      {!closed && t.sales_close_at && <span className={closingSoon ? "font-semibold text-amber-300" : "text-zinc-400"}>{tx("form.salesUntil", { date: fmtCutoff(t.sales_close_at) })}</span>}
                     </p>
                   )}
                 </div>
@@ -410,15 +414,15 @@ export function OrderForm({ types, availability, channel }: { types: TicketTypeR
               <h3 className="holder-title">{t.name} <span className="text-zinc-400">× {qty[t.id]}</span></h3>
               {(attendees[t.id] ?? []).map((a, i) => (
                 <div key={i} className="grid gap-3 rounded-lg border border-white/10 bg-black/30 p-3 sm:grid-cols-2">
-                  <div className="sm:col-span-2 text-xs font-semibold text-zinc-500">Ticket {i + 1}</div>
+                  <div className="sm:col-span-2 text-xs font-semibold text-zinc-500">{tx("form.ticketNo", { ...reg, n: i + 1 })}</div>
                   <div>
-                    <label className="label">{t.requires_vehicle ? `${vehicleWords(t).person[0].toUpperCase()}${vehicleWords(t).person.slice(1)} full name *` : "Holder full name *"}</label>
-                    <input className="input" value={a.holder_name} onChange={(e) => updateAttendee(t.id, i, { holder_name: e.target.value })} placeholder={t.requires_vehicle ? `Name of the ${vehicleWords(t).person}` : "Name of the person using this ticket"} required minLength={2} />
+                    <label className="label">{t.requires_vehicle ? tx("form.driverName", { person: vehicleWords(t).person, Person: `${vehicleWords(t).person[0].toUpperCase()}${vehicleWords(t).person.slice(1)}` }) : tx("form.holderName")} *</label>
+                    <input className="input" value={a.holder_name} onChange={(e) => updateAttendee(t.id, i, { holder_name: e.target.value })} placeholder={(t.requires_vehicle ? tx("form.driverNamePlaceholder", { person: vehicleWords(t).person }) : tx("form.holderNamePlaceholder")) || undefined} required minLength={2} />
                   </div>
                   {t.includes_shirt && (
                     <div>
                       <div className="mb-1 flex items-center justify-between gap-2">
-                        <label className="label !mb-0" htmlFor={`shirt-${t.id}-${i}`}>T-shirt size *</label>
+                        <label className="label !mb-0" htmlFor={`shirt-${t.id}-${i}`}>{tx("form.shirtSize")} *</label>
                         <ShirtSizeChartButton highlight={a.shirt_size} />
                       </div>
                       <select id={`shirt-${t.id}-${i}`} className="input" value={a.shirt_size} onChange={(e) => updateAttendee(t.id, i, { shirt_size: e.target.value })} required>
@@ -435,30 +439,31 @@ export function OrderForm({ types, availability, channel }: { types: TicketTypeR
                   {t.requires_vehicle && (
                     <>
                       <div>
-                        <label className="label">Plate number *</label>
-                        <input className="input uppercase" value={a.vehicle_plate} onChange={(e) => updateAttendee(t.id, i, { vehicle_plate: e.target.value.toUpperCase() })} placeholder="ABC 1234" required minLength={3} />
+                        <label className="label">{tx("form.plate")} *</label>
+                        <input className="input uppercase" value={a.vehicle_plate} onChange={(e) => updateAttendee(t.id, i, { vehicle_plate: e.target.value.toUpperCase() })} placeholder={tx("form.platePlaceholder") || undefined} required minLength={3} />
                       </div>
                       <div>
-                        <label className="label">Make / model *</label>
+                        <label className="label">{tx("form.model")} *</label>
                         <input className="input" value={a.vehicle_model} onChange={(e) => updateAttendee(t.id, i, { vehicle_model: e.target.value })} placeholder={vehicleWords(t).example} required minLength={2} />
                       </div>
                       <div className="sm:col-span-2">
-                        <label className="label">Photo of the {vehicleWords(t).noun} *</label>
+                        <label className="label">{tx("form.photo", { noun: vehicleWords(t).noun })} *</label>
                         <CarPhotoField
                           preview={a.photo_preview}
                           fileName={a.vehicle_photo?.name ?? null}
                           onPick={(file) => setPhoto(t.id, i, file)}
                           noun={vehicleWords(t).noun}
+                          hint={tx("form.photoHint", { noun: vehicleWords(t).noun })}
                         />
                       </div>
                       {companionType && (
                         <div className="sm:col-span-2 rounded-lg border border-emerald-400/25 bg-emerald-400/5 p-3">
                           <div className="flex flex-wrap items-start justify-between gap-2">
                             <div>
-                              <div className="text-xs font-semibold uppercase tracking-wide text-emerald-300">Passengers riding with this car</div>
+                              <div className="text-xs font-semibold uppercase tracking-wide text-emerald-300">{tx("form.passengersTitle")}</div>
                               <p className="mt-0.5 text-xs text-zinc-400">
-                                {t.included_companions > 0 && <>This package includes a {T.one} for <b>{t.included_companions} passenger{t.included_companions === 1 ? "" : "s"}</b> at no extra cost: the same {t.band_color ? <><b>{t.band_color}</b> band</> : T.one} as the car, no shirt, since the package has one t-shirt for the driver. The name can be left blank for now. </>}
-                                {t.included_companions > 0 ? "Extra" : "Each"} companion{t.included_companions > 0 ? "s" : ""}: <b>{php(companionPrice)}</b> per person, a <b>{companionType.name}</b> {T.one} with event t-shirt, added to your total. {cap(T.many)} are linked to plate <b>{a.vehicle_plate.trim() || "…"}</b>. Up to {MAX_COMPANIONS_PER_CAR} passengers per car.
+                                {t.included_companions > 0 && <><RichText text={tx("form.passengersIncluded", { ...reg, passengers: plural(t.included_companions, "passenger"), band: t.band_color ? `**${t.band_color}** band` : T.one })} />{" "}</>}
+                                <RichText text={tx("form.passengersPaid", { ...reg, who: t.included_companions > 0 ? "Extra companions" : "Each companion", price: php(companionPrice), companion: companionType.name, plate: a.vehicle_plate.trim() || "…", max: MAX_COMPANIONS_PER_CAR })} />
                               </p>
                             </div>
                             <button
@@ -467,13 +472,13 @@ export function OrderForm({ types, availability, channel }: { types: TicketTypeR
                               disabled={companionsLeft <= 0 || a.companions.length >= MAX_COMPANIONS_PER_CAR}
                               onClick={() => setCompanions(t.id, i, [...a.companions, { holder_name: "", shirt_size: "" }])}
                             >
-                              + Add companion
+                              {tx("form.addCompanion")}
                             </button>
                           </div>
                           {a.companions.map((c, k) => (
                             <div key={k} className="mt-2 grid items-end gap-2 sm:grid-cols-[1fr_150px_auto]">
                               <div>
-                                <label className="label">{c.included ? <>Passenger {k + 1} full name <span className="ml-1 rounded bg-emerald-400/20 px-1.5 py-0.5 text-[10px] font-semibold normal-case tracking-normal text-emerald-200">Included</span></> : <>Extra companion {k + 1} full name *</>}</label>
+                                <label className="label">{c.included ? <>{tx("form.passengerName", { n: k + 1 })} <span className="ml-1 rounded bg-emerald-400/20 px-1.5 py-0.5 text-[10px] font-semibold normal-case tracking-normal text-emerald-200">{tx("form.includedBadge")}</span></> : <>{tx("form.extraCompanionName", { n: k + 1 })} *</>}</label>
                                 <input
                                   className="input"
                                   value={c.holder_name}
@@ -484,10 +489,10 @@ export function OrderForm({ types, availability, channel }: { types: TicketTypeR
                                 />
                               </div>
                               {c.included ? (
-                                <div className="text-xs text-zinc-400 sm:pb-2">{t.band_color ? `${t.band_color} ${T.one}` : cap(T.one)}, lanyard and decal. No shirt.</div>
+                                <div className="text-xs text-zinc-400 sm:pb-2">{tx("form.passengerNote", { band: t.band_color ? `${t.band_color} ${T.one}` : cap(T.one) })}</div>
                               ) : (
                                 <div>
-                                  <label className="label">T-shirt size *</label>
+                                  <label className="label">{tx("form.shirtSize")} *</label>
                                   <select className="input" value={c.shirt_size} onChange={(e) => setCompanions(t.id, i, a.companions.map((x, j) => (j === k ? { ...x, shirt_size: e.target.value } : x)))} required>
                                     <option value="">Select size</option>
                                     {SHIRT_SIZES.map((s) => <option key={s} value={s}>{s}</option>)}
@@ -617,51 +622,51 @@ export function OrderForm({ types, availability, channel }: { types: TicketTypeR
           <h2 className="form-step"><span><span className="form-step-no">4</span> {fill(page.shippingTitle)}</span>{page.shippingSub && <span className="form-step-sub">{fill(page.shippingSub)}</span>}</h2>
           <div className="card space-y-3">
             <div className="rounded-lg border border-violet-400/30 bg-violet-400/10 p-3 text-sm text-violet-100">
-              {SHIPPING_NOTE}
-              <span className="mt-1 block text-xs text-violet-200/80">{SHIPPING_NOTE_TL}</span>
+              {tx("ship.note", { time: processing })}
+              {tx("ship.noteTl") && <span className="mt-1 block text-xs text-violet-200/80">{tx("ship.noteTl")}</span>}
             </div>
             <label className="flex cursor-pointer items-center gap-2 text-sm">
               <input type="checkbox" className="h-4 w-4 accent-cyan-400" checked={shipToBuyer} onChange={(e) => setShipToBuyer(e.target.checked)} />
-              Send it to me ({buyer.buyer_name.trim() || "the name above"}, {buyer.buyer_mobile.trim() || "the mobile above"})
+              {tx("ship.toMe", { name: buyer.buyer_name.trim() || "the name above", mobile: buyer.buyer_mobile.trim() || "the mobile above" })}
             </label>
             {!shipToBuyer && (
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
-                  <label className="label" htmlFor="ship-name">Recipient&apos;s full name *</label>
+                  <label className="label" htmlFor="ship-name">{tx("ship.recipientName")} *</label>
                   <input id="ship-name" className="input" autoComplete="shipping name" value={ship.name} onChange={(e) => setShip({ ...ship, name: e.target.value })} />
                 </div>
                 <div>
-                  <label className="label" htmlFor="ship-mobile">Recipient&apos;s mobile *</label>
+                  <label className="label" htmlFor="ship-mobile">{tx("ship.recipientMobile")} *</label>
                   <input id="ship-mobile" className="input" type="tel" inputMode="numeric" autoComplete="shipping tel-national" placeholder="09171234567" maxLength={16}
                     value={ship.mobile} onChange={(e) => setShip({ ...ship, mobile: e.target.value.replace(/[^\d+\s-]/g, "") })}
                     aria-describedby="ship-mobile-hint" />
-                  <p id="ship-mobile-hint" className={`mt-1 text-xs ${shipMobileIssue ? "text-amber-300" : "text-zinc-500"}`}>{shipMobileIssue ?? "The courier calls this number."}</p>
+                  <p id="ship-mobile-hint" className={`mt-1 text-xs ${shipMobileIssue ? "text-amber-300" : "text-zinc-500"}`}>{shipMobileIssue ?? tx("ship.courierCalls")}</p>
                 </div>
               </div>
             )}
             <div>
-              <label className="label" htmlFor="ship-address">House / unit no., street, barangay *</label>
-              <input id="ship-address" className="input" autoComplete="shipping street-address" placeholder="e.g. Blk 3 Lot 12, Mabini St., Brgy. San Isidro"
+              <label className="label" htmlFor="ship-address">{tx("ship.address")} *</label>
+              <input id="ship-address" className="input" autoComplete="shipping street-address" placeholder={tx("ship.addressPlaceholder") || undefined}
                 value={ship.address} onChange={(e) => setShip({ ...ship, address: e.target.value })} />
             </div>
             <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_7rem]">
               <div>
-                <label className="label" htmlFor="ship-city">City / municipality *</label>
+                <label className="label" htmlFor="ship-city">{tx("ship.city")} *</label>
                 <input id="ship-city" className="input" autoComplete="shipping address-level2" value={ship.city} onChange={(e) => setShip({ ...ship, city: e.target.value })} />
               </div>
               <div>
-                <label className="label" htmlFor="ship-province">Province *</label>
+                <label className="label" htmlFor="ship-province">{tx("ship.province")} *</label>
                 <input id="ship-province" className="input" autoComplete="shipping address-level1" value={ship.province} onChange={(e) => setShip({ ...ship, province: e.target.value })} />
               </div>
               <div>
-                <label className="label" htmlFor="ship-zip">ZIP code *</label>
+                <label className="label" htmlFor="ship-zip">{tx("ship.zip")} *</label>
                 <input id="ship-zip" className="input" inputMode="numeric" autoComplete="shipping postal-code" maxLength={4} placeholder="3018"
                   value={ship.zip} onChange={(e) => setShip({ ...ship, zip: e.target.value.replace(/\D/g, "") })} />
               </div>
             </div>
             <div>
-              <span className="label">Courier *</span>
-              <div className="mt-1 inline-flex rounded-lg border border-white/15 bg-black/30 p-0.5" role="radiogroup" aria-label="Courier">
+              <span className="label">{tx("ship.courier")} *</span>
+              <div className="mt-1 inline-flex rounded-lg border border-white/15 bg-black/30 p-0.5" role="radiogroup" aria-label={tx("ship.courier")}>
                 {COURIERS.map((c) => (
                   <button key={c} type="button" role="radio" aria-checked={ship.courier === c} onClick={() => setShip({ ...ship, courier: c })}
                     className={`rounded-md px-4 py-1.5 text-sm font-semibold transition ${ship.courier === c ? "bg-gradient-to-r from-cyan-300 to-green-300 text-zinc-950" : "text-zinc-300 hover:bg-white/10"}`}>
@@ -669,7 +674,7 @@ export function OrderForm({ types, availability, channel }: { types: TicketTypeR
                   </button>
                 ))}
               </div>
-              <p className="mt-1 text-xs text-zinc-500">The shipping fee is paid by you and is not part of the total below.</p>
+              {tx("ship.feeNote") && <p className="mt-1 text-xs text-zinc-500">{tx("ship.feeNote")}</p>}
             </div>
           </div>
         </Reveal>
@@ -680,9 +685,9 @@ export function OrderForm({ types, availability, channel }: { types: TicketTypeR
       <Reveal from="zoom" delay={200} className="total-bar">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <div className="text-xs font-semibold text-zinc-400">Total</div>
+            <div className="text-xs font-semibold text-zinc-400">{tx("form.total")}</div>
             <div className="total-amount">{php(total)}</div>
-            {anySelected && <div className="text-xs text-zinc-400">{count} ticket{count === 1 ? "" : "s"}</div>}
+            {anySelected && <div className="text-xs text-zinc-400">{tx("form.count", { n: count, items: count === 1 ? T.one : T.many })}</div>}
           </div>
           <button className="btn-neon" disabled={!anySelected || pending}>
             {pending ? "Reserving..." : fill(page.submitButton)}
