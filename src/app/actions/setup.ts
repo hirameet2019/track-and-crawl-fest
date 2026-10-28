@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { z } from "zod";
-import { assertSystem } from "@/lib/auth";
+import { assertPermission } from "@/lib/auth";
 import { audit } from "@/lib/audit";
 import type { TraceResult, TraceSource } from "@/lib/circuit-map-types";
 import { traceCircuit } from "@/lib/circuit-trace";
@@ -49,7 +49,7 @@ export async function createAssetUpload(
   size: number,
 ): Promise<{ ok: true; path: string; token: string; publicUrl: string } | { ok: false; error: string }> {
   try {
-    await assertSystem();
+    await assertPermission("settings");
     const t = UPLOAD_TYPES[contentType];
     if (!t) return { ok: false, error: "Use a PNG, JPG or WebP image, or an MP4 / WebM video" };
     if (!Number.isFinite(size) || size <= 0) return { ok: false, error: "That file is empty" };
@@ -97,7 +97,7 @@ async function readTraceImage(image: string): Promise<Buffer> {
 /** Traces the track in an overhead photo for the map editor. Nothing is saved until Save look. */
 export async function traceCircuitAction(source: TraceSource): Promise<{ ok: true; trace: TraceResult } | { ok: false; error: string }> {
   try {
-    await assertSystem();
+    await assertPermission("settings");
     const parsed = traceSourceSchema.safeParse(source);
     if (!parsed.success) return { ok: false, error: firstIssue(parsed.error) };
     const { image, ...params } = parsed.data;
@@ -111,7 +111,7 @@ export async function traceCircuitAction(source: TraceSource): Promise<{ ok: tru
 
 export async function saveSiteSettingsAction(value: SiteSettings): Promise<ActionResult> {
   try {
-    const { userId } = await assertSystem();
+    const { userId } = await assertPermission("settings");
     const parsed = siteSettingsSchema.safeParse(value);
     if (!parsed.success) return { ok: false, error: firstIssue(parsed.error) };
     const before = await getSiteSettings();
@@ -136,7 +136,7 @@ export async function saveSiteSettingsAction(value: SiteSettings): Promise<Actio
 
 export async function resetSiteSettingsAction(): Promise<ActionResult> {
   try {
-    const { userId } = await assertSystem();
+    const { userId } = await assertPermission("settings");
     await resetSiteSettings();
     await audit(createAdminClient(), { actor: userId, action: "settings.site_reset", entity: "app_settings", entity_id: "site", data: {} });
     refreshSite();
@@ -206,7 +206,7 @@ export type PaymentQrInput = z.input<typeof paymentQrSchema>;
 
 export async function saveEventDetails(input: EventDetailsInput): Promise<ActionResult> {
   try {
-    const { userId } = await assertSystem();
+    const { userId } = await assertPermission("settings");
     const parsed = eventSchema.safeParse(input);
     if (!parsed.success) return { ok: false, error: firstIssue(parsed.error) };
     const v = parsed.data;
@@ -234,7 +234,7 @@ export async function saveEventDetails(input: EventDetailsInput): Promise<Action
 /** Payment QR codes and account names on the events row (Payments tab). */
 export async function savePaymentQr(input: PaymentQrInput): Promise<ActionResult> {
   try {
-    const { userId } = await assertSystem();
+    const { userId } = await assertPermission("settings");
     const parsed = paymentQrSchema.safeParse(input);
     if (!parsed.success) return { ok: false, error: firstIssue(parsed.error) };
     const v = parsed.data;
@@ -266,7 +266,7 @@ export async function savePaymentQr(input: PaymentQrInput): Promise<ActionResult
  */
 export async function saveRulesSection(patch: Partial<Rules>): Promise<ActionResult> {
   try {
-    const { userId } = await assertSystem();
+    const { userId } = await assertPermission("settings");
     const before = await getRules();
     const parsed = rulesSchema.safeParse({ ...before, ...patch });
     if (!parsed.success) return { ok: false, error: firstIssue(parsed.error) };
@@ -319,7 +319,7 @@ export type TicketTypeInput = z.input<typeof ticketTypeSchema>;
 
 export async function saveTicketType(input: TicketTypeInput): Promise<ActionResult> {
   try {
-    const { userId } = await assertSystem();
+    const { userId } = await assertPermission("settings");
     const parsed = ticketTypeSchema.safeParse(input);
     if (!parsed.success) return { ok: false, error: firstIssue(parsed.error) };
     const { id, price, walkin_price, ...rest } = parsed.data;

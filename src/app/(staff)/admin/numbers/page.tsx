@@ -1,4 +1,4 @@
-import { requireSystem } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getActiveEvent, getAvailability, getTicketTypes } from "@/lib/queries";
 import { NumberForms } from "@/components/NumberForms";
@@ -6,7 +6,7 @@ import { getRules } from "@/lib/rules";
 import { cap } from "@/lib/rules-types";
 
 export default async function NumbersPage({ searchParams }: { searchParams: Promise<{ type?: string }> }) {
-  await requireSystem();
+  await requirePermission("numbers");
   const { type } = await searchParams;
   const event = await getActiveEvent();
   if (!event) return <p>No active event.</p>;

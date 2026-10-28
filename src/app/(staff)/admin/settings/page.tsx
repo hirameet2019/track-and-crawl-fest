@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireSystem } from "@/lib/auth";
+import { can, requirePermission } from "@/lib/auth";
 import { getEmailSettings } from "@/lib/settings";
 import { EmailSettingsForm } from "@/components/EmailSettingsForm";
 import { EmailOutbox } from "@/components/settings/EmailOutbox";
@@ -15,6 +15,9 @@ import { OrderingForm } from "@/components/settings/OrderingForm";
 import { PageForm } from "@/components/settings/PageForm";
 import { SiteTextForm } from "@/components/settings/SiteTextForm";
 import { AdvancedForm } from "@/components/settings/AdvancedForm";
+import { UsersRoles } from "@/components/settings/UsersRoles";
+import { ActiveTabInView } from "@/components/settings/ActiveTabInView";
+import { loadUsersAndRoles } from "@/lib/users";
 import { LOCALE } from "@/config/site";
 import { getActiveEvent, getAvailability, publicOrder } from "@/lib/queries";
 import { getRules } from "@/lib/rules";
@@ -37,14 +40,17 @@ const TABS = [
   { id: "look", label: "Look", blurb: "Logo, artwork, slideshow, colours and the PDF ticket." },
   { id: "email", label: "Email", blurb: "The mailbox tickets and receipts are sent from, and the outbox of every email to buyers." },
   { id: "advanced", label: "Advanced", blurb: "Staff login domain and locale." },
+  { id: "users", label: "Users & roles", blurb: "Who can sign in to the staff pages, and what each role may open and do." },
 ] as const;
 type TabId = (typeof TABS)[number]["id"];
 
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
-  const session = await requireSystem();
+  const session = await requirePermission("settings", "users");
+  // Settings opens every tab but Users & roles; Users & roles opens only that one.
+  const tabs = TABS.filter((t) => can(session, t.id === "users" ? "users" : "settings"));
   const { tab: raw } = await searchParams;
-  const tab: TabId = TABS.some((t) => t.id === raw) ? (raw as TabId) : "overview";
-  const current = TABS.find((t) => t.id === tab)!;
+  const tab: TabId = tabs.some((t) => t.id === raw) ? (raw as TabId) : tabs[0].id;
+  const current = tabs.find((t) => t.id === tab)!;
 
   const [event, rules] = await Promise.all([getActiveEvent(), getRules()]);
   // Only the data the open tab needs.
@@ -141,6 +147,22 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       );
       break;
     }
+    case "users": {
+      const { users, roles, missing } = await loadUsersAndRoles(createAdminClient());
+      body = missing ? (
+        <p className="card text-sm text-amber-300">
+          Not switched on yet. Run <code className="rounded bg-zinc-100 px-1">supabase/migrations/20261028010000_roles_permissions.sql</code> in the Supabase SQL editor, then reload this page.
+        </p>
+      ) : (
+        <UsersRoles
+          users={users}
+          roles={roles}
+          me={{ id: session.userId, roleId: session.role.id, owner: session.role.owner, permissions: session.permissions }}
+          domain={rules.staffUsernameDomain}
+        />
+      );
+      break;
+    }
     case "advanced":
       body = <AdvancedForm rules={rules} locale={{ locale: LOCALE.locale, timeZone: LOCALE.timeZone, utcOffset: LOCALE.utcOffset, currency: LOCALE.currency }} />;
       break;
@@ -151,14 +173,14 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       <aside className="min-w-0 lg:sticky lg:top-6 lg:self-start">
         <h1 className="mb-3 text-2xl font-bold">Settings</h1>
         {/* Rail on desktop, a scrollable strip on phones. Links, so each tab can be bookmarked. */}
-        <nav aria-label="Settings sections" className="-mx-4 overflow-x-auto px-4 lg:mx-0 lg:overflow-visible lg:px-0">
+        <nav id="settings-tabs" aria-label="Settings sections" className="-mx-4 overflow-x-auto px-4 lg:mx-0 lg:overflow-visible lg:px-0">
           <ul className="flex gap-1 lg:flex-col">
-            {TABS.map((t) => {
+            {tabs.map((t) => {
               const active = t.id === tab;
               return (
                 <li key={t.id} className="shrink-0">
                   <Link
-                    href={t.id === "overview" ? "/admin/settings" : `/admin/settings?tab=${t.id}`}
+                    href={t.id === tabs[0].id ? "/admin/settings" : `/admin/settings?tab=${t.id}`}
                     aria-current={active ? "page" : undefined}
                     className={`block rounded-xl px-3 py-2 text-sm transition lg:border-l-2 ${
                       active
@@ -173,6 +195,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
             })}
           </ul>
         </nav>
+        <ActiveTabInView navId="settings-tabs" />
       </aside>
       <main className="min-w-0 space-y-4">
         <div>

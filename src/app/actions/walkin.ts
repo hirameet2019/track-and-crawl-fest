@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { assertStaff } from "@/lib/auth";
+import { assertPermission } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getRules } from "@/lib/rules";
 import type { PaymentMethod } from "@/lib/supabase/types";
@@ -40,7 +40,7 @@ export interface RecordWalkinInput {
  */
 export async function recordWalkin(input: RecordWalkinInput): Promise<ActionResult & { count?: number; saleId?: string; duplicate?: boolean }> {
   try {
-    const { userId } = await assertStaff("gate");
+    const { userId } = await assertPermission("walkin");
     const ticketTypeId = z.string().uuid().parse(input.ticketTypeId);
     const delta = z.number().int().min(-50).max(50).parse(input.delta);
     if (delta === 0) return { ok: false, error: "Nothing to record" };
@@ -86,7 +86,7 @@ export async function recordWalkin(input: RecordWalkinInput): Promise<ActionResu
 /** Reverse exactly one gate sale, once, shortly after it was made (seller or admin). */
 export async function undoWalkinSale(saleId: string): Promise<ActionResult> {
   try {
-    const { userId } = await assertStaff("gate");
+    const { userId } = await assertPermission("walkin");
     const id = z.string().uuid().parse(saleId);
     const { error } = await createAdminClient().rpc("undo_walkin_sale", { p_actor: userId, p_sale_id: id });
     if (error) return { ok: false, error: error.message };
@@ -101,7 +101,7 @@ export async function undoWalkinSale(saleId: string): Promise<ActionResult> {
 /** Admin sets the gate price for a label (in pesos). Online price is untouched. */
 export async function setWalkinPrice(ticketTypeId: string, pesos: number): Promise<ActionResult> {
   try {
-    const { userId } = await assertStaff("admin");
+    const { userId } = await assertPermission("walkin_prices");
     const id = z.string().uuid().parse(ticketTypeId);
     const amount = z.number().min(0).max(100000).parse(pesos);
     const centavos = Math.round(amount * 100);

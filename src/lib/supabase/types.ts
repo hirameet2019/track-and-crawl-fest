@@ -108,10 +108,25 @@ export interface TicketNumberRow {
   created_at: string;
 }
 
+/** A named set of permissions (src/lib/roles.ts), edited in Settings > Users & roles. */
+export interface RoleRow {
+  id: string;
+  name: string;
+  description: string | null;
+  permissions: string[];
+  /** Every permission, always; cannot be edited or deleted. */
+  is_owner: boolean;
+  sort_order: number;
+  created_at: string;
+}
+
 export interface StaffRow {
   id: string;
   full_name: string;
+  /** Superseded by role_id; read only while role_id is null. */
   role: StaffRole;
+  /** The account's role. Null until the roles migration has run for it. */
+  role_id: string | null;
   active: boolean;
   /** May open Numbers, Audit and Settings and use their actions (on top of the admin role). */
   system_access: boolean;

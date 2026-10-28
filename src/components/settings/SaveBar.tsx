@@ -38,7 +38,8 @@ export function SaveBar({
           <button type="button" className="btn-secondary" onClick={onDiscard}>Discard changes</button>
         )}
         {dirty && !pending && <span className="text-xs text-amber-300">Unsaved changes</span>}
-        {extra && <div className="ml-auto">{extra}</div>}
+        {/* Right-aligned beside the buttons; when a phone wraps it, it stays left under them. */}
+        {extra && <div className="sm:ml-auto">{extra}</div>}
       </div>
       {msg && (
         <p role="status" className={`rounded-lg border p-3 text-sm ${msg.kind === "ok" ? "border-emerald-200 bg-emerald-50 text-emerald-900" : "border-red-200 bg-red-50 text-red-700"}`}>

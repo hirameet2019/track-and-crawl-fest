@@ -1,7 +1,7 @@
 import { LOCALE } from "@/config/site";
 import { fetchAll } from "@/lib/fetch-all";
 import Link from "next/link";
-import { requireSystem } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { CATEGORY_LABEL, actionMeta, actionsInCategory, describe, type AuditCategory } from "@/lib/audit";
 
@@ -35,7 +35,7 @@ function entityHref(entity: string, id: string | null): string | null {
 }
 
 export default async function AuditPage({ searchParams }: { searchParams: Promise<{ q?: string; cat?: string; actor?: string; from?: string; to?: string; page?: string }> }) {
-  await requireSystem();
+  await requirePermission("audit");
   const sp = await searchParams;
   const q = (sp.q ?? "").trim();
   const cat = CATEGORIES.includes(sp.cat as AuditCategory) ? (sp.cat as AuditCategory) : "";
@@ -65,7 +65,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
 
   const [{ data: rows, count }, { data: staff }, { count: today }, todayRows] = await Promise.all([
     query,
-    admin.from("staff").select("id, full_name, role").order("full_name"),
+    admin.from("staff").select("id, full_name, role, access_role:roles(name)").order("full_name"),
     admin.from("audit_log").select("id", { count: "exact", head: true }).gte("created_at", dayStart),
     fetchAll((from, to) => admin.from("audit_log").select("action").gte("created_at", dayStart).order("id").range(from, to)),
   ]);
@@ -132,7 +132,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
           <select name="actor" defaultValue={actor} className="input w-auto">
             <option value="">Anyone</option>
             <option value="system">Buyer / system</option>
-            {(staff ?? []).map((s) => <option key={s.id} value={s.id}>{s.full_name} ({s.role})</option>)}
+            {(staff ?? []).map((s) => <option key={s.id} value={s.id}>{s.full_name} ({(s.access_role as unknown as { name: string } | null)?.name ?? s.role})</option>)}
           </select>
         </div>
         <div>

@@ -58,6 +58,12 @@ const ACTIONS: Record<string, { cat: AuditCategory; label: string }> = {
   "number.deleted": { cat: "numbers", label: "Number removed from the pool" },
   "staff.signed_in": { cat: "staff", label: "Staff signed in" },
   "staff.signed_out": { cat: "staff", label: "Staff signed out" },
+  "staff.created": { cat: "staff", label: "Staff account added" },
+  "staff.updated": { cat: "staff", label: "Staff account changed" },
+  "staff.password_set": { cat: "staff", label: "Staff password reset" },
+  "role.created": { cat: "staff", label: "Role added" },
+  "role.updated": { cat: "staff", label: "Role changed" },
+  "role.deleted": { cat: "staff", label: "Role deleted" },
   "settings.email_updated": { cat: "settings", label: "Email settings changed" },
   "ticket_type.cutoff": { cat: "settings", label: "Sales cut-off changed" },
   "settings.site_updated": { cat: "settings", label: "Site look changed" },
@@ -141,6 +147,14 @@ export function describe(action: string, data: Record<string, unknown> | null | 
     case "staff.signed_in":
     case "staff.signed_out":
       return [d.email, d.role].filter(Boolean).join(" · ");
+    case "staff.created":
+    case "staff.updated":
+    case "staff.password_set":
+      return [d.name, d.login, d.role, d.active === false ? "inactive" : ""].filter(Boolean).join(" · ");
+    case "role.created":
+    case "role.updated":
+    case "role.deleted":
+      return [d.name, Array.isArray(d.permissions) ? (d.permissions as string[]).join(", ") || "no permissions" : ""].filter(Boolean).join(" · ");
     case "settings.email_updated":
       return d.provider ? `Provider ${d.provider}` : "";
     case "settings.site_updated":

@@ -18,6 +18,7 @@ Settings is split into tabs, one job each:
 | Email | SMTP / Resend sender |
 | Page | What the registration page shows and says, the "Your details" fields, and what a registration is called |
 | Advanced | Staff login domain (change between events, not during one); locale shown read-only |
+| Users & roles | Staff accounts (add, turn off, reset passwords) and the roles that decide what each may open and do |
 
 Uploads go to the public `event-assets` Storage bucket. What is never saved in
 Settings falls back to the defaults in `src/config/site.ts`, so a fresh install
@@ -98,16 +99,23 @@ The same fields appear in Settings > Ticket types with plain labels.
 Import each type's numbers at **Admin > Numbers**, e.g. prefix C, 1 to 500, pad 3
 for C001 to C500 (or paste a list). A number can be voided there later.
 
-Staff: create each user in Supabase Auth, then add a `staff` row:
+Staff: the first account is made by hand, because nobody can open Settings yet.
+Create the user in Supabase Auth, then put it on the System admin role:
 
 ```sql
-insert into staff (id, full_name, role) values ('<auth user uuid>', 'Juan Dela Cruz', 'admin');
+insert into staff (id, full_name, role_id)
+values ('<auth user uuid>', 'Juan Dela Cruz', (select id from roles where is_owner));
 ```
 
-Roles, lowest to highest: `scanner` (gate scanner only), `gate` (walk-in desk:
-Walk-in and Scan only), `staff` (verify, orders, dashboard), `admin` (everything).
+Everyone else is added at **Admin > Settings > Users & roles**: name, username or
+email, password and role. Built-in roles: `Scanner` (Scan only), `Gate` (walk-in
+desk: Walk-in and Scan), `Staff` (Dashboard, Verify, Orders, Walk-in, Scan),
+`Admin` (also voids, conversions, gate prices and Reports) and `System admin`
+(everything, including Numbers, Audit, Settings and Users & roles). Roles can be
+edited and new ones added there, one tick per permission. Nobody can give a role
+more than they have themselves, and the last System admin cannot be removed.
 Gate users can log in with a short username: the login form adds
-`@<STAFF.usernameDomain>` (`site.ts`), so the Auth email for `walkin1` is
+`@<staff login domain>` (Settings > Advanced), so the Auth email for `walkin1` is
 `walkin1@drift.local` unless you change the domain.
 
 ## 5. Look of the site: Admin > Settings

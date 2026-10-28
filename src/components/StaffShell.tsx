@@ -6,31 +6,29 @@ import { useEffect, useState, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { recordSignOut } from "@/app/actions/auth";
-import { hasRole, homeFor } from "@/lib/roles";
-import type { StaffRole } from "@/lib/supabase/types";
+import { homeFor, type Permission } from "@/lib/roles";
 
-type Item = { href: string; label: string; min: StaffRole; icon: keyof typeof ICONS; system?: true; scan?: true };
+// `any`: shown when the account's role has one of these permissions.
+type Item = { href: string; label: string; any: Permission[]; icon: keyof typeof ICONS };
 
-// `system`: Numbers, Audit and Settings, only for an admin with system access.
-// `scan`: hidden for an account with Scan turned off (staff.can_scan).
 const GROUPS: { title: string; items: Item[] }[] = [
-  { title: "Overview", items: [{ href: "/admin", label: "Dashboard", min: "staff", icon: "dashboard" }] },
+  { title: "Overview", items: [{ href: "/admin", label: "Dashboard", any: ["dashboard"], icon: "dashboard" }] },
   {
     title: "Sales",
     items: [
-      { href: "/admin/verify", label: "Verify", min: "staff", icon: "verify" },
-      { href: "/admin/orders", label: "Orders", min: "staff", icon: "orders" },
-      { href: "/admin/walkin", label: "Walk-in", min: "gate", icon: "walkin" },
+      { href: "/admin/verify", label: "Verify", any: ["verify"], icon: "verify" },
+      { href: "/admin/orders", label: "Orders", any: ["orders"], icon: "orders" },
+      { href: "/admin/walkin", label: "Walk-in", any: ["walkin"], icon: "walkin" },
     ],
   },
-  { title: "Gate", items: [{ href: "/scan", label: "Scan", min: "scanner", icon: "scan", scan: true }] },
+  { title: "Gate", items: [{ href: "/scan", label: "Scan", any: ["scan"], icon: "scan" }] },
   {
     title: "Admin",
     items: [
-      { href: "/admin/reports", label: "Reports", min: "admin", icon: "reports" },
-      { href: "/admin/numbers", label: "Numbers", min: "admin", icon: "numbers", system: true },
-      { href: "/admin/audit", label: "Audit", min: "admin", icon: "audit", system: true },
-      { href: "/admin/settings", label: "Settings", min: "admin", icon: "settings", system: true },
+      { href: "/admin/reports", label: "Reports", any: ["reports"], icon: "reports" },
+      { href: "/admin/numbers", label: "Numbers", any: ["numbers"], icon: "numbers" },
+      { href: "/admin/audit", label: "Audit", any: ["audit"], icon: "audit" },
+      { href: "/admin/settings", label: "Settings", any: ["settings", "users"], icon: "settings" },
     ],
   },
 ];
@@ -61,8 +59,8 @@ function Icon({ name, className = "h-[18px] w-[18px]" }: { name: keyof typeof IC
 }
 
 export function StaffShell({
-  name, role, system, scan, eventName, logo, children,
-}: { name: string; role: StaffRole; system: boolean; scan: boolean; eventName: string; logo: string; children: ReactNode }) {
+  name, roleName, permissions, eventName, logo, children,
+}: { name: string; roleName: string; permissions: Permission[]; eventName: string; logo: string; children: ReactNode }) {
   const path = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -82,7 +80,7 @@ export function StaffShell({
 
   const groups = GROUPS.map((g) => ({
     ...g,
-    items: g.items.filter((l) => hasRole(role, l.min) && (!l.system || system) && (!l.scan || scan)),
+    items: g.items.filter((l) => l.any.some((p) => permissions.includes(p))),
   })).filter((g) => g.items.length);
   const isActive = (href: string) => (href === "/admin" ? path === "/admin" : path.startsWith(href));
   const current = groups.flatMap((g) => g.items).find((l) => isActive(l.href));
@@ -128,7 +126,7 @@ export function StaffShell({
         </span>
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-semibold text-zinc-900">{name}</div>
-          <div className="text-xs capitalize text-zinc-500">{role}</div>
+          <div className="truncate text-xs text-zinc-500">{roleName}</div>
         </div>
         <button type="button" onClick={signOut} className="grid h-8 w-8 place-items-center rounded-lg text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900" title="Sign out" aria-label="Sign out">
           <Icon name="signout" />
@@ -138,7 +136,7 @@ export function StaffShell({
   );
 
   const brand = (
-    <Link prefetch={false} href={homeFor(role)} className="flex items-center gap-3 px-5 pb-5 pt-5" aria-label={eventName ? `${eventName} staff home` : "Staff home"}>
+    <Link prefetch={false} href={homeFor(permissions) ?? "/login"} className="flex items-center gap-3 px-5 pb-5 pt-5" aria-label={eventName ? `${eventName} staff home` : "Staff home"}>
       <SiteLogo src={logo} name={eventName} size="sm" className="h-10 w-auto max-w-[150px] object-contain" />
       <span className="rounded-md border border-zinc-300 px-1.5 py-0.5 text-[11px] font-semibold text-zinc-500">Staff</span>
     </Link>

@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { LoginForm } from "@/components/LoginForm";
 import { LOCALE } from "@/config/site";
 import { getStaff } from "@/lib/auth";
-import { homeFor, roleRank } from "@/lib/roles";
+import { homeFor } from "@/lib/roles";
 import { getActiveEvent } from "@/lib/queries";
 import { getSiteSettings } from "@/lib/site-settings";
 import { getRules } from "@/lib/rules";
@@ -20,9 +20,10 @@ export const dynamic = "force-dynamic";
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string; reason?: string; who?: string }> }) {
   const { next, reason, who } = await searchParams;
   const session = await getStaff();
-  // A role this code does not know stays here with the not-staff note, rather than
+  // A role that opens nothing stays here with the not-staff note, rather than
   // bouncing between pages it cannot open.
-  if (session && roleRank(session.staff.role) > 0) redirect(next && next.startsWith("/") ? next : homeFor(session.staff.role));
+  const home = session && homeFor(session.permissions);
+  if (home) redirect(next && next.startsWith("/") ? next : home);
   const notStaff = reason === "not_staff";
   const [event, site, rules] = await Promise.all([getActiveEvent(), getSiteSettings(), getRules()]);
   const tx = siteText(rules.text);

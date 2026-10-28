@@ -2,8 +2,7 @@ import { LOCALE } from "@/config/site";
 import { fetchAll } from "@/lib/fetch-all";
 import { shirtShips, shippingOneLine, type Shipping } from "@/lib/shipping";
 import { NextResponse, type NextRequest } from "next/server";
-import { getStaff } from "@/lib/auth";
-import { hasRole } from "@/lib/roles";
+import { can, getStaff } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { actionMeta, describe } from "@/lib/audit";
 import { buildTicketsWorkbook } from "@/lib/export-xlsx";
@@ -94,20 +93,17 @@ async function auditCsv() {
 export async function GET(req: NextRequest) {
   const session = await getStaff();
   const type = req.nextUrl.searchParams.get("type");
-  // The gate desk gets its own tally (counts only, no buyers). Everything else holds
-  // buyer names and contacts, so it needs staff or above.
-  if (!session || !hasRole(session.staff.role, type === "walkin" ? "gate" : "staff")) {
+  // The gate desk gets its own tally (counts only, no buyers), the audit trail needs
+  // Audit, the per-staff workbook Reports. Everything else holds buyer names and
+  // contacts, so it needs Orders.
+  if (!session || !can(session, type === "walkin" ? "walkin" : type === "audit" ? "audit" : type === "staff" ? "reports" : "orders")) {
     return new NextResponse("Forbidden", { status: 403 });
   }
   if (type === "walkin") return download(await walkinCsv(), "walkin-tally");
-  if (type === "audit") {
-    if (session.staff.role !== "admin" || !session.staff.system_access) return new NextResponse("Forbidden", { status: 403 });
-    return download(await auditCsv(), "audit-log");
-  }
+  if (type === "audit") return download(await auditCsv(), "audit-log");
 
   // Walk-in cash per staff account (labels hidden in Settings left out): for the organizer's admins, like the Reports page it sits on.
   if (type === "staff") {
-    if (session.staff.role !== "admin") return new NextResponse("Forbidden", { status: 403 });
     const xlsx = await buildStaffSalesWorkbook();
     return new NextResponse(new Uint8Array(xlsx), {
       headers: {

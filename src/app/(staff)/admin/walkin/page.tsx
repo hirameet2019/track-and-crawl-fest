@@ -1,7 +1,7 @@
 import type { Shipping } from "@/lib/shipping";
 import { fetchAll } from "@/lib/fetch-all";
 import { LOCALE } from "@/config/site";
-import { requireStaff } from "@/lib/auth";
+import { can, requirePermission } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getActiveEvent, getAvailability, getTicketTypes } from "@/lib/queries";
 import { WalkinTally, type GateSale, type TallyEntry, type TallyToday } from "@/components/WalkinTally";
@@ -19,13 +19,13 @@ function manilaDayStart(): string {
 
 export default async function WalkinPage() {
   const { terms: T } = await getRules();
-  const session = await requireStaff("gate");
+  const session = await requirePermission("walkin");
   const event = await getActiveEvent();
   if (!event) return <p>No active event.</p>;
 
   const admin = createAdminClient();
   const dayStart = manilaDayStart();
-  const isAdmin = session.staff.role === "admin";
+  const isAdmin = can(session, "walkin_prices");
 
   // Drifter family bands share the table but never the gate tally: they have their own tab.
   const [types, availability, todayRows, { data: recentRows }, shirtRows, carRows] = await Promise.all([

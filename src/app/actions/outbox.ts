@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { assertSystem } from "@/lib/auth";
+import { assertPermission } from "@/lib/auth";
 import { deliver } from "@/lib/email";
 import { deliverOrder } from "@/lib/issue";
 import { staleReason, type EmailKind, type OutboxStatus } from "@/lib/outbox";
@@ -88,7 +88,7 @@ async function run(rows: Row[], left: number): Promise<ActionResult> {
 /** Send (or resend) the chosen outbox emails. */
 export async function sendOutboxEmails(ids: number[]): Promise<ActionResult> {
   try {
-    await assertSystem();
+    await assertPermission("settings");
     const list = z.array(z.number().int().positive()).min(1).max(BATCH).parse(ids);
     const { data, error } = await createAdminClient().from("email_outbox").select(SELECT).in("id", list).order("id");
     if (error) return { ok: false, error: error.message };
@@ -101,7 +101,7 @@ export async function sendOutboxEmails(ids: number[]): Promise<ActionResult> {
 /** Send everything held or failed, oldest first, one batch per click. */
 export async function sendAllWaiting(): Promise<ActionResult> {
   try {
-    await assertSystem();
+    await assertPermission("settings");
     const { data, error, count } = await createAdminClient()
       .from("email_outbox")
       .select(SELECT, { count: "exact" })
@@ -120,7 +120,7 @@ export async function sendAllWaiting(): Promise<ActionResult> {
 /** The stored body of one email, for the preview. */
 export async function outboxEmailHtml(id: number): Promise<{ ok: true; html: string } | { ok: false; error: string }> {
   try {
-    await assertSystem();
+    await assertPermission("settings");
     const { data, error } = await createAdminClient().from("email_outbox").select("html").eq("id", z.number().int().positive().parse(id)).maybeSingle();
     if (error || !data) return { ok: false, error: error?.message ?? "Not found" };
     return { ok: true, html: data.html as string };

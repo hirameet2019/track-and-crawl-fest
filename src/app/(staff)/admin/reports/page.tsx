@@ -1,8 +1,8 @@
-import { requireStaff } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 
 /** Admin > Reports: downloads built from the live data. Admin only: they name staff cash and buyers. */
 export default async function ReportsPage() {
-  await requireStaff("admin");
+  await requirePermission("reports");
   return (
     <div className="space-y-6">
       <div className="card mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-3">

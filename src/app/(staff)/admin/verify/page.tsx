@@ -1,5 +1,5 @@
 /* eslint-disable react-hooks/purity -- server component: rendered once per request */
-import { requireStaff } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { VerifyQueue, type QueueOrder } from "@/components/VerifyQueue";
 import { LiveOrders } from "@/components/LiveOrders";
@@ -9,7 +9,7 @@ import { getActiveEvent, getTicketTypes } from "@/lib/queries";
 import { getRules } from "@/lib/rules";
 
 export default async function VerifyPage() {
-  await requireStaff("staff");
+  await requirePermission("verify");
   const [event, rules] = await Promise.all([getActiveEvent(), getRules()]);
   // Orders holding only labels hidden in Settings (hidden_in_admin) are left out; an
   // order that also holds a shown label stays, in full, since its whole payment is checked.

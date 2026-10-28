@@ -1,8 +1,8 @@
-import { requireScan } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { Scanner } from "@/components/Scanner";
 
 export default async function ScanPage() {
-  const session = await requireScan();
+  const session = await requirePermission("scan");
   return (
     <div className="mx-auto max-w-md">
       <h1 className="text-xl font-bold">Gate scanner</h1>

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { assertStaff, assertSystem } from "@/lib/auth";
+import { assertPermission, assertStaff } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getOrderBundle } from "@/lib/queries";
 import { audit } from "@/lib/audit";
@@ -22,7 +22,7 @@ function fail(e: unknown): ActionResult {
 /* ----------------------------------------------------------- verification */
 export async function approveOrder(orderId: string): Promise<ActionResult> {
   try {
-    const { userId } = await assertStaff("staff");
+    const { userId } = await assertPermission("verify");
     const bundle = await getOrderBundle(orderId);
     if (!bundle) return { ok: false, error: "Order not found" };
     if (bundle.order.status !== "awaiting_verification" && bundle.order.status !== "pending_payment")
@@ -46,7 +46,7 @@ export async function approveOrder(orderId: string): Promise<ActionResult> {
 
 export async function rejectOrder(orderId: string, reason: string): Promise<ActionResult> {
   try {
-    const { userId } = await assertStaff("staff");
+    const { userId } = await assertPermission("verify");
     const r = reason.trim();
     if (r.length < 3) return { ok: false, error: "Give a short reason for the buyer" };
     const admin = createAdminClient();
@@ -74,7 +74,7 @@ export async function rejectOrder(orderId: string, reason: string): Promise<Acti
  */
 export async function cancelUnpaidOrder(orderId: string): Promise<ActionResult> {
   try {
-    const { userId } = await assertStaff("staff");
+    const { userId } = await assertPermission("orders", "verify");
     const admin = createAdminClient();
     const { data, error } = await admin
       .from("orders")
@@ -97,7 +97,7 @@ export async function cancelUnpaidOrder(orderId: string): Promise<ActionResult> 
 
 export async function resendTickets(orderId: string): Promise<ActionResult> {
   try {
-    const { userId } = await assertStaff("staff");
+    const { userId } = await assertPermission("orders", "verify");
     const r = await deliverOrder(orderId);
     await audit(createAdminClient(), { actor: userId, action: "order.resent", entity: "order", entity_id: orderId, data: { emailed: r.emailed, to: r.bundle.order.buyer_email } });
     revalidatePath(`/admin/orders/${orderId}`);
@@ -115,7 +115,7 @@ export async function resendTickets(orderId: string): Promise<ActionResult> {
  */
 export async function setSalesCutoff(ticketTypeId: string, closeAtIso: string | null): Promise<ActionResult> {
   try {
-    const { userId } = await assertSystem();
+    const { userId } = await assertPermission("settings");
     z.string().uuid().parse(ticketTypeId);
     if (closeAtIso !== null && Number.isNaN(new Date(closeAtIso).getTime())) return { ok: false, error: "Invalid date" };
     const admin = createAdminClient();
@@ -139,7 +139,7 @@ export async function setSalesCutoff(ticketTypeId: string, closeAtIso: string | 
  */
 export async function voidTicket(ticketId: string, reason: string): Promise<ActionResult> {
   try {
-    const { userId } = await assertStaff("admin");
+    const { userId } = await assertPermission("orders_manage");
     const r = reason.trim();
     if (r.length < 3) return { ok: false, error: "Give a short reason (the buyer will see it)" };
     const admin = createAdminClient();
@@ -165,7 +165,7 @@ export async function voidTicket(ticketId: string, reason: string): Promise<Acti
 /** Undo a void: ticket becomes valid again and the fresh PDF is re-sent to the buyer. */
 export async function unvoidTicket(ticketId: string): Promise<ActionResult> {
   try {
-    const { userId } = await assertStaff("admin");
+    const { userId } = await assertPermission("orders_manage");
     const admin = createAdminClient();
     const { data, error } = await admin.rpc("unvoid_ticket", { p_ticket_id: ticketId, p_actor: userId });
     if (error) return { ok: false, error: error.message };
@@ -197,7 +197,7 @@ export async function unvoidTicket(ticketId: string): Promise<ActionResult> {
  */
 export async function unredeemTicket(ticketId: string, reason: string): Promise<ActionResult> {
   try {
-    const { userId } = await assertStaff("admin");
+    const { userId } = await assertPermission("orders_manage");
     const r = reason.trim();
     if (r.length < 3) return { ok: false, error: "Give a short reason (it goes in the audit log)" };
     const admin = createAdminClient();
@@ -241,7 +241,7 @@ export async function unredeemTicket(ticketId: string, reason: string): Promise<
 /** Void every unused ticket of a paid order; tickets already scanned are skipped. */
 export async function voidOrder(orderId: string, reason: string): Promise<ActionResult> {
   try {
-    const { userId } = await assertStaff("admin");
+    const { userId } = await assertPermission("orders_manage");
     const r = reason.trim();
     if (r.length < 3) return { ok: false, error: "Give a short reason (the buyer will see it)" };
     const admin = createAdminClient();
@@ -322,7 +322,7 @@ export interface ConvertContext {
  * Labels kept off the online sale can still be a conversion target, as long as they are priced.
  */
 export async function getConvertTargets(orderId: string): Promise<ConvertContext> {
-  await assertStaff("admin");
+  await assertPermission("orders_manage");
   const admin = createAdminClient();
   const { data: order } = await admin.from("orders").select("event_id, shipping").eq("id", orderId).maybeSingle();
   if (!order) return { targets: [], shipping: null, tickets: [] };
@@ -415,7 +415,7 @@ const convertSchema = z.object({
  */
 export async function convertOrder(input: z.input<typeof convertSchema>): Promise<ActionResult & { summary?: string }> {
   try {
-    const { userId } = await assertStaff("admin");
+    const { userId } = await assertPermission("orders_manage");
     const parsed = convertSchema.safeParse(input);
     if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
     const p = parsed.data;
@@ -492,7 +492,7 @@ export async function convertOrder(input: z.input<typeof convertSchema>): Promis
 /** Record that the refund (or the extra payment) has actually been moved. */
 export async function settleOrderBalance(orderId: string, note: string): Promise<ActionResult> {
   try {
-    const { userId } = await assertStaff("admin");
+    const { userId } = await assertPermission("orders_manage");
     const id = z.string().uuid().parse(orderId);
     const admin = createAdminClient();
     const { error } = await admin.rpc("settle_order_balance", { p_order_id: id, p_actor: userId, p_note: note.trim().slice(0, 200) });
@@ -548,7 +548,7 @@ export interface OrderDetail {
 }
 
 export async function getOrderDetail(orderId: string): Promise<OrderDetail | null> {
-  await assertStaff("staff");
+  await assertPermission("orders");
   const b = await getOrderBundle(orderId);
   if (!b) return null;
   const { order, items, tickets } = b;
@@ -599,7 +599,7 @@ export type PrivateBucket = "payment-proofs" | "vehicle-photos";
 
 /** Short-lived signed URL for an object in one of the private buckets. Any signed-in staff. */
 export async function getSignedUrl(bucket: PrivateBucket, path: string): Promise<string | null> {
-  await assertStaff("scanner");
+  await assertStaff();
   if (bucket !== "payment-proofs" && bucket !== "vehicle-photos") return null;
   const admin = createAdminClient();
   const { data } = await admin.storage.from(bucket).createSignedUrl(path, 60 * 10);
@@ -622,7 +622,7 @@ const rangeSchema = z.object({
 
 export async function importNumberRange(formData: FormData): Promise<ActionResult & { inserted?: number }> {
   try {
-    const { userId } = await assertSystem();
+    const { userId } = await assertPermission("numbers");
     const parsed = rangeSchema.safeParse(Object.fromEntries(formData));
     if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
     const { start, end } = parsed.data;
@@ -648,7 +648,7 @@ export async function importNumberRange(formData: FormData): Promise<ActionResul
 /** Import an explicit list of numbers (one per line) for non-sequential serials. */
 export async function importNumberList(formData: FormData): Promise<ActionResult & { inserted?: number }> {
   try {
-    const { userId } = await assertSystem();
+    const { userId } = await assertPermission("numbers");
     const ticketTypeId = z.string().uuid().parse(formData.get("ticket_type_id"));
     const raw = String(formData.get("numbers") ?? "");
     const numbers = Array.from(new Set(raw.split(/\r?\n|,/).map((s) => s.trim()).filter(Boolean)));
@@ -676,7 +676,7 @@ export async function importNumberList(formData: FormData): Promise<ActionResult
 
 export async function voidNumber(numberId: string, reason: string): Promise<ActionResult> {
   try {
-    const { userId } = await assertSystem();
+    const { userId } = await assertPermission("numbers");
     const admin = createAdminClient();
     const { error } = await admin
       .from("ticket_numbers")
@@ -699,7 +699,7 @@ export async function voidNumber(numberId: string, reason: string): Promise<Acti
  */
 export async function unvoidNumber(numberId: string): Promise<ActionResult> {
   try {
-    const { userId } = await assertSystem();
+    const { userId } = await assertPermission("numbers");
     const admin = createAdminClient();
     const { data: row, error: readErr } = await admin.from("ticket_numbers").select("number, status, void_reason").eq("id", numberId).maybeSingle();
     if (readErr) return { ok: false, error: readErr.message };

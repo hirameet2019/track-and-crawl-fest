@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireStaff } from "@/lib/auth";
+import { can, requirePermission } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { LiveOrders } from "@/components/LiveOrders";
 import { OrdersTable, type OrderRow } from "@/components/OrdersTable";
@@ -23,8 +23,9 @@ const PAGE = 1000;
 
 export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ q?: string; status?: string; type?: string }> }) {
   const { terms: T } = await getRules();
-  const session = await requireStaff("staff");
-  const isAdmin = session.staff.role === "admin";
+  const session = await requirePermission("orders");
+  const isAdmin = can(session, "orders_manage");
+  const canVerify = can(session, "verify");
   const { q = "", status = "", type: typeParam = "" } = await searchParams;
   const admin = createAdminClient();
 
@@ -233,7 +234,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
         Tap a row to open the order here. Nothing else loads until you do.
         {truncated ? ` The table shows the newest ${LIST_LIMIT}; the totals above cover all ${totalRows.length}.` : ""}
       </p>
-      <OrdersTable rows={(orders ?? []) as unknown as OrderRow[]} isAdmin={isAdmin} payApp={await getRules().then((r) => primaryChannel(event, r.channels, r.extraChannels).app)} />
+      <OrdersTable rows={(orders ?? []) as unknown as OrderRow[]} isAdmin={isAdmin} canVerify={canVerify} payApp={await getRules().then((r) => primaryChannel(event, r.channels, r.extraChannels).app)} />
     </div>
   );
 }

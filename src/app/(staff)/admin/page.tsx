@@ -4,7 +4,7 @@ import { fetchAll } from "@/lib/fetch-all";
 import Link from "next/link";
 import { LiveOrders } from "@/components/LiveOrders";
 import { humanMinutes } from "@/lib/elapsed";
-import { requireStaff } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getActiveEvent, getAvailability, getTicketTypes } from "@/lib/queries";
 import { php } from "@/lib/money";
@@ -27,7 +27,7 @@ const manilaDay = (iso: string) => new Date(iso).toLocaleDateString("en-CA", { t
 
 export default async function DashboardPage() {
   const { terms: T } = await getRules();
-  await requireStaff("staff");
+  await requirePermission("dashboard");
   const event = await getActiveEvent();
   if (!event) return <p>No active event. Run the seed.</p>;
 

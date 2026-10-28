@@ -10,10 +10,12 @@ import type { OrderStatus } from "@/lib/supabase/types";
 import { useRules } from "@/components/RulesProvider";
 
 export function OrderActions({
-  orderId, status, proofPath, hasEmail, isAdmin = false,
+  orderId, status, proofPath, hasEmail, isAdmin = false, canVerify = true,
   buyerName = "", totalCentavos = 0, balanceCentavos = 0, balanceSettledAt = null, hasRedeemed = false, payApp,
 }: {
   orderId: string; status: OrderStatus; proofPath: string | null; hasEmail: boolean; isAdmin?: boolean;
+  /** Approve and Reject need the Verify permission. */
+  canVerify?: boolean;
   buyerName?: string; totalCentavos?: number; balanceCentavos?: number; balanceSettledAt?: string | null; hasRedeemed?: boolean;
   /** Short name of the channel refunds and balances move through, e.g. "GoTyme". */
   payApp: string;
@@ -42,7 +44,7 @@ export function OrderActions({
           Open payment screenshot
         </button>
       )}
-      {(status === "awaiting_verification" || status === "pending_payment") && (
+      {canVerify && (status === "awaiting_verification" || status === "pending_payment") && (
         <>
           <button className="btn-success w-full" disabled={pending} onClick={() => run(() => approveOrder(orderId), "Approved and tickets issued")}>Approve &amp; issue tickets</button>
           <div className="space-y-2">

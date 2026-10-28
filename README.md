@@ -10,7 +10,7 @@ dashboard, and a mobile gate scanner with offline fallback.
 everything is edited in **Admin > Settings**: Event, Tickets, Payments (QR codes and
 added channels such as bank transfers), Payment page, Ordering, Page (what the
 registration page shows and says, and what a registration is called), Look, Email,
-Advanced. `src/config/site.ts` and `src/config/event.ts` only hold the defaults.
+Advanced, Users & roles (staff accounts and what each role may do). `src/config/site.ts` and `src/config/event.ts` only hold the defaults.
 
 ## Stack
 
@@ -35,6 +35,14 @@ Its own project (ref in `.env.local`), separate from any earlier event. Apply ev
 file in `supabase/migrations` with `npx supabase db push`, or run new ones in the
 SQL editor (the payment-channel migration's enum statement must run on its own).
 Migrations are additive; never reset or wipe a project that has taken registrations.
+
+## Staff roles
+
+Staff accounts and roles live in **Admin > Settings > Users & roles** (tables
+`staff` and `roles`, migration `20261028010000_roles_permissions.sql`). A role is a
+set of permissions (`src/lib/roles.ts`); pages and server actions check those, not
+a rank. System admin always has every permission. An account with no `role_id` is
+read from the old `role`, `system_access` and `can_scan` columns.
 
 ## Payment channels
 

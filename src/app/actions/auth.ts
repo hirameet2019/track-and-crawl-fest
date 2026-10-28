@@ -8,12 +8,12 @@ import { audit } from "@/lib/audit";
 export async function recordSignIn(): Promise<void> {
   const session = await getStaff();
   if (!session) return; // not on the staff list; the login page explains this
-  await audit(createAdminClient(), { actor: session.userId, action: "staff.signed_in", entity: "staff", entity_id: session.userId, data: { email: session.email, role: session.staff.role } });
+  await audit(createAdminClient(), { actor: session.userId, action: "staff.signed_in", entity: "staff", entity_id: session.userId, data: { email: session.email, role: session.role.name } });
 }
 
 /** Called by the staff nav before the browser session is cleared. */
 export async function recordSignOut(): Promise<void> {
   const session = await getStaff();
   if (!session) return;
-  await audit(createAdminClient(), { actor: session.userId, action: "staff.signed_out", entity: "staff", entity_id: session.userId, data: { email: session.email, role: session.staff.role } });
+  await audit(createAdminClient(), { actor: session.userId, action: "staff.signed_out", entity: "staff", entity_id: session.userId, data: { email: session.email, role: session.role.name } });
 }

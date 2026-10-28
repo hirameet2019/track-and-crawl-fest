@@ -36,7 +36,7 @@ const COLS = 7;
  * fetched the first time a row is opened and re-fetched only when that order's status
  * changes (an approval, rejection or void), so browsing the list costs one query.
  */
-export function OrdersTable({ rows, isAdmin, payApp }: { rows: OrderRow[]; isAdmin: boolean; payApp: string }) {
+export function OrdersTable({ rows, isAdmin, canVerify, payApp }: { rows: OrderRow[]; isAdmin: boolean; canVerify: boolean; payApp: string }) {
   const [openId, setOpenId] = useState<string | null>(null);
   // detail plus the status it was loaded at, so a live update can invalidate it
   const [cache, setCache] = useState<Record<string, { at: OrderStatus; detail: OrderDetail | null }>>({});
@@ -117,7 +117,7 @@ export function OrdersTable({ rows, isAdmin, payApp }: { rows: OrderRow[]; isAdm
                           {loading === o.id && !entry ? (
                             <div className="py-6 text-center text-sm text-zinc-500">Loading order #{o.order_no}...</div>
                           ) : entry?.detail ? (
-                            <OrderPanel d={entry.detail} isAdmin={isAdmin} payApp={payApp} />
+                            <OrderPanel d={entry.detail} isAdmin={isAdmin} canVerify={canVerify} payApp={payApp} />
                           ) : (
                             <div className="py-6 text-center text-sm text-zinc-500">Could not load this order.</div>
                           )}
@@ -135,7 +135,7 @@ export function OrdersTable({ rows, isAdmin, payApp }: { rows: OrderRow[]; isAdm
   );
 }
 
-function OrderPanel({ d, isAdmin, payApp }: { d: OrderDetail; isAdmin: boolean; payApp: string }) {
+function OrderPanel({ d, isAdmin, canVerify, payApp }: { d: OrderDetail; isAdmin: boolean; canVerify: boolean; payApp: string }) {
   return (
     <div className="grid gap-4 lg:grid-cols-3">
       <div className="lg:col-span-2">
@@ -177,7 +177,7 @@ function OrderPanel({ d, isAdmin, payApp }: { d: OrderDetail; isAdmin: boolean; 
         <div>
           <h4 className="font-semibold">Actions</h4>
           <OrderActions
-            orderId={d.id} status={d.status} proofPath={d.payment_proof_path} hasEmail={!!d.buyer_email} isAdmin={isAdmin}
+            orderId={d.id} status={d.status} proofPath={d.payment_proof_path} hasEmail={!!d.buyer_email} isAdmin={isAdmin} canVerify={canVerify}
             buyerName={d.buyer_name} totalCentavos={d.total_centavos}
             balanceCentavos={d.balance_centavos} balanceSettledAt={d.balance_settled_at}
             hasRedeemed={d.tickets.some((t) => t.status === "redeemed")}

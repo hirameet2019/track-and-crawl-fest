@@ -1,7 +1,7 @@
 import { LOCALE } from "@/config/site";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { requireStaff } from "@/lib/auth";
+import { can, requirePermission } from "@/lib/auth";
 import { getOrderBundle } from "@/lib/queries";
 import { primaryChannel } from "@/config/event";
 import { getRules } from "@/lib/rules";
@@ -18,8 +18,9 @@ import { paymentLabel } from "@/lib/payment-options";
 const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleString(LOCALE.locale, { timeZone: LOCALE.timeZone }) : "-");
 
 export default async function OrderDetailPage({ params }: { params: Promise<{ orderId: string }> }) {
-  const session = await requireStaff("staff");
-  const isAdmin = session.staff.role === "admin";
+  const session = await requirePermission("orders");
+  const isAdmin = can(session, "orders_manage");
+  const canVerify = can(session, "verify");
   const { orderId } = await params;
   const b = await getOrderBundle(orderId);
   if (!b) notFound();
@@ -69,7 +70,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ or
         <div className="card">
           <h2 className="font-semibold">Actions</h2>
           <OrderActions
-            orderId={order.id} status={order.status} proofPath={order.payment_proof_path} hasEmail={!!order.buyer_email} isAdmin={isAdmin}
+            orderId={order.id} status={order.status} proofPath={order.payment_proof_path} hasEmail={!!order.buyer_email} isAdmin={isAdmin} canVerify={canVerify}
             buyerName={order.buyer_name} totalCentavos={order.total_centavos}
             balanceCentavos={order.balance_centavos} balanceSettledAt={order.balance_settled_at}
             hasRedeemed={tickets.some((t) => t.status === "redeemed")}
