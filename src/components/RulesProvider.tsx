@@ -1,7 +1,8 @@
 "use client";
 
-import { createContext, useContext } from "react";
+import { createContext, useContext, useMemo } from "react";
 import { RULE_DEFAULTS, type Rules } from "@/lib/rules-types";
+import { siteText, type TextGetter } from "@/lib/site-text";
 
 /**
  * The saved business rules for client components (order form, size chart, staff
@@ -15,3 +16,9 @@ export function RulesProvider({ rules, children }: { rules: Rules; children: Rea
 }
 
 export const useRules = (): Rules => useContext(RulesContext);
+
+/** Website text for client components: t("form.total"). Server pages use siteText(rules.text). */
+export function useText(): TextGetter {
+  const { text } = useRules();
+  return useMemo(() => siteText(text), [text]);
+}

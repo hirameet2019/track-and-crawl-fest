@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { useRules } from "@/components/RulesProvider";
+import { useRules, useText } from "@/components/RulesProvider";
 import { shirtSummary } from "@/lib/rules-types";
 
 /**
@@ -24,6 +24,7 @@ export function ShirtSizeChartButton({ highlight, className = "", label = "Size 
   const titleId = useId();
   // Sizes, measurements and chart image from Admin > Settings.
   const { shirtChart, shirtChartImage } = useRules();
+  const tx = useText();
 
   useEffect(() => {
     const el = ref.current;
@@ -47,9 +48,9 @@ export function ShirtSizeChartButton({ highlight, className = "", label = "Size 
           <div className="flex max-h-[92vh] flex-col">
             <div className="flex items-start justify-between gap-4 border-b border-white/10 px-5 py-4">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-cyan-300">Event t-shirt</p>
-                <h2 id={titleId} className="text-lg font-black uppercase italic">Regular shirt size chart</h2>
-                <p className="mt-0.5 text-xs text-zinc-400">All measurements are in inches. Lay a shirt that fits you flat and compare.</p>
+                {tx("shirt.kicker") && <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-cyan-300">{tx("shirt.kicker")}</p>}
+                <h2 id={titleId} className="text-lg font-black uppercase italic">{tx("shirt.title")}</h2>
+                {tx("shirt.intro") && <p className="mt-0.5 text-xs text-zinc-400">{tx("shirt.intro")}</p>}
               </div>
               <button type="button" onClick={() => setOpen(false)} className="btn-secondary h-9 w-9 shrink-0 px-0" aria-label="Close size chart">
                 <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden><path d="M6 6l12 12M18 6L6 18" /></svg>
@@ -92,7 +93,7 @@ export function ShirtSizeChartButton({ highlight, className = "", label = "Size 
                   })}
                 </tbody>
               </table>
-              <p className="mt-3 text-xs text-zinc-500">Shirt sizes cannot be changed after tickets are issued, so double-check before you pay.</p>
+              {tx("shirt.final") && <p className="mt-3 text-xs text-zinc-500">{tx("shirt.final")}</p>}
             </div>
           </div>
       </dialog>
@@ -118,8 +119,9 @@ export function ShirtSizeChartButton({ highlight, className = "", label = "Size 
 /** Live measurement line under the size dropdown, e.g. "M: Width 20 in · Length 29 in · Sleeve 9.5 in". */
 export function ShirtSizeHint({ size }: { size: string }) {
   const summary = shirtSummary(useRules().shirtChart, size);
+  const hint = useText()("shirt.hint");
   if (size && summary) {
     return <p className="mt-1 text-xs text-zinc-400"><span className="font-semibold text-white/75">{size}:</span> {summary}</p>;
   }
-  return <p className="mt-1 text-xs text-zinc-500">Measurements are in inches. Open the size chart if you are unsure.</p>;
+  return hint ? <p className="mt-1 text-xs text-zinc-500">{hint}</p> : null;
 }

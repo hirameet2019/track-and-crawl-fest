@@ -4,6 +4,7 @@ import { LOCALE } from "@/config/site";
 import { HeroSlides } from "@/components/HeroSlides";
 import { primaryChannel } from "@/config/event";
 import { getRules } from "@/lib/rules";
+import { siteText } from "@/lib/site-text";
 import { fillText } from "@/lib/rules-types";
 import { getSiteSettings } from "@/lib/site-settings";
 import { heroFallbackGradient, neon } from "@/lib/theme";
@@ -12,8 +13,8 @@ import type { EventRow } from "@/lib/supabase/types";
 /** The inner-page backdrop over the neon wash, which shows until the file loads. */
 const backdropImage = (backdrop: string) => `url(${backdrop}), ${heroFallbackGradient()}`;
 
-function fmtDate(iso: string | null) {
-  if (!iso) return { day: "Date TBA", time: "" };
+function fmtDate(iso: string | null, tba: string) {
+  if (!iso) return { day: tba, time: "" };
   const d = new Date(iso);
   return {
     day: d.toLocaleDateString(LOCALE.locale, { weekday: "long", month: "long", day: "numeric", year: "numeric", timeZone: LOCALE.timeZone }),
@@ -23,8 +24,9 @@ function fmtDate(iso: string | null) {
 
 /** Full hero for the sales page. */
 export async function EventHero({ event, prices }: { event: EventRow; prices: { label: string; price: string }[] }) {
-  const { day, time } = fmtDate(event.starts_at);
   const [site, rules] = await Promise.all([getSiteSettings(), getRules()]);
+  const t = siteText(rules.text);
+  const { day, time } = fmtDate(event.starts_at, t("hero.dateTba"));
   const { page } = rules;
   const channel = primaryChannel(event, rules.channels, rules.extraChannels);
   const fill = (text: string) => fillText(text, { pay: channel.payVia, via: channel.via, minutes: rules.paymentWindowMinutes });
@@ -78,7 +80,7 @@ export async function EventHero({ event, prices }: { event: EventRow; prices: { 
 
         {chips && (
           <div className="mt-6 flex flex-wrap gap-3 text-sm">
-            {show.heroDate && <span className="glass px-4 py-2 font-semibold">{day}{time ? ` · ${time} onwards` : ""}</span>}
+            {show.heroDate && <span className="glass px-4 py-2 font-semibold">{day}{time ? ` · ${t("hero.timeOnwards", { time })}` : ""}</span>}
             {show.heroVenue && event.venue && <span className="glass px-4 py-2 text-zinc-200">{event.venue}</span>}
             {show.heroTagline && event.tagline && <span className="glass px-4 py-2 text-cyan-200">{event.tagline}</span>}
           </div>
@@ -102,7 +104,7 @@ export async function EventHero({ event, prices }: { event: EventRow; prices: { 
           </div>
         )}
         {show.heroScrollCue && <a href="#info" aria-label="Scroll down to the event details" className="hero-cue mx-auto mt-8 flex w-fit flex-col items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.3em] text-zinc-400 hover:text-white">
-          Scroll
+          {t("hero.scrollCue")}
           <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden><path d="M6 9l6 6 6-6" /></svg>
         </a>}
       </div>
@@ -111,9 +113,10 @@ export async function EventHero({ event, prices }: { event: EventRow; prices: { 
 }
 
 /** Slim banner for payment / order pages. */
-export async function EventBanner({ event, backHref = "/", backLabel = "Back to registration" }: { event: EventRow; backHref?: string; backLabel?: string }) {
-  const { day } = fmtDate(event.starts_at);
-  const site = await getSiteSettings();
+export async function EventBanner({ event, backHref = "/", backLabel }: { event: EventRow; backHref?: string; backLabel?: string }) {
+  const [site, rules] = await Promise.all([getSiteSettings(), getRules()]);
+  const t = siteText(rules.text);
+  const { day } = fmtDate(event.starts_at, t("hero.dateTba"));
   return (
     <header className="relative isolate overflow-hidden bg-brand text-white">
       <div className="absolute -inset-2 -z-20 bg-cover bg-[position:center_45%] opacity-60 blur-[3px]" style={{ backgroundImage: backdropImage(site.backdrop) }} aria-hidden />
@@ -122,7 +125,7 @@ export async function EventBanner({ event, backHref = "/", backLabel = "Back to 
           floating beside a narrower page column. */}
       <div className="flex w-full items-center justify-between gap-4 px-4 py-6 sm:px-6">
         <div>
-          <Link href={backHref} className="text-xs text-zinc-300 hover:underline">&larr; {backLabel}</Link>
+          <Link href={backHref} className="text-xs text-zinc-300 hover:underline">&larr; {backLabel ?? t("nav.back")}</Link>
           <SiteLogo src={site.logo} name={event.name} size="sm" className="mt-1 h-16 w-auto sm:h-24" />
           <div className="mt-1 text-xs text-zinc-300">{day}{event.venue ? ` · ${event.venue}` : ""}</div>
         </div>

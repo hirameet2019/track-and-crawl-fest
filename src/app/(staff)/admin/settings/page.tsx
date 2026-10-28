@@ -13,6 +13,7 @@ import { ExtraChannelsForm, PaymentQrForm, PaymentRulesForm } from "@/components
 import { PayPageForm } from "@/components/settings/PayPageForm";
 import { OrderingForm } from "@/components/settings/OrderingForm";
 import { PageForm } from "@/components/settings/PageForm";
+import { SiteTextForm } from "@/components/settings/SiteTextForm";
 import { AdvancedForm } from "@/components/settings/AdvancedForm";
 import { LOCALE } from "@/config/site";
 import { getActiveEvent, getAvailability, publicOrder } from "@/lib/queries";
@@ -32,6 +33,7 @@ const TABS = [
   { id: "paypage", label: "Payment page", blurb: "What the payment page shows, and its steps, labels and notes." },
   { id: "ordering", label: "Ordering", blurb: "Limits per order and the shirt sizes offered." },
   { id: "page", label: "Page", blurb: "What the registration page shows, and its headings, steps and notes." },
+  { id: "text", label: "Website text", blurb: "Every other label, message and button on the public pages, page by page." },
   { id: "look", label: "Look", blurb: "Logo, artwork, slideshow, colours and the PDF ticket." },
   { id: "email", label: "Email", blurb: "The mailbox tickets and receipts are sent from, and the outbox of every email to buyers." },
   { id: "advanced", label: "Advanced", blurb: "Staff login domain and locale." },
@@ -105,6 +107,9 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       break;
     case "page":
       body = <PageForm rules={rules} />;
+      break;
+    case "text":
+      body = <SiteTextForm current={rules.text} />;
       break;
     case "look": {
       const [site, customised] = await Promise.all([getSiteSettings(), siteSettingsCustomised()]);

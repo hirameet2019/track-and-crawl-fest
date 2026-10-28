@@ -1,5 +1,6 @@
 import { LOCALE } from "@/config/site";
 import { getRules } from "@/lib/rules";
+import { siteText } from "@/lib/site-text";
 import { getSiteSettings } from "@/lib/site-settings";
 import { Reveal } from "@/components/Reveal";
 import { CircuitGuide } from "@/components/CircuitGuide";
@@ -43,10 +44,11 @@ function Fact({ icon, label, value, sub, children }: { icon: keyof typeof Icon; 
  * presenters and sponsors. Everything comes from the event row and Settings.
  */
 export async function EventInfo({ event }: { event: EventRow }) {
-  const [site, { page }] = await Promise.all([getSiteSettings(), getRules()]);
+  const [site, { page, text }] = await Promise.all([getSiteSettings(), getRules()]);
+  const t = siteText(text);
   const show = page.show;
   const start = event.starts_at ? new Date(event.starts_at) : null;
-  const date = start ? start.toLocaleDateString(LOCALE.locale, { month: "short", day: "numeric", year: "numeric", timeZone: LOCALE.timeZone }).toUpperCase() : "Date to be announced";
+  const date = start ? start.toLocaleDateString(LOCALE.locale, { month: "short", day: "numeric", year: "numeric", timeZone: LOCALE.timeZone }).toUpperCase() : t("info.dateTba");
   const weekday = start ? start.toLocaleDateString(LOCALE.locale, { weekday: "long", timeZone: LOCALE.timeZone }) : undefined;
   const time = hours(event.starts_at, site.info.endTime);
   // The venue row: first comma part large, the rest as the line under it.
@@ -65,12 +67,12 @@ export async function EventInfo({ event }: { event: EventRow }) {
         <Reveal from="left">
           <dl className="space-y-8">
             {show.venue && event.venue && (
-              <Fact icon="pin" label="Venue" value={place} sub={rest.join(", ") || undefined}>
-                {maps && <dd className="mt-2"><a href={maps} target="_blank" rel="noreferrer" className="info-link">Open in Google Maps</a></dd>}
+              <Fact icon="pin" label={t("info.venue")} value={place} sub={rest.join(", ") || undefined}>
+                {maps && <dd className="mt-2"><a href={maps} target="_blank" rel="noreferrer" className="info-link">{t("info.mapsLink")}</a></dd>}
               </Fact>
             )}
-            {show.date && <Fact icon="calendar" label="Event date" value={date} sub={weekday} />}
-            {show.time && time && <Fact icon="clock" label="Time" value={time} />}
+            {show.date && <Fact icon="calendar" label={t("info.date")} value={date} sub={weekday} />}
+            {show.time && time && <Fact icon="clock" label={t("info.time")} value={time} />}
           </dl>
         </Reveal>
         )}
@@ -83,11 +85,12 @@ export async function EventInfo({ event }: { event: EventRow }) {
       )}
       {/* Keep the hero from butting into whatever comes first when the details are all off. */}
       {!facts && !tagline && <div className="h-16 md:h-24" aria-hidden />}
-      {show.circuit && <CircuitGuide title={site.circuit.title} venueName={place || undefined} photos={site.circuit.photos} map={site.circuit.map} />}
+      {show.circuit && <CircuitGuide title={site.circuit.title} venueName={place || undefined} photos={site.circuit.photos} map={site.circuit.map}
+        keys={{ curbs: t("circuit.keyCurbs"), start: t("circuit.keyStart"), direction: t("circuit.keyDirection"), buildings: t("circuit.keyBuildings"), parking: t("circuit.keyParking"), zones: t("circuit.keyZones") }} />}
       {/* The presenters are the headline sponsors: their own centred band, wider than the column allowed. */}
       {show.presenters && site.info.presentedBy && (
         <Reveal from="up" className="mx-auto max-w-5xl px-4 pb-16 text-center sm:px-8 md:pb-24">
-          <div className="info-fact-label">Presented by</div>
+          {t("info.presentedBy") && <div className="info-fact-label">{t("info.presentedBy")}</div>}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={site.info.presentedBy} alt="Event presenters" className="mx-auto mt-4 h-auto w-full max-w-xl" />
         </Reveal>

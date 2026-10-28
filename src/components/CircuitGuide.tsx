@@ -3,23 +3,35 @@ import { Reveal } from "@/components/Reveal";
 import type { GalleryPhoto } from "@/config/site";
 import type { CircuitMapData } from "@/lib/circuit-map-types";
 
-/** The map key lists only what this map actually shows. */
-function legend(map: CircuitMapData) {
+/** Map key wording from Settings > Website text; a blank label leaves that entry out. */
+export interface MapKeyLabels {
+  curbs: string;
+  start: string;
+  direction: string;
+  buildings: string;
+  parking: string;
+  zones: string;
+}
+
+/** The map key lists only what this map actually shows, and only entries with a label. */
+function legend(map: CircuitMapData, k: MapKeyLabels) {
   return [
-    map.curbs.length > 0 && { key: "curb", label: "Curbs" },
-    map.startFinish && { key: "flag", label: "Start / finish" },
-    map.arrows.length > 0 && { key: "arrow", label: "Direction" },
-    map.blocks.some((b) => b.kind === "building") && { key: "paddock", label: "Buildings" },
-  ].filter((x): x is { key: string; label: string } => !!x);
+    map.curbs.length > 0 && { key: "curb", label: k.curbs },
+    map.startFinish && { key: "flag", label: k.start },
+    map.arrows.length > 0 && { key: "arrow", label: k.direction },
+    map.blocks.some((b) => b.kind === "building") && { key: "paddock", label: k.buildings },
+    map.blocks.some((b) => b.kind === "parking") && { key: "parking", label: k.parking },
+    map.blocks.some((b) => b.kind === "zone") && { key: "zone", label: k.zones },
+  ].filter((x): x is { key: string; label: string } => !!x && !!x.label);
 }
 
 /**
  * The venue band in the event details: the circuit map beside photos of the track
  * and paddock. Both come from Settings > Look > Circuit; either may be empty.
  */
-export function CircuitGuide({ title, venueName, photos, map }: { title: string; venueName?: string; photos: GalleryPhoto[]; map: CircuitMapData | null }) {
+export function CircuitGuide({ title, venueName, photos, map, keys: labels }: { title: string; venueName?: string; photos: GalleryPhoto[]; map: CircuitMapData | null; keys: MapKeyLabels }) {
   if (!map && !photos.length) return null;
-  const keys = map ? legend(map) : [];
+  const keys = map ? legend(map, labels) : [];
   return (
     <div className="mx-auto max-w-5xl px-4 pb-16 sm:px-8 md:pb-24">
       <Reveal from="left" className="mb-6">

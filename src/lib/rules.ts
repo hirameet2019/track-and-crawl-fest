@@ -2,6 +2,7 @@ import { cache } from "react";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { MAX_EXTRA_CHANNELS, PAGE_DEFAULTS, PAY_PAGE_DEFAULTS, RULE_DEFAULTS, type PageSettings, type PayPageSettings, type Rules } from "@/lib/rules-types";
+import { MAX_TEXT_LENGTH, SITE_TEXT, type TextOverrides } from "@/lib/site-text";
 import type { PaymentMethod } from "@/lib/supabase/types";
 
 /**
@@ -137,6 +138,11 @@ const terms = z.object({
   physical: z.boolean(),
 });
 
+/** Website text overrides: known keys only, so a renamed or removed text drops out instead of lingering. */
+const text = z
+  .record(z.string(), z.string().max(MAX_TEXT_LENGTH, `Keep each website text under ${MAX_TEXT_LENGTH} characters`))
+  .transform((r) => Object.fromEntries(Object.entries(r).filter(([k]) => k in SITE_TEXT)) as TextOverrides);
+
 export const rulesSchema = z.object({
   paymentDeadline: z.boolean(),
   paymentReminder: z.boolean(),
@@ -158,6 +164,7 @@ export const rulesSchema = z.object({
   extraChannels,
   payPage,
   terms,
+  text,
 }).refine((r) => r.reminderMinutes < r.paymentWindowMinutes, { message: "The reminder must go out before the hold runs out", path: ["reminderMinutes"] });
 
 /** Lay stored values over the defaults field by field. Exported for tests. */
@@ -197,6 +204,7 @@ export function mergeRules(stored: unknown): Rules {
     })(),
     extraChannels: pick(extraChannels, s.extraChannels, d.extraChannels),
     terms: pick(terms, { ...d.terms, ...(s.terms as object | undefined) }, d.terms),
+    text: pick(text, s.text ?? {}, d.text),
     payPage: (() => {
       const sp = (s.payPage ?? {}) as Partial<PayPageSettings>;
       return pick(payPage, { ...d.payPage, ...sp, show: { ...d.payPage.show, ...(sp.show ?? {}) } }, d.payPage);
